@@ -39,6 +39,7 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent)
     setMinimumSize(1100, 270);
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     setMouseTracking(true);
+    setToolTip("Track controls: click L to lock/unlock and M to mute/unmute a track");
     setFocusPolicy(Qt::StrongFocus);
 }
 
@@ -116,6 +117,40 @@ bool TimelineWidget::removeMarkerAtTime(qint64 timeMs)
         }
     }
     return false;
+}
+
+bool TimelineWidget::isTrackLocked(int track) const
+{
+    return track >= 0 && track < kTrackCount && m_trackLocked[track];
+}
+
+bool TimelineWidget::isTrackMuted(int track) const
+{
+    return track >= 0 && track < kTrackCount && m_trackMuted[track];
+}
+
+QJsonArray TimelineWidget::trackStatesToJson() const
+{
+    QJsonArray states;
+    for (int track = 0; track < kTrackCount; ++track) {
+        QJsonObject state;
+        state.insert("locked", m_trackLocked[track]);
+        state.insert("muted", m_trackMuted[track]);
+        states.append(state);
+    }
+    return states;
+}
+
+void TimelineWidget::trackStatesFromJson(const QJsonArray &states)
+{
+    for (int track = 0; track < kTrackCount; ++track) {
+        const QJsonObject state = track < states.size() ? states.at(track).toObject() : QJsonObject{};
+        m_trackLocked[track] = state.value("locked").toBool(false);
+        m_trackMuted[track] = state.value("muted").toBool(false);
+    }
+    update();
+    for (int track = 0; track < kTrackCount; ++track)
+        emit trackStateChanged(track);
 }
 
 void TimelineWidget::goToNextMarker()
@@ -383,6 +418,7 @@ bool TimelineWidget::splitSelectedClipAtPlayhead()
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
 
     const Clip original = m_clips.at(m_selectedClip);
+    if (isTrackLocked(original.track)) return false;
     const qint64 clipEnd = original.timelineStartMs + original.durationMs;
     if (m_playheadMs <= original.timelineStartMs + kMinimumClipDurationMs
         || m_playheadMs >= clipEnd - kMinimumClipDurationMs) {
@@ -409,6 +445,7 @@ bool TimelineWidget::splitSelectedClipAtPlayhead()
 bool TimelineWidget::deleteSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
+    if (isTrackLocked(m_clips.at(m_selectedClip).track)) return false;
 
     m_clips.removeAt(m_selectedClip);
     if (m_clips.isEmpty()) m_selectedClip = -1;
@@ -586,8 +623,20 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
         p.fillRect(QRect(kTrackLabelWidth, y, width() - kTrackLabelWidth - 8,
                          kTrackHeight), QColor("#151c24"));
         p.setPen(track < 3 ? QColor("#c1ccd5") : QColor("#a2b3bf"));
-        p.drawText(QRect(16, y, 100, kTrackHeight),
+        p.drawText(QRect(16, y, 56, kTrackHeight),
                    Qt::AlignVCenter | Qt::AlignLeft, tracks.at(track));
+        const QRect lockRect(75, y + 6, 20, 22);
+        const QRect muteRect(99, y + 6, 20, 22);
+        p.setPen(QPen(m_trackLocked[track] ? QColor("#d78cff") : QColor("#596875"), 1));
+        p.setBrush(m_trackLocked[track] ? QColor("#49305f") : QColor("#202a34"));
+        p.drawRoundedRect(lockRect, 3, 3);
+        p.setPen(m_trackLocked[track] ? QColor("#ffffff") : QColor("#aab7c2"));
+        p.drawText(lockRect, Qt::AlignCenter, m_trackLocked[track] ? "L" : "l");
+        p.setPen(QPen(m_trackMuted[track] ? QColor("#e6a36f") : QColor("#596875"), 1));
+        p.setBrush(m_trackMuted[track] ? QColor("#59402d") : QColor("#202a34"));
+        p.drawRoundedRect(muteRect, 3, 3);
+        p.setPen(m_trackMuted[track] ? QColor("#ffffff") : QColor("#aab7c2"));
+        p.drawText(muteRect, Qt::AlignCenter, m_trackMuted[track] ? "M" : "m");
     }
 
     for (int i = 0; i < m_clips.size(); ++i) {
@@ -651,6 +700,17 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
 
     if (event->button() == Qt::LeftButton) {
         const QPoint pos = event->position().toPoint();
+        const int controlTrack = (pos.y() - kTrackTop) / (kTrackHeight + kTrackGap);
+        if (pos.x() >= 74 && pos.x() < 124 && pos.y() >= kTrackTop
+            && controlTrack >= 0 && controlTrack < kTrackCount
+            && (pos.y() - kTrackTop) % (kTrackHeight + kTrackGap) < kTrackHeight) {
+            if (pos.x() < 98) m_trackLocked[controlTrack] = !m_trackLocked[controlTrack];
+            else m_trackMuted[controlTrack] = !m_trackMuted[controlTrack];
+            update();
+            emit trackStateChanged(controlTrack);
+            event->accept();
+            return;
+        }
         const int index = clipIndexAt(pos);
         m_playheadMs = timeAt(pos.x());
         emit playheadChanged(m_playheadMs);
@@ -740,6 +800,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         * kSnapIntervalMs;
 
     Clip &clip = m_clips[m_selectedClip];
+    if (isTrackLocked(clip.track)) return;
     const qint64 snapToleranceMs = qMax<qint64>(
         kSnapIntervalMs, qRound64(8.0 * 1000.0 / m_pixelsPerSecond));
 
@@ -783,7 +844,8 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         }
 
         clip.timelineStartMs = qMax<qint64>(0, proposedStart);
-        clip.track = trackAt(pos.y());
+        const int destinationTrack = trackAt(pos.y());
+        if (!isTrackLocked(destinationTrack)) clip.track = destinationTrack;
     } else if (m_dragMode == DragMode::TrimLeft) {
         const qint64 minimumDelta = -m_dragSnapshot.sourceInMs;
         const qint64 maximumDelta =
