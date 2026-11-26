@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "timelinewidget.h"
 #include "programmonitorwidget.h"
+#include "frame_timebase.h"
 
 #include <QAction>
 #include <QAudioOutput>
@@ -140,6 +141,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             updateSequenceTimeLabel();
             if (m_sequencePlaying) {
                 // A manual timeline seek must reload every active track at its new source in-point.
+                m_sequenceClockOriginMs = position;
                 if (m_sequenceClock.isValid()) m_sequenceClock.restart();
                 else m_sequenceClock.start();
 
@@ -224,7 +226,7 @@ void MainWindow::buildInterface()
     m_sequenceButton = new QPushButton("Play Timeline");
     m_sequenceButton->setObjectName("primaryButton");
     auto *stopSequence = new QPushButton("Stop Timeline");
-    m_sequenceTimeLabel = new QLabel("00:00");
+    m_sequenceTimeLabel = new QLabel("00:00:00:00");
     m_sequenceTimeLabel->setObjectName("timecodeLabel");
 
     connect(m_playButton, &QPushButton::clicked, this, &MainWindow::playPause);
@@ -871,6 +873,7 @@ void MainWindow::toggleSequencePlayback()
     m_sequencePlaying = true;
     m_playButton->setEnabled(false);
     m_sequenceButton->setText("Pause Timeline");
+    m_sequenceClockOriginMs = m_sequencePositionMs;
     m_sequenceClock.start();
     m_sequenceTimer->start();
     syncVideoTracks();
@@ -920,10 +923,14 @@ void MainWindow::tickSequencePlayback()
 {
     if (!m_sequencePlaying || !m_sequenceClock.isValid()) return;
 
-    const qint64 elapsed = m_sequenceClock.restart();
-    if (elapsed <= 0) return;
+    const qint64 elapsed = m_sequenceClock.elapsed();
+    if (elapsed < 0) return;
 
-    m_sequencePositionMs += elapsed;
+    // Drive the sequence from one monotonic clock origin, then quantize to
+    // the 25 fps sequence timebase. This avoids cumulative timer-rounding drift.
+    const FrameTimebase timebase(25, 1);
+    m_sequencePositionMs = timebase.frameToMilliseconds(
+        timebase.millisecondsToFrame(m_sequenceClockOriginMs + elapsed));
     const qint64 sequenceEnd = m_timeline->sequenceDurationMs();
     if (m_sequencePositionMs >= sequenceEnd) {
         m_sequencePositionMs = sequenceEnd;
@@ -1177,8 +1184,11 @@ void MainWindow::handleAudioTrackStatus(int audioTrack)
 
 void MainWindow::updateSequenceTimeLabel()
 {
-    if (m_sequenceTimeLabel)
-        m_sequenceTimeLabel->setText(formatTime(m_sequencePositionMs));
+    if (m_sequenceTimeLabel) {
+        const FrameTimebase timebase(25, 1);
+        m_sequenceTimeLabel->setText(QString::fromStdString(
+            timebase.timecode(timebase.millisecondsToFrame(m_sequencePositionMs))));
+    }
 }
 
 void MainWindow::updatePosition(qint64 position)
