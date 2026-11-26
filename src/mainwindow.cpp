@@ -155,6 +155,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             const QSignalBlocker b6(m_clipColorSliders[6]);
             const QSignalBlocker b7(m_clipColorSliders[7]);
             const QSignalBlocker b8(m_clipColorSliders[8]);
+            const QSignalBlocker t0(m_clipTransformSliders[0]);
+            const QSignalBlocker t1(m_clipTransformSliders[1]);
+            const QSignalBlocker t2(m_clipTransformSliders[2]);
             m_clipColorSliders[0]->setValue(clip.brightness);
             m_clipColorSliders[1]->setValue(clip.contrast);
             m_clipColorSliders[2]->setValue(clip.saturation);
@@ -164,6 +167,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipColorSliders[6]->setValue(clip.redCurve);
             m_clipColorSliders[7]->setValue(clip.greenCurve);
             m_clipColorSliders[8]->setValue(clip.blueCurve);
+            m_clipTransformSliders[0]->setValue(clip.scale);
+            m_clipTransformSliders[1]->setValue(clip.positionX);
+            m_clipTransformSliders[2]->setValue(clip.positionY);
+            if (clip.track < 3)
+                m_monitor->setTrackTransform(clip.track, clip.scale, clip.positionX, clip.positionY);
             if (clip.track < 3) {
                 m_monitor->setTrackColorGrade(clip.track, clip.brightness, clip.contrast,
                     clip.saturation, clip.shadows, clip.midtones, clip.highlights,
@@ -523,6 +531,76 @@ void MainWindow::buildInterface()
         });
     inspectorLayout->addWidget(addContrastKeyframeButton);
     inspectorLayout->addWidget(removeContrastKeyframeButton);
+
+    auto *transformHeading = new QLabel("TRANSFORM");
+    transformHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(transformHeading);
+    auto *scaleSlider = new QSlider(Qt::Horizontal);
+    auto *positionXSlider = new QSlider(Qt::Horizontal);
+    auto *positionYSlider = new QSlider(Qt::Horizontal);
+    m_clipTransformSliders = {{scaleSlider, positionXSlider, positionYSlider}};
+    const QStringList transformNames = {"Scale (%)", "Position X", "Position Y"};
+    const int transformMinimums[] = {10, -100, -100};
+    const int transformMaximums[] = {300, 100, 100};
+    const int transformDefaults[] = {100, 0, 0};
+    for (int i = 0; i < 3; ++i) {
+        auto *label = new QLabel(QString("%1: %2").arg(transformNames.at(i)).arg(transformDefaults[i]));
+        label->setObjectName("mutedLabel");
+        m_clipTransformSliders[static_cast<size_t>(i)]->setRange(
+            transformMinimums[i], transformMaximums[i]);
+        m_clipTransformSliders[static_cast<size_t>(i)]->setValue(transformDefaults[i]);
+        connect(m_clipTransformSliders[static_cast<size_t>(i)], &QSlider::valueChanged,
+            this, [this, label, i, transformNames](int value) {
+                label->setText(QString("%1: %2").arg(transformNames.at(i)).arg(value));
+                if (m_selectedTimelineClipId < 0) return;
+                m_timeline->setClipTransformSettings(m_selectedTimelineClipId,
+                    m_clipTransformSliders[0]->value(), m_clipTransformSliders[1]->value(),
+                    m_clipTransformSliders[2]->value());
+                TimelineWidget::ClipInfo clip;
+                if (m_timeline->selectedClipInfo(&clip) && clip.track < 3)
+                    m_monitor->setTrackTransform(clip.track, clip.scale, clip.positionX, clip.positionY);
+            });
+        inspectorLayout->addWidget(label);
+        inspectorLayout->addWidget(m_clipTransformSliders[static_cast<size_t>(i)]);
+    }
+    auto *transformKeyframeHeading = new QLabel("ANIMATION — TRANSFORM");
+    transformKeyframeHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(transformKeyframeHeading);
+    auto *transformKeyframeCountLabel = new QLabel("Transform keyframes: 0");
+    transformKeyframeCountLabel->setObjectName("mutedLabel");
+    inspectorLayout->addWidget(transformKeyframeCountLabel);
+    auto *addTransformKeyframeButton = new QPushButton("Add / Update Transform Keyframe");
+    auto *removeTransformKeyframeButton = new QPushButton("Remove Nearest Transform Keyframe");
+    connect(addTransformKeyframeButton, &QPushButton::clicked, this,
+        [this, transformKeyframeCountLabel]() {
+            if (m_selectedTimelineClipId < 0) {
+                statusBar()->showMessage("Select a video clip before adding keyframes", 3500);
+                return;
+            }
+            if (m_timeline->addTransformKeyframe(m_selectedTimelineClipId,
+                    m_timeline->playheadMs(), m_clipTransformSliders[0]->value(),
+                    m_clipTransformSliders[1]->value(), m_clipTransformSliders[2]->value())) {
+                transformKeyframeCountLabel->setText(QString("Transform keyframes: %1")
+                    .arg(m_timeline->transformKeyframeCount(m_selectedTimelineClipId)));
+                statusBar()->showMessage("Transform keyframe added at the playhead", 3000);
+                refreshPausedTimelinePreview();
+            }
+        });
+    connect(removeTransformKeyframeButton, &QPushButton::clicked, this,
+        [this, transformKeyframeCountLabel]() {
+            if (m_selectedTimelineClipId < 0) return;
+            if (m_timeline->removeTransformKeyframeAt(
+                    m_selectedTimelineClipId, m_timeline->playheadMs())) {
+                transformKeyframeCountLabel->setText(QString("Transform keyframes: %1")
+                    .arg(m_timeline->transformKeyframeCount(m_selectedTimelineClipId)));
+                statusBar()->showMessage("Transform keyframe removed", 3000);
+                refreshPausedTimelinePreview();
+            } else {
+                statusBar()->showMessage("No transform keyframe close to the playhead", 3000);
+            }
+        });
+    inspectorLayout->addWidget(addTransformKeyframeButton);
+    inspectorLayout->addWidget(removeTransformKeyframeButton);
     inspectorLayout->addStretch(1);
     inspectorDock->setWidget(inspector);
     addDockWidget(Qt::RightDockWidgetArea, inspectorDock);
@@ -1231,6 +1309,10 @@ void MainWindow::refreshPausedTimelinePreview()
             clip.id, m_sequencePositionMs);
         const int animatedContrast = m_timeline->evaluatedContrast(
             clip.id, m_sequencePositionMs);
+        int animatedScale = 100, animatedX = 0, animatedY = 0;
+        m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
+            &animatedScale, &animatedX, &animatedY);
+        m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
@@ -1319,6 +1401,10 @@ void MainWindow::syncVideoTracks()
             clip.id, m_sequencePositionMs);
         const int animatedContrast = m_timeline->evaluatedContrast(
             clip.id, m_sequencePositionMs);
+        int animatedScale = 100, animatedX = 0, animatedY = 0;
+        m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
+            &animatedScale, &animatedX, &animatedY);
+        m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
