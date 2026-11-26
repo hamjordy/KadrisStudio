@@ -20,6 +20,7 @@ public:
     void clearAllFrames();
     void setCaption(const QString &caption);
     void setColorCorrection(int brightness, int contrast, int saturation);
+    void setColorWheels(int shadows, int midtones, int highlights);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -32,5 +33,8 @@ private:
     int m_brightness = 0;
     int m_contrast = 0;
     int m_saturation = 100;
+    int m_shadowWarmth = 0;
+    int m_midtoneWarmth = 0;
+    int m_highlightWarmth = 0;
     QString m_caption;
 };
