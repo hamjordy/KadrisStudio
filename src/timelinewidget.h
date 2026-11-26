@@ -32,6 +32,8 @@ public:
     void resetZoom();
     void addMarker();
     void removeNearestMarker();
+    void goToNextMarker();
+    void goToPreviousMarker();
     QJsonArray markersToJson() const;
     void markersFromJson(const QJsonArray &markers);
     void clearClips();
