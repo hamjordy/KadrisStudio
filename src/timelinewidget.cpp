@@ -238,6 +238,7 @@ void TimelineWidget::addClip(const QString &path)
     update();
 
     emit clipActivated(path);
+    emit clipSelectionChanged(clip.id, clip.path, clip.track);
     emit playheadChanged(m_playheadMs);
     emit timelineEdited();
 
@@ -284,6 +285,27 @@ void TimelineWidget::probeMediaDuration(int clipId, const QString &path)
     });
 
     probe->setSource(QUrl::fromLocalFile(path));
+}
+
+int TimelineWidget::selectedClipId() const
+{
+    return m_selectedClip >= 0 && m_selectedClip < m_clips.size()
+        ? m_clips.at(m_selectedClip).id : -1;
+}
+
+bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
+{
+    if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
+    const Clip &clip = m_clips.at(m_selectedClip);
+    if (result) {
+        result->id = clip.id;
+        result->path = clip.path;
+        result->track = clip.track;
+        result->timelineStartMs = clip.timelineStartMs;
+        result->sourceInMs = clip.sourceInMs;
+        result->durationMs = clip.durationMs;
+    }
+    return true;
 }
 
 bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
@@ -569,6 +591,7 @@ bool TimelineWidget::duplicateSelectedClip()
     update();
     emit playheadChanged(m_playheadMs);
     emit clipActivated(duplicate.path);
+    emit clipSelectionChanged(duplicate.id, duplicate.path, duplicate.track);
     emit timelineEdited();
     return true;
 }
@@ -846,9 +869,12 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
             }
 
             emit clipActivated(m_clips.at(index).path);
+            emit clipSelectionChanged(m_clips.at(index).id,
+                m_clips.at(index).path, m_clips.at(index).track);
         } else {
             m_selectedClip = -1;
             m_dragMode = DragMode::None;
+            emit clipSelectionChanged(-1, QString(), -1);
         }
 
         update();
