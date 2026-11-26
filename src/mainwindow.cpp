@@ -25,6 +25,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSlider>
+#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -138,13 +139,37 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         });
     connect(m_timeline, &TimelineWidget::clipSelectionChanged, this,
         [this](int clipId, const QString &path, int track) {
+            m_selectedTimelineClipId = clipId;
             if (clipId < 0) {
-                m_inspectorLabel->setText("No timeline clip selected.");
+                m_inspectorLabel->setText("No timeline clip selected. Color controls are stored per clip.");
                 return;
             }
-            m_inspectorLabel->setText(QString("Selected clip: %1\\nClip ID: %2\\nTrack: V%3\\n\\n"
-                "Clip-specific effect controls will be attached here.")
-                .arg(QFileInfo(path).fileName()).arg(clipId).arg(track + 1));
+            TimelineWidget::ClipInfo clip;
+            if (!m_timeline->selectedClipInfo(&clip)) return;
+            const QSignalBlocker b0(m_clipColorSliders[0]);
+            const QSignalBlocker b1(m_clipColorSliders[1]);
+            const QSignalBlocker b2(m_clipColorSliders[2]);
+            const QSignalBlocker b3(m_clipColorSliders[3]);
+            const QSignalBlocker b4(m_clipColorSliders[4]);
+            const QSignalBlocker b5(m_clipColorSliders[5]);
+            const QSignalBlocker b6(m_clipColorSliders[6]);
+            const QSignalBlocker b7(m_clipColorSliders[7]);
+            const QSignalBlocker b8(m_clipColorSliders[8]);
+            m_clipColorSliders[0]->setValue(clip.brightness);
+            m_clipColorSliders[1]->setValue(clip.contrast);
+            m_clipColorSliders[2]->setValue(clip.saturation);
+            m_clipColorSliders[3]->setValue(clip.shadows);
+            m_clipColorSliders[4]->setValue(clip.midtones);
+            m_clipColorSliders[5]->setValue(clip.highlights);
+            m_clipColorSliders[6]->setValue(clip.redCurve);
+            m_clipColorSliders[7]->setValue(clip.greenCurve);
+            m_clipColorSliders[8]->setValue(clip.blueCurve);
+            m_monitor->setColorCorrection(clip.brightness, clip.contrast, clip.saturation);
+            m_monitor->setColorWheels(clip.shadows, clip.midtones, clip.highlights);
+            m_monitor->setRgbCurves(clip.redCurve, clip.greenCurve, clip.blueCurve);
+            m_inspectorLabel->setText(QString("Selected clip: %1\\nClip ID: %2\\nTrack: %3\\n\\nColor settings are saved with this clip.")
+                .arg(QFileInfo(path).fileName()).arg(clipId)
+                .arg(track < 3 ? QString("V%1").arg(track + 1) : QString("A%1").arg(track - 2)));
         });
     connect(m_timeline, &TimelineWidget::playheadChanged, this,
         [this](qint64 position) {
@@ -364,6 +389,19 @@ void MainWindow::buildInterface()
     auto *redCurve = new QSlider(Qt::Horizontal);
     auto *greenCurve = new QSlider(Qt::Horizontal);
     auto *blueCurve = new QSlider(Qt::Horizontal);
+    m_clipColorSliders = {{brightnessSlider, contrastSlider, saturationSlider,
+        shadowWheel, midtoneWheel, highlightWheel, redCurve, greenCurve, blueCurve}};
+    for (QSlider *slider : m_clipColorSliders) {
+        connect(slider, &QSlider::valueChanged, this, [this](int) {
+            if (m_selectedTimelineClipId < 0) return;
+            m_timeline->setClipColorSettings(m_selectedTimelineClipId,
+                m_clipColorSliders[0]->value(), m_clipColorSliders[1]->value(),
+                m_clipColorSliders[2]->value(), m_clipColorSliders[3]->value(),
+                m_clipColorSliders[4]->value(), m_clipColorSliders[5]->value(),
+                m_clipColorSliders[6]->value(), m_clipColorSliders[7]->value(),
+                m_clipColorSliders[8]->value());
+        });
+    }
     auto addCurveSlider = [this, inspectorLayout, redCurve, greenCurve, blueCurve](
             const QString &name, QSlider *slider) {
         auto *label = new QLabel(name + " curve: 0");
@@ -389,6 +427,12 @@ void MainWindow::buildInterface()
             brightnessSlider->setValue(0);
             contrastSlider->setValue(0);
             saturationSlider->setValue(100);
+            shadowWheel->setValue(0);
+            midtoneWheel->setValue(0);
+            highlightWheel->setValue(0);
+            redCurve->setValue(0);
+            greenCurve->setValue(0);
+            blueCurve->setValue(0);
         });
     inspectorLayout->addWidget(resetColor);
     inspectorLayout->addStretch(1);
