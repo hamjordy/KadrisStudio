@@ -27,6 +27,9 @@ public:
     };
 
     void addClip(const QString &path);
+    void zoomIn();
+    void zoomOut();
+    void resetZoom();
     void clearClips();
     bool clipAtTime(qint64 positionMs, ClipInfo *clip) const;
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
@@ -77,6 +80,7 @@ private:
     int m_selectedClip = -1;
     int m_nextClipId = 1;
     qint64 m_playheadMs = 0;
+    int m_pixelsPerSecond = 80;
 
     DragMode m_dragMode = DragMode::None;
     QPoint m_dragOrigin;
