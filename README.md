@@ -2,7 +2,7 @@
 
 Independent open-source desktop video-editor project for Windows 11.
 
-**Status: early prototype (0.4.0).** The application provides a native Qt shell, media import, source playback, project save/open, and an interactive timeline foundation. Clips can be moved between tracks, trimmed from either edge, split at the playhead, selected, and deleted. The timeline stores clip timing and track placement in the project. This is not yet a full nonlinear editor: the program monitor combines active video layers, but the prototype is not a frame-accurate render engine. Advanced audio mixing, frame-accurate rendering/synchronization, effects, color grading, captions, undo/redo, and sequence export remain planned work.
+**Status: early prototype (0.4.0).** The application provides a native Qt shell, media import, source playback, project save/open, and an interactive timeline foundation. Clips can be moved between tracks, trimmed from either edge, split at the playhead, selected, and deleted. The timeline stores clip timing and track placement in the project. This is not yet a full nonlinear editor: the program monitor combines active video layers, but the prototype is not a frame-accurate render engine. The current Audio Mixer provides basic track faders, Mute/Solo, and master gain; advanced audio processing, meters, routing, frame-accurate rendering/synchronization, effects, color grading, captions, undo/redo, and sequence export remain planned work.
 
 ## Current functionality
 - Native C++20 / Qt 6 Windows desktop application.
@@ -18,7 +18,7 @@ Independent open-source desktop video-editor project for Windows 11.
 - Play clips on VIDEO 1, VIDEO 2, and VIDEO 3 concurrently in a layered program monitor, honoring each clip's timeline position and source in-point.
 - Composite decoded video frames from the three active video tracks in track order using alpha-aware image composition.
 - Play clips on AUDIO 1 and AUDIO 2 with independent Qt Multimedia players, aligned to the timeline playhead and clip source in-points.
-- Adjust the shared master output level for the two timeline audio tracks.
+- Adjust AUDIO 1 and AUDIO 2 independently with -60 dB to 0 dB faders, Mute and Solo switches, and a shared master fader in a dockable Audio Mixer panel.
 - Save timeline positions, source in-points, durations, and track assignments in project format version 2 (version 1 projects remain readable).
 - Create, save, and reopen .kadris project files.
 - GitHub Actions Windows build workflow.

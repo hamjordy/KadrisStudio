@@ -14,6 +14,11 @@ QTreeWidget::item { padding: 5px 3px; }
 QHeaderView::section { background: #202a34; color: #b7c4ce; border: none; border-right: 1px solid #34414d; padding: 6px; font-weight: 600; }
 QPushButton { background: #202b35; border: 1px solid #3a4855; border-radius: 4px; padding: 7px 12px; }
 QPushButton:hover, QToolButton:hover { background: #2a3a45; border-color: #3caeaa; }
+QPushButton:checked { background: #1d5e60; border-color: #45bdb6; color: #ffffff; }
+QPushButton#mixerMuteButton:checked { background: #783e45; border-color: #d77878; }
+QPushButton#mixerSoloButton:checked { background: #715629; border-color: #e7c47b; }
+QGroupBox { background: #151d26; border: 1px solid #34424f; border-radius: 4px; margin-top: 9px; padding: 8px; font-weight: 600; }
+QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #aab8c3; }
 QPushButton#primaryButton { background: #126a70; border: 1px solid #31b6b0; color: white; font-weight: 600; min-width: 62px; }
 QLabel#sectionTitle { color: #9fb0bc; font-size: 8pt; font-weight: 700; }
 QLabel#mutedLabel { color: #8e9ba8; }
@@ -22,5 +27,9 @@ QVideoWidget#videoMonitor { background: #05080b; border: 1px solid #293541; }
 QSlider::groove:horizontal { height: 5px; background: #303c47; border-radius: 2px; }
 QSlider::sub-page:horizontal { background: #24a7a4; border-radius: 2px; }
 QSlider::handle:horizontal { background: #e7c47b; border: 1px solid #f4d99e; width: 12px; margin: -5px 0; border-radius: 6px; }
+QSlider::groove:vertical { width: 5px; background: #303c47; border-radius: 2px; }
+QSlider::sub-page:vertical { background: #24a7a4; border-radius: 2px; }
+QSlider::add-page:vertical { background: #303c47; border-radius: 2px; }
+QSlider::handle:vertical { background: #e7c47b; border: 1px solid #f4d99e; height: 12px; margin: 0 -5px; border-radius: 6px; }
 QStatusBar { background: #151c24; border-top: 1px solid #293541; color: #9eacb8; }
 QScrollArea { border: none; background: #10151b; }

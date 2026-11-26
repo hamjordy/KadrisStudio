@@ -9,6 +9,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -31,6 +32,24 @@
 #include <QVideoSink>
 #include <QVideoFrame>
 #include <QUrl>
+
+#include <cmath>
+
+namespace {
+float faderToLinearGain(int value)
+{
+    if (value <= 0) return 0.0f;
+    const double decibels = (static_cast<double>(value) / 100.0 - 1.0) * 60.0;
+    return static_cast<float>(std::pow(10.0, decibels / 20.0));
+}
+
+QString faderToLabel(int value)
+{
+    if (value <= 0) return QStringLiteral("-INF dB");
+    const double decibels = (static_cast<double>(value) / 100.0 - 1.0) * 60.0;
+    return QStringLiteral("%1 dB").arg(decibels, 0, 'f', 1);
+}
+}
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
@@ -73,7 +92,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     for (int track = 0; track < 2; ++track) {
         m_audioTrackPlayers[track] = new QMediaPlayer(this);
         m_audioTrackOutputs[track] = new QAudioOutput(this);
-        m_audioTrackOutputs[track]->setVolume(0.8f);
+        m_audioTrackOutputs[track]->setVolume(1.0f);
         m_audioTrackPlayers[track]->setAudioOutput(m_audioTrackOutputs[track]);
 
         connect(m_audioTrackPlayers[track], &QMediaPlayer::mediaStatusChanged, this,
@@ -90,6 +109,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     }
 
     buildInterface();
+    applyAudioMixerState();
     buildMenus();
 
     connect(m_player, &QMediaPlayer::positionChanged, this, &MainWindow::updatePosition);
@@ -214,24 +234,6 @@ void MainWindow::buildInterface()
     sequenceTransport->addStretch();
     sequenceTransport->addWidget(new QLabel("TIMELINE POSITION"));
     sequenceTransport->addWidget(m_sequenceTimeLabel);
-    sequenceTransport->addSpacing(18);
-    sequenceTransport->addWidget(new QLabel("MASTER"));
-    auto *masterVolume = new QSlider(Qt::Horizontal);
-    masterVolume->setRange(0, 100);
-    masterVolume->setValue(80);
-    masterVolume->setFixedWidth(110);
-    auto *masterVolumeLabel = new QLabel("80%");
-    masterVolumeLabel->setObjectName("timecodeLabel");
-    connect(masterVolume, &QSlider::valueChanged, this,
-        [this, masterVolumeLabel](int value) {
-            const float volume = static_cast<float>(value) / 100.0f;
-            for (QAudioOutput *output : m_audioTrackOutputs) {
-                if (output) output->setVolume(volume);
-            }
-            masterVolumeLabel->setText(QString("%1%").arg(value));
-        });
-    sequenceTransport->addWidget(masterVolume);
-    sequenceTransport->addWidget(masterVolumeLabel);
     layout->addLayout(sequenceTransport);
     setCentralWidget(central);
 
@@ -277,6 +279,100 @@ void MainWindow::buildInterface()
     inspectorLayout->addWidget(m_inspectorLabel, 1);
     inspectorDock->setWidget(inspector);
     addDockWidget(Qt::RightDockWidgetArea, inspectorDock);
+
+    auto *mixerDock = new QDockWidget("Audio Mixer", this);
+    mixerDock->setObjectName("audioMixerDock");
+    mixerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
+                               | Qt::BottomDockWidgetArea);
+    mixerDock->setMinimumHeight(230);
+    auto *mixerPanel = new QWidget(mixerDock);
+    auto *mixerLayout = new QHBoxLayout(mixerPanel);
+    mixerLayout->setContentsMargins(8, 8, 8, 8);
+    mixerLayout->setSpacing(10);
+
+    for (int track = 0; track < 2; ++track) {
+        auto *strip = new QGroupBox(QString("AUDIO %1").arg(track + 1), mixerPanel);
+        strip->setMinimumWidth(100);
+        auto *stripLayout = new QVBoxLayout(strip);
+        stripLayout->setAlignment(Qt::AlignHCenter);
+
+        auto *gainLabel = new QLabel("0.0 dB", strip);
+        gainLabel->setObjectName("timecodeLabel");
+        gainLabel->setAlignment(Qt::AlignCenter);
+
+        auto *fader = new QSlider(Qt::Vertical, strip);
+        fader->setRange(0, 100);
+        fader->setValue(100);
+        fader->setTickPosition(QSlider::TicksBothSides);
+        fader->setTickInterval(10);
+        fader->setMinimumHeight(120);
+        fader->setToolTip("Track level: -60 dB to 0 dB");
+        m_audioTrackFaders[track] = fader;
+
+        auto *switches = new QHBoxLayout();
+        auto *muteButton = new QPushButton("M", strip);
+        muteButton->setObjectName("mixerMuteButton");
+        muteButton->setCheckable(true);
+        muteButton->setToolTip("Mute this audio track");
+        auto *soloButton = new QPushButton("S", strip);
+        soloButton->setObjectName("mixerSoloButton");
+        soloButton->setCheckable(true);
+        soloButton->setToolTip("Solo this audio track");
+        switches->addWidget(muteButton);
+        switches->addWidget(soloButton);
+
+        stripLayout->addWidget(gainLabel);
+        stripLayout->addWidget(fader, 1, Qt::AlignHCenter);
+        stripLayout->addLayout(switches);
+        mixerLayout->addWidget(strip);
+
+        connect(fader, &QSlider::valueChanged, this,
+            [this, track, gainLabel](int value) {
+                m_audioTrackGains[track] = faderToLinearGain(value);
+                gainLabel->setText(faderToLabel(value));
+                applyAudioMixerState();
+            });
+        connect(muteButton, &QPushButton::toggled, this,
+            [this, track](bool muted) {
+                m_audioTrackMuted[track] = muted;
+                applyAudioMixerState();
+            });
+        connect(soloButton, &QPushButton::toggled, this,
+            [this, track](bool solo) {
+                m_audioTrackSolo[track] = solo;
+                applyAudioMixerState();
+            });
+    }
+
+    auto *masterStrip = new QGroupBox("MASTER", mixerPanel);
+    masterStrip->setMinimumWidth(110);
+    auto *masterLayout = new QVBoxLayout(masterStrip);
+    masterLayout->setAlignment(Qt::AlignHCenter);
+    auto *masterGainLabel = new QLabel("0.0 dB", masterStrip);
+    masterGainLabel->setObjectName("timecodeLabel");
+    masterGainLabel->setAlignment(Qt::AlignCenter);
+    m_masterVolumeSlider = new QSlider(Qt::Vertical, masterStrip);
+    m_masterVolumeSlider->setRange(0, 100);
+    m_masterVolumeSlider->setValue(100);
+    m_masterVolumeSlider->setTickPosition(QSlider::TicksBothSides);
+    m_masterVolumeSlider->setTickInterval(10);
+    m_masterVolumeSlider->setMinimumHeight(120);
+    m_masterVolumeSlider->setToolTip("Master level: -60 dB to 0 dB");
+    masterLayout->addWidget(masterGainLabel);
+    masterLayout->addWidget(m_masterVolumeSlider, 1, Qt::AlignHCenter);
+    mixerLayout->addWidget(masterStrip);
+
+    connect(m_masterVolumeSlider, &QSlider::valueChanged, this,
+        [this, masterGainLabel](int value) {
+            m_masterGain = faderToLinearGain(value);
+            masterGainLabel->setText(faderToLabel(value));
+            applyAudioMixerState();
+        });
+
+    mixerDock->setWidget(mixerPanel);
+    addDockWidget(Qt::RightDockWidgetArea, mixerDock);
+    splitDockWidget(inspectorDock, mixerDock, Qt::Vertical);
+    resizeDocks({inspectorDock, mixerDock}, {240, 260}, Qt::Vertical);
 
     auto *timelineDock = new QDockWidget("Timeline", this);
     timelineDock->setObjectName("timelineDock");
@@ -726,6 +822,21 @@ void MainWindow::handleVideoTrackStatus(int track)
         m_monitor->clearFrame(track);
         statusBar()->showMessage(
             QString("Could not play media on VIDEO %1").arg(track + 1), 6000);
+    }
+}
+
+void MainWindow::applyAudioMixerState()
+{
+    const bool anySolo = m_audioTrackSolo[0] || m_audioTrackSolo[1];
+
+    for (int track = 0; track < 2; ++track) {
+        QAudioOutput *output = m_audioTrackOutputs[track];
+        if (!output) continue;
+
+        const bool mutedBySolo = anySolo && !m_audioTrackSolo[track];
+        output->setVolume(qBound(0.0f,
+            m_audioTrackGains[track] * m_masterGain, 1.0f));
+        output->setMuted(m_audioTrackMuted[track] || mutedBySolo);
     }
 }
 

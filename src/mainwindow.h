@@ -37,6 +37,7 @@ private slots:
     void handleVideoTrackStatus(int track);
     void syncAudioTracks();
     void handleAudioTrackStatus(int track);
+    void applyAudioMixerState();
 
 private:
     void buildInterface();
@@ -77,6 +78,12 @@ private:
     std::array<int, 2> m_activeAudioClipIds{{-1, -1}};
     std::array<bool, 2> m_waitingForAudioTrack{{false, false}};
     std::array<bool, 2> m_failedAudioTrack{{false, false}};
+    std::array<QSlider *, 2> m_audioTrackFaders{};
+    std::array<float, 2> m_audioTrackGains{{1.0f, 1.0f}};
+    std::array<bool, 2> m_audioTrackMuted{{false, false}};
+    std::array<bool, 2> m_audioTrackSolo{{false, false}};
+    QSlider *m_masterVolumeSlider = nullptr;
+    float m_masterGain = 1.0f;
     TimelineWidget *m_timeline = nullptr;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
