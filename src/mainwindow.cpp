@@ -549,6 +549,18 @@ void MainWindow::buildMenus()
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
     QMenu *sequence = menuBar()->addMenu("&Sequence");
+    auto *splitAllAction = sequence->addAction("Add Edit to All Tracks");
+    splitAllAction->setShortcut(QKeySequence("Ctrl+Shift+K"));
+    connect(splitAllAction, &QAction::triggered, this, [this]() {
+        const int count = m_timeline->splitAllClipsAtPlayhead();
+        if (count == 0)
+            statusBar()->showMessage(
+                "No eligible clips at the playhead on unlocked tracks", 3500);
+        else
+            statusBar()->showMessage(
+                QString("Added an edit to %1 clip(s) across unlocked tracks").arg(count),
+                3500);
+    });
     auto *rippleDeleteAction = sequence->addAction("Ripple Delete Selected Clip");
     rippleDeleteAction->setShortcut(QKeySequence("Shift+Delete"));
     connect(rippleDeleteAction, &QAction::triggered, this, [this]() {
