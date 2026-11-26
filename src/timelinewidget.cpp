@@ -89,8 +89,6 @@ QVector<float> readWaveformPeaks(const QString &path)
     if (frameCount <= 0 || !file.seek(dataOffset)) return peaks;
     const int bucketCount = static_cast<int>(qMin<qint64>(1600, frameCount));
     peaks.fill(0.0f, bucketCount);
-    const qint64 framesPerBucket = qMax<qint64>(1,
-        (frameCount + bucketCount - 1) / bucketCount);
     QByteArray frameBuffer;
 
     for (qint64 frame = 0; frame < frameCount; ++frame) {
@@ -120,7 +118,8 @@ QVector<float> readWaveformPeaks(const QString &path)
             }
             framePeak = qMax(framePeak, static_cast<float>(qBound(0.0, std::abs(value), 1.0)));
         }
-        const int bucket = static_cast<int>(frame / framesPerBucket);
+        const int bucket = static_cast<int>(
+            (static_cast<long double>(frame) * bucketCount) / frameCount);
         if (bucket < bucketCount)
             peaks[bucket] = qMax(peaks.at(bucket), framePeak);
     }
