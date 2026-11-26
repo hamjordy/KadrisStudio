@@ -302,23 +302,6 @@ void MainWindow::buildInterface()
     auto *colorHeading = new QLabel("COLOR CORRECTION");
     colorHeading->setObjectName("sectionTitle");
     inspectorLayout->addWidget(colorHeading);
-    auto addColorControl = [this, inspectorLayout](const QString &name,
-            int minimum, int maximum, int initial, const QString &suffix,
-            std::function<void(int, int, int)> apply) {
-        auto *label = new QLabel(QString("%1: %2%3").arg(name).arg(initial).arg(suffix));
-        label->setObjectName("mutedLabel");
-        auto *slider = new QSlider(Qt::Horizontal);
-        slider->setRange(minimum, maximum);
-        slider->setValue(initial);
-        connect(slider, &QSlider::valueChanged, this,
-            [this, label, name, suffix, apply, slider](int value) {
-                label->setText(QString("%1: %2%3").arg(name).arg(value).arg(suffix));
-                apply(value, 0, 0);
-            });
-        inspectorLayout->addWidget(label);
-        inspectorLayout->addWidget(slider);
-        return slider;
-    };
     auto *brightnessSlider = new QSlider(Qt::Horizontal);
     auto *contrastSlider = new QSlider(Qt::Horizontal);
     auto *saturationSlider = new QSlider(Qt::Horizontal);
