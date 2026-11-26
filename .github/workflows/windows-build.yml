@@ -36,7 +36,7 @@ jobs:
         shell: pwsh
         run: |
           cmake --install build --prefix package --config Release
-          & "${{ steps.install-qt.outputs.dir }}\bin\windeployqt.exe" --release "package\kadris-studio.exe"
+          & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release "package\kadris-studio.exe"
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
