@@ -136,6 +136,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 "Use the timeline controls to move, trim, split, or remove this clip.")
                 .arg(QFileInfo(path).fileName()));
         });
+    connect(m_timeline, &TimelineWidget::clipSelectionChanged, this,
+        [this](int clipId, const QString &path, int track) {
+            if (clipId < 0) {
+                m_inspectorLabel->setText("No timeline clip selected.");
+                return;
+            }
+            m_inspectorLabel->setText(QString("Selected clip: %1\\nClip ID: %2\\nTrack: V%3\\n\\n"
+                "Clip-specific effect controls will be attached here.")
+                .arg(QFileInfo(path).fileName()).arg(clipId).arg(track + 1));
+        });
     connect(m_timeline, &TimelineWidget::playheadChanged, this,
         [this](qint64 position) {
             m_sequencePositionMs = position;
