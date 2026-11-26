@@ -33,6 +33,10 @@ public:
     void addMarker();
     void removeNearestMarker();
     bool removeMarkerAtTime(qint64 timeMs);
+    bool isTrackLocked(int track) const;
+    bool isTrackMuted(int track) const;
+    QJsonArray trackStatesToJson() const;
+    void trackStatesFromJson(const QJsonArray &states);
     void goToNextMarker();
     void goToPreviousMarker();
     QJsonArray markersToJson() const;
@@ -54,6 +58,7 @@ signals:
     void playheadChanged(qint64 positionMs);
     void timelineEdited();
     void markersChanged();
+    void trackStateChanged(int track);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -88,6 +93,8 @@ private:
     struct Marker { qint64 timeMs = 0; QString label; };
     QVector<Clip> m_clips;
     QVector<Marker> m_markers;
+    bool m_trackLocked[5] = {false, false, false, false, false};
+    bool m_trackMuted[5] = {false, false, false, false, false};
     int m_selectedClip = -1;
     int m_nextClipId = 1;
     qint64 m_playheadMs = 0;
