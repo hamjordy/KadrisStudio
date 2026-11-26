@@ -457,6 +457,32 @@ bool TimelineWidget::deleteSelectedClip()
     return true;
 }
 
+bool TimelineWidget::duplicateSelectedClip()
+{
+    if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
+
+    const Clip original = m_clips.at(m_selectedClip);
+    if (isTrackLocked(original.track)) return false;
+
+    Clip duplicate = original;
+    duplicate.id = m_nextClipId++;
+    duplicate.timelineStartMs = kTimelineTimebase.snapMilliseconds(
+        original.timelineStartMs + original.durationMs);
+    duplicate.sourceInMs = original.sourceInMs;
+    duplicate.durationKnown = original.durationKnown;
+
+    m_clips.append(duplicate);
+    m_selectedClip = m_clips.size() - 1;
+    m_playheadMs = duplicate.timelineStartMs;
+
+    updateCanvasSize();
+    update();
+    emit playheadChanged(m_playheadMs);
+    emit clipActivated(duplicate.path);
+    emit timelineEdited();
+    return true;
+}
+
 QJsonArray TimelineWidget::toJson() const
 {
     QJsonArray result;
