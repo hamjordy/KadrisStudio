@@ -4,6 +4,7 @@
 #include <QAction>
 #include <QAudioOutput>
 #include <QDockWidget>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -23,6 +24,7 @@
 #include <QStatusBar>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
+#include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QVideoWidget>
@@ -41,12 +43,48 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     connect(m_player, &QMediaPlayer::errorOccurred, this,
         [this](QMediaPlayer::Error, const QString &message) {
             statusBar()->showMessage(QString("Playback error: %1").arg(message), 8000);
+            if (m_sequencePlaying && m_waitingForSequenceMedia) {
+                m_waitingForSequenceMedia = false;
+                m_activeSequenceClipId = -1;
+                m_sequencePositionMs = qMax(m_sequencePositionMs, m_activeSequenceClipEndMs);
+                if (!m_sequenceClock.isValid()) m_sequenceClock.start();
+                activateSequencePosition();
+            }
         });
+    connect(m_player, &QMediaPlayer::mediaStatusChanged, this,
+        [this](QMediaPlayer::MediaStatus) { handleSequenceMediaStatus(); });
     connect(m_player, &QMediaPlayer::playbackStateChanged, this,
         [this](QMediaPlayer::PlaybackState state) {
-            m_playButton->setText(state == QMediaPlayer::PlayingState ? "Pause" : "Play");
+            if (!m_sequencePlaying)
+                m_playButton->setText(state == QMediaPlayer::PlayingState ? "Pause" : "Play");
         });
-    connect(m_timeline, &TimelineWidget::clipActivated, this, &MainWindow::loadPreview);
+
+    m_sequenceTimer = new QTimer(this);
+    m_sequenceTimer->setInterval(16);
+    connect(m_sequenceTimer, &QTimer::timeout, this, &MainWindow::tickSequencePlayback);
+
+    connect(m_timeline, &TimelineWidget::clipActivated, this,
+        [this](const QString &path) {
+            m_inspectorLabel->setText(QString("Timeline clip: %1\n\n"
+                "Use the timeline controls to move, trim, split, or remove this clip.")
+                .arg(QFileInfo(path).fileName()));
+        });
+    connect(m_timeline, &TimelineWidget::playheadChanged, this,
+        [this](qint64 position) {
+            m_sequencePositionMs = position;
+            updateSequenceTimeLabel();
+            if (m_sequencePlaying) {
+                m_sequenceClock.restart();
+                activateSequencePosition();
+            }
+        });
+    connect(m_timeline, &TimelineWidget::timelineEdited, this,
+        [this]() {
+            if (m_sequencePlaying) {
+                stopSequencePlayback(false);
+                statusBar()->showMessage("Timeline changed — sequence playback stopped", 4000);
+            }
+        });
 
     updateWindowTitle();
     statusBar()->showMessage("Ready — create a project or import media");
@@ -77,22 +115,45 @@ void MainWindow::buildInterface()
     layout->addWidget(m_videoWidget, 1);
 
     auto *transport = new QHBoxLayout();
-    m_playButton = new QPushButton("Play");
+    m_playButton = new QPushButton("Source Play");
     m_playButton->setObjectName("primaryButton");
-    auto *stop = new QPushButton("Stop");
+    auto *stopSource = new QPushButton("Stop Source");
     m_seekSlider = new QSlider(Qt::Horizontal);
     m_seekSlider->setRange(0, 0);
     m_timeLabel = new QLabel("00:00 / 00:00");
     m_timeLabel->setObjectName("timecodeLabel");
+
+    m_sequenceButton = new QPushButton("Play Timeline");
+    m_sequenceButton->setObjectName("primaryButton");
+    auto *stopSequence = new QPushButton("Stop Timeline");
+    m_sequenceTimeLabel = new QLabel("00:00");
+    m_sequenceTimeLabel->setObjectName("timecodeLabel");
+
     connect(m_playButton, &QPushButton::clicked, this, &MainWindow::playPause);
-    connect(stop, &QPushButton::clicked, this, &MainWindow::stopPlayback);
+    connect(stopSource, &QPushButton::clicked, this, &MainWindow::stopPlayback);
     connect(m_seekSlider, &QSlider::sliderMoved, this,
         [this](int value) { m_player->setPosition(value); });
+    connect(m_sequenceButton, &QPushButton::clicked,
+            this, &MainWindow::toggleSequencePlayback);
+    connect(stopSequence, &QPushButton::clicked, this,
+            [this]() { stopSequencePlayback(true); });
+
     transport->addWidget(m_playButton);
-    transport->addWidget(stop);
+    transport->addWidget(stopSource);
     transport->addWidget(m_seekSlider, 1);
     transport->addWidget(m_timeLabel);
     layout->addLayout(transport);
+
+    auto *sequenceTransport = new QHBoxLayout();
+    auto *sequenceLabel = new QLabel("SEQUENCE");
+    sequenceLabel->setObjectName("sectionTitle");
+    sequenceTransport->addWidget(sequenceLabel);
+    sequenceTransport->addWidget(m_sequenceButton);
+    sequenceTransport->addWidget(stopSequence);
+    sequenceTransport->addStretch();
+    sequenceTransport->addWidget(new QLabel("TIMELINE POSITION"));
+    sequenceTransport->addWidget(m_sequenceTimeLabel);
+    layout->addLayout(sequenceTransport);
     setCentralWidget(central);
 
     auto *mediaDock = new QDockWidget("Media", this);
@@ -216,6 +277,7 @@ void MainWindow::buildMenus()
 
 void MainWindow::newProject()
 {
+    stopSequencePlayback(true);
     if (!m_mediaPaths.isEmpty()
         && QMessageBox::question(this, "New Project", "Discard the current project state?")
             != QMessageBox::Yes) return;
@@ -283,6 +345,7 @@ bool MainWindow::writeProject(const QString &path)
 
 bool MainWindow::readProject(const QString &path)
 {
+    stopSequencePlayback(true);
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return false;
     QJsonParseError error;
@@ -343,6 +406,7 @@ void MainWindow::addSelectedMediaToTimeline()
 
 void MainWindow::loadPreview(const QString &path)
 {
+    stopSequencePlayback(false);
     if (!QFileInfo::exists(path)) {
         QMessageBox::warning(this, "Media Missing", "The selected source file cannot be found:\n" + path);
         return;
@@ -372,6 +436,174 @@ void MainWindow::stopPlayback()
 {
     m_player->stop();
     m_player->setPosition(0);
+}
+
+void MainWindow::toggleSequencePlayback()
+{
+    if (m_sequencePlaying) {
+        m_sequencePlaying = false;
+        m_sequenceTimer->stop();
+        m_sequenceClock.invalidate();
+        m_player->pause();
+        m_sequenceButton->setText("Play Timeline");
+        statusBar()->showMessage("Timeline playback paused", 3000);
+        return;
+    }
+
+    if (m_timeline->sequenceDurationMs() <= 0) {
+        statusBar()->showMessage("Add at least one clip to the timeline first", 4000);
+        return;
+    }
+
+    if (m_sequencePositionMs >= m_timeline->sequenceDurationMs()) {
+        m_sequencePositionMs = 0;
+        m_timeline->setPlayheadMs(0);
+    }
+
+    m_sequencePlaying = true;
+    m_sequenceButton->setText("Pause Timeline");
+    m_sequenceTimer->start();
+    activateSequencePosition();
+
+    if (!m_waitingForSequenceMedia && !m_sequenceClock.isValid())
+        m_sequenceClock.start();
+
+    statusBar()->showMessage(
+        "Timeline playback started. Video clips play in sequence; separate audio-track mixing is not implemented yet.",
+        6000);
+}
+
+void MainWindow::stopSequencePlayback(bool resetToStart)
+{
+    m_sequencePlaying = false;
+    if (m_sequenceTimer) m_sequenceTimer->stop();
+    m_sequenceClock.invalidate();
+    m_waitingForSequenceMedia = false;
+    m_activeSequenceClipId = -1;
+    if (m_player) {
+        m_player->stop();
+        m_player->setSource(QUrl());
+    }
+    if (m_sequenceButton) m_sequenceButton->setText("Play Timeline");
+
+    if (resetToStart) {
+        m_sequencePositionMs = 0;
+        if (m_timeline) m_timeline->setPlayheadMs(0);
+    }
+    updateSequenceTimeLabel();
+}
+
+void MainWindow::tickSequencePlayback()
+{
+    if (!m_sequencePlaying || m_waitingForSequenceMedia) return;
+
+    if (!m_sequenceClock.isValid()) {
+        m_sequenceClock.start();
+        return;
+    }
+
+    const qint64 elapsed = m_sequenceClock.restart();
+    if (elapsed <= 0) return;
+
+    m_sequencePositionMs += elapsed;
+    const qint64 sequenceEnd = m_timeline->sequenceDurationMs();
+    if (m_sequencePositionMs >= sequenceEnd) {
+        m_sequencePositionMs = sequenceEnd;
+        m_timeline->setPlayheadMs(m_sequencePositionMs);
+        updateSequenceTimeLabel();
+        stopSequencePlayback(false);
+        statusBar()->showMessage("Timeline playback finished", 4000);
+        return;
+    }
+
+    m_timeline->setPlayheadMs(m_sequencePositionMs);
+    updateSequenceTimeLabel();
+
+    TimelineWidget::ClipInfo current;
+    if (m_timeline->clipAtTime(m_sequencePositionMs, &current)) {
+        if (current.id != m_activeSequenceClipId)
+            activateSequencePosition();
+    } else if (m_activeSequenceClipId >= 0) {
+        activateSequencePosition();
+    }
+}
+
+void MainWindow::activateSequencePosition()
+{
+    if (!m_sequencePlaying) return;
+
+    TimelineWidget::ClipInfo clip;
+    if (m_timeline->clipAtTime(m_sequencePositionMs, &clip)) {
+        if (clip.id == m_activeSequenceClipId) {
+            if (!m_waitingForSequenceMedia
+                && m_player->playbackState() != QMediaPlayer::PlayingState) {
+                m_player->play();
+                if (!m_sequenceClock.isValid()) m_sequenceClock.start();
+            }
+            return;
+        }
+
+        if (!QFileInfo::exists(clip.path)) {
+            statusBar()->showMessage(
+                QString("Missing timeline media: %1").arg(clip.path), 6000);
+            m_sequencePositionMs = clip.timelineStartMs + clip.durationMs;
+            m_activeSequenceClipId = -1;
+            if (!m_sequenceClock.isValid()) m_sequenceClock.start();
+            return;
+        }
+
+        m_player->stop();
+        m_waitingForSequenceMedia = true;
+        m_sequenceClock.invalidate();
+        m_activeSequenceClipId = clip.id;
+        m_activeSequenceClipEndMs = clip.timelineStartMs + clip.durationMs;
+        m_pendingSequenceSourceMs =
+            clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+
+        m_player->setSource(QUrl::fromLocalFile(clip.path));
+        handleSequenceMediaStatus();
+        return;
+    }
+
+    if (m_activeSequenceClipId >= 0) {
+        m_player->stop();
+        m_player->setSource(QUrl());
+        m_activeSequenceClipId = -1;
+    }
+
+    TimelineWidget::ClipInfo next;
+    if (!m_timeline->nextVideoClipAtOrAfter(m_sequencePositionMs, &next)
+        && m_sequencePositionMs >= m_timeline->sequenceDurationMs()) {
+        stopSequencePlayback(false);
+        statusBar()->showMessage("Timeline playback finished", 4000);
+    } else if (!m_sequenceClock.isValid()) {
+        m_sequenceClock.start();
+    }
+}
+
+void MainWindow::handleSequenceMediaStatus()
+{
+    if (!m_sequencePlaying || !m_waitingForSequenceMedia) return;
+
+    if (m_player->mediaStatus() == QMediaPlayer::LoadedMedia
+        || m_player->mediaStatus() == QMediaPlayer::BufferedMedia) {
+        m_player->setPosition(m_pendingSequenceSourceMs);
+        m_waitingForSequenceMedia = false;
+        m_player->play();
+        m_sequenceClock.start();
+    } else if (m_player->mediaStatus() == QMediaPlayer::InvalidMedia) {
+        m_waitingForSequenceMedia = false;
+        m_activeSequenceClipId = -1;
+        m_sequencePositionMs = m_activeSequenceClipEndMs;
+        m_sequenceClock.start();
+        statusBar()->showMessage("A timeline clip could not be decoded; skipping it", 6000);
+    }
+}
+
+void MainWindow::updateSequenceTimeLabel()
+{
+    if (m_sequenceTimeLabel)
+        m_sequenceTimeLabel->setText(formatTime(m_sequencePositionMs));
 }
 
 void MainWindow::updatePosition(qint64 position)

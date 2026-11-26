@@ -29,7 +29,9 @@ This roadmap describes planned work. A feature is complete only after implementa
 - [ ] Ripple and roll editing
 - [ ] Markers and advanced track controls
 - [ ] Undo/redo command stack
-- [ ] Sequence playback across clips
+- [x] Basic video sequence playback across timeline clips
+- [ ] Compositing of overlapping video tracks and frame-accurate timeline clock
+- [ ] Separate audio-track playback and mixing
 
 ## Milestone 3 — Rendering and media engine
 - [ ] FFmpeg integration with documented license/build choices

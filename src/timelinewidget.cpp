@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QSizePolicy>
 #include <QStringList>
+#include <limits>
 #include <QTimer>
 #include <QUrl>
 
@@ -117,6 +118,86 @@ void TimelineWidget::probeMediaDuration(int clipId, const QString &path)
     });
 
     probe->setSource(QUrl::fromLocalFile(path));
+}
+
+bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
+{
+    int bestIndex = -1;
+    int bestTrack = -1;
+
+    for (int i = 0; i < m_clips.size(); ++i) {
+        const Clip &clip = m_clips.at(i);
+        if (clip.track >= 3) continue;
+
+        const qint64 clipEnd = clip.timelineStartMs + clip.durationMs;
+        if (positionMs >= clip.timelineStartMs && positionMs < clipEnd
+            && clip.track > bestTrack) {
+            bestIndex = i;
+            bestTrack = clip.track;
+        }
+    }
+
+    if (bestIndex < 0) return false;
+
+    const Clip &clip = m_clips.at(bestIndex);
+    if (result) {
+        result->id = clip.id;
+        result->path = clip.path;
+        result->track = clip.track;
+        result->timelineStartMs = clip.timelineStartMs;
+        result->sourceInMs = clip.sourceInMs;
+        result->durationMs = clip.durationMs;
+    }
+    return true;
+}
+
+bool TimelineWidget::nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *result) const
+{
+    int bestIndex = -1;
+    qint64 bestStart = std::numeric_limits<qint64>::max();
+
+    for (int i = 0; i < m_clips.size(); ++i) {
+        const Clip &clip = m_clips.at(i);
+        if (clip.track >= 3 || clip.timelineStartMs < positionMs) continue;
+
+        if (clip.timelineStartMs < bestStart) {
+            bestIndex = i;
+            bestStart = clip.timelineStartMs;
+        }
+    }
+
+    if (bestIndex < 0) return false;
+
+    const Clip &clip = m_clips.at(bestIndex);
+    if (result) {
+        result->id = clip.id;
+        result->path = clip.path;
+        result->track = clip.track;
+        result->timelineStartMs = clip.timelineStartMs;
+        result->sourceInMs = clip.sourceInMs;
+        result->durationMs = clip.durationMs;
+    }
+    return true;
+}
+
+qint64 TimelineWidget::sequenceDurationMs() const
+{
+    qint64 result = 0;
+    for (const Clip &clip : m_clips)
+        result = qMax(result, clip.timelineStartMs + clip.durationMs);
+    return result;
+}
+
+qint64 TimelineWidget::playheadMs() const
+{
+    return m_playheadMs;
+}
+
+void TimelineWidget::setPlayheadMs(qint64 positionMs, bool notify)
+{
+    m_playheadMs = qMax<qint64>(0, positionMs);
+    update();
+    if (notify) emit playheadChanged(m_playheadMs);
 }
 
 int TimelineWidget::indexForClipId(int clipId) const

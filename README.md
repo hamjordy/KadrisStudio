@@ -2,7 +2,7 @@
 
 Independent open-source desktop video-editor project for Windows 11.
 
-**Status: early prototype (0.2.0).** The application provides a native Qt shell, media import, source playback, project save/open, and an interactive timeline foundation. Clips can be moved between tracks, trimmed from either edge, split at the playhead, selected, and deleted. The timeline stores clip timing and track placement in the project. This is not yet a full nonlinear editor: multi-clip sequence playback/rendering, effects, color grading, audio mixing, captions, undo/redo, and sequence export remain planned work.
+**Status: early prototype (0.3.0).** The application provides a native Qt shell, media import, source playback, project save/open, and an interactive timeline foundation. Clips can be moved between tracks, trimmed from either edge, split at the playhead, selected, and deleted. The timeline stores clip timing and track placement in the project. This is not yet a full nonlinear editor: timeline playback switches between video clips but does not composite overlapping video tracks. Separate audio-track mixing, effects, color grading, captions, undo/redo, frame-accurate timebase, and sequence export remain planned work.
 
 ## Current functionality
 - Native C++20 / Qt 6 Windows desktop application.
@@ -15,6 +15,7 @@ Independent open-source desktop video-editor project for Windows 11.
 - Trim clip in/out points by dragging timeline edges.
 - Position the playhead and split a selected clip at that point.
 - Delete selected clips and use the Delete/Backspace keys.
+- Play video clips across the video tracks in timeline order in the program monitor, honoring clip start positions and source in-points.
 - Save timeline positions, source in-points, durations, and track assignments in project format version 2 (version 1 projects remain readable).
 - Create, save, and reopen .kadris project files.
 - GitHub Actions Windows build workflow.

@@ -18,8 +18,22 @@ class TimelineWidget final : public QWidget
 public:
     explicit TimelineWidget(QWidget *parent = nullptr);
 
+    struct ClipInfo {
+        int id = -1;
+        QString path;
+        int track = 0;
+        qint64 timelineStartMs = 0;
+        qint64 sourceInMs = 0;
+        qint64 durationMs = 0;
+    };
+
     void addClip(const QString &path);
     void clearClips();
+    bool clipAtTime(qint64 positionMs, ClipInfo *clip) const;
+    bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
+    qint64 sequenceDurationMs() const;
+    qint64 playheadMs() const;
+    void setPlayheadMs(qint64 positionMs, bool notify = false);
     bool splitSelectedClipAtPlayhead();
     bool deleteSelectedClip();
     QJsonArray toJson() const;
