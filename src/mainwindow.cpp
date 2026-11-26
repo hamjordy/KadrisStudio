@@ -162,7 +162,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             const QSignalBlocker opacityBlocker(m_clipOpacitySlider);
             const QSignalBlocker blendBlocker(m_clipBlendModeCombo);
             const QSignalBlocker audioVolumeBlocker(m_clipAudioVolumeSlider);
-            const QSignalBlocker clipAudioMuteBlocker(clipAudioMuteCheckBox);
+            const QSignalBlocker clipAudioMuteBlocker(m_clipAudioMuteCheckBox);
             const QSignalBlocker fadeInBlocker(m_clipFadeInSlider);
             const QSignalBlocker fadeOutBlocker(m_clipFadeOutSlider);
             m_clipColorSliders[0]->setValue(clip.brightness);
