@@ -314,6 +314,9 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->positionY = clip.positionY;
         result->opacity = clip.opacity;
         result->blendMode = clip.blendMode;
+        result->audioVolume = clip.audioVolume;
+        result->fadeInMs = clip.fadeInMs;
+        result->fadeOutMs = clip.fadeOutMs;
     }
     return true;
 }
@@ -507,6 +510,19 @@ bool TimelineWidget::setClipOpacity(int clipId, int opacity)
     m_clips[index].opacity = qBound(0, opacity, 100);
     update(); emit timelineEdited(); return true;
 }
+bool TimelineWidget::setClipAudioSettings(int clipId, int volume, int fadeInMs, int fadeOutMs)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    clip.audioVolume = qBound(0, volume, 100);
+    clip.fadeInMs = qBound(0, fadeInMs, 5000);
+    clip.fadeOutMs = qBound(0, fadeOutMs, 5000);
+    emit timelineEdited();
+    update();
+    return true;
+}
+
 bool TimelineWidget::addOpacityKeyframe(int clipId, qint64 timelineTimeMs, int opacity)
 {
     const int index = indexForClipId(clipId);
@@ -1011,6 +1027,9 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("positionY", clip.positionY);
         item.insert("opacity", clip.opacity);
         item.insert("blendMode", clip.blendMode);
+        item.insert("audioVolume", clip.audioVolume);
+        item.insert("fadeInMs", clip.fadeInMs);
+        item.insert("fadeOutMs", clip.fadeOutMs);
         QJsonArray opacityKeyframes;
         for (const Keyframe &keyframe : clip.opacityKeyframes) {
             QJsonObject frame; frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
@@ -1104,6 +1123,9 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.positionY = qBound(-100, item.value("positionY").toInt(0), 100);
         clip.opacity = qBound(0, item.value("opacity").toInt(100), 100);
         clip.blendMode = qBound(0, item.value("blendMode").toInt(0), 3);
+        clip.audioVolume = qBound(0, item.value("audioVolume").toInt(100), 100);
+        clip.fadeInMs = qBound(0, item.value("fadeInMs").toInt(0), 5000);
+        clip.fadeOutMs = qBound(0, item.value("fadeOutMs").toInt(0), 5000);
         const QJsonArray opacityKeyframes = item.value("opacityKeyframes").toArray();
         for (const QJsonValue &frameValue : opacityKeyframes) {
             if (!frameValue.isObject()) continue;
