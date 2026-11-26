@@ -1,5 +1,7 @@
 #include "programmonitorwidget.h"
 
+#include <QColor>
+
 #include <QFont>
 #include <QPainter>
 #include <QPaintEvent>
