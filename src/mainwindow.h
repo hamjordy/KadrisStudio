@@ -94,6 +94,7 @@ private:
     float m_masterGain = 1.0f;
     TimelineWidget *m_timeline = nullptr;
     std::array<QSlider *, 9> m_clipColorSliders{};
+    std::array<QSlider *, 3> m_clipTransformSliders{};
     int m_selectedTimelineClipId = -1;
     QVector<QJsonArray> m_undoHistory;
     QVector<QJsonArray> m_redoHistory;
