@@ -549,6 +549,15 @@ void MainWindow::buildMenus()
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
     QMenu *sequence = menuBar()->addMenu("&Sequence");
+    auto *duplicateClipAction = sequence->addAction("Duplicate Selected Clip");
+    duplicateClipAction->setShortcut(QKeySequence("Ctrl+D"));
+    connect(duplicateClipAction, &QAction::triggered, this, [this]() {
+        if (!m_timeline->duplicateSelectedClip())
+            statusBar()->showMessage("Select an unlocked timeline clip to duplicate", 3500);
+        else
+            statusBar()->showMessage("Clip duplicated after the original", 3000);
+    });
+
     auto *addMarkerAction = sequence->addAction("Add Timeline Marker");
     addMarkerAction->setShortcut(QKeySequence("M"));
     connect(addMarkerAction, &QAction::triggered, m_timeline, &TimelineWidget::addMarker);
