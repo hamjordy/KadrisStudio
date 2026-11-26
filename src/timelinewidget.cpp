@@ -41,33 +41,39 @@ QVector<float> readWaveformPeaks(const QString &path)
     QVector<float> peaks;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return peaks;
-    const QByteArray bytes = file.readAll();
-    if (bytes.size() < 44 || bytes.left(4) != "RIFF"
-        || bytes.mid(8, 4) != "WAVE") return peaks;
+    // Read only the RIFF header and chunk metadata first. Avoid loading an
+    // entire multi-gigabyte WAV into memory just to build a small thumbnail.
+    QByteArray header = file.read(12);
+    if (header.size() != 12 || header.left(4) != "RIFF"
+        || header.mid(8, 4) != "WAVE") return peaks;
 
     quint16 format = 0, channels = 0, bitsPerSample = 0, blockAlign = 0;
-    qsizetype dataOffset = -1;
-    qsizetype dataSize = 0;
-    for (qsizetype offset = 12; offset + 8 <= bytes.size();) {
-        const char *chunk = bytes.constData() + offset;
+    qint64 dataOffset = -1;
+    qint64 dataSize = 0;
+    while (!file.atEnd()) {
+        const QByteArray chunkHeader = file.read(8);
+        if (chunkHeader.size() != 8) break;
         const quint32 chunkSize = qFromLittleEndian<quint32>(
-            reinterpret_cast<const uchar *>(chunk + 4));
-        const qsizetype payload = offset + 8;
-        if (QByteArrayView(chunk, 4) == QByteArrayView("fmt ", 4)
-            && chunkSize >= 16 && payload + 16 <= bytes.size()) {
-            const auto *fmt = reinterpret_cast<const uchar *>(bytes.constData() + payload);
-            format = qFromLittleEndian<quint16>(fmt);
-            channels = qFromLittleEndian<quint16>(fmt + 2);
-            blockAlign = qFromLittleEndian<quint16>(fmt + 12);
-            bitsPerSample = qFromLittleEndian<quint16>(fmt + 14);
-        } else if (QByteArrayView(chunk, 4) == QByteArrayView("data", 4)) {
+            reinterpret_cast<const uchar *>(chunkHeader.constData() + 4));
+        const qint64 payload = file.pos();
+        if (chunkHeader.left(4) == "fmt " && chunkSize >= 16) {
+            const QByteArray fmt = file.read(16);
+            if (fmt.size() != 16) return peaks;
+            format = qFromLittleEndian<quint16>(
+                reinterpret_cast<const uchar *>(fmt.constData()));
+            channels = qFromLittleEndian<quint16>(
+                reinterpret_cast<const uchar *>(fmt.constData() + 2));
+            blockAlign = qFromLittleEndian<quint16>(
+                reinterpret_cast<const uchar *>(fmt.constData() + 12));
+            bitsPerSample = qFromLittleEndian<quint16>(
+                reinterpret_cast<const uchar *>(fmt.constData() + 14));
+        } else if (chunkHeader.left(4) == "data") {
             dataOffset = payload;
-            dataSize = qMin<qsizetype>(chunkSize, bytes.size() - payload);
+            dataSize = chunkSize;
+            break;
         }
-        const qsizetype advance = 8 + static_cast<qsizetype>(chunkSize)
-            + (chunkSize & 1u);
-        if (advance <= 8 || offset > bytes.size() - advance) break;
-        offset += advance;
+        const qint64 nextChunk = payload + chunkSize + (chunkSize & 1u);
+        if (nextChunk < payload || !file.seek(nextChunk)) break;
     }
 
     if (dataOffset < 0 || dataSize <= 0 || channels == 0 || blockAlign == 0
@@ -78,15 +84,20 @@ QVector<float> readWaveformPeaks(const QString &path)
 
     const int bytesPerSample = bitsPerSample / 8;
     if (blockAlign < channels * bytesPerSample) return peaks;
-    const qsizetype frameCount = dataSize / blockAlign;
-    if (frameCount <= 0) return peaks;
-    const int bucketCount = static_cast<int>(qMin<qsizetype>(1600, frameCount));
+    dataSize = qMin<qint64>(dataSize, file.size() - dataOffset);
+    const qint64 frameCount = dataSize / blockAlign;
+    if (frameCount <= 0 || !file.seek(dataOffset)) return peaks;
+    const int bucketCount = static_cast<int>(qMin<qint64>(1600, frameCount));
     peaks.fill(0.0f, bucketCount);
-    const auto *data = reinterpret_cast<const uchar *>(bytes.constData() + dataOffset);
+    const qint64 framesPerBucket = qMax<qint64>(1,
+        (frameCount + bucketCount - 1) / bucketCount);
+    QByteArray frameBuffer;
 
-    for (qsizetype frame = 0; frame < frameCount; ++frame) {
+    for (qint64 frame = 0; frame < frameCount; ++frame) {
+        if (frameBuffer.size() != blockAlign) frameBuffer.resize(blockAlign);
+        if (file.read(frameBuffer.data(), blockAlign) != blockAlign) break;
+        const auto *frameData = reinterpret_cast<const uchar *>(frameBuffer.constData());
         float framePeak = 0.0f;
-        const uchar *frameData = data + frame * blockAlign;
         for (quint16 channel = 0; channel < channels; ++channel) {
             const uchar *sample = frameData + channel * bytesPerSample;
             double value = 0.0;
@@ -109,8 +120,9 @@ QVector<float> readWaveformPeaks(const QString &path)
             }
             framePeak = qMax(framePeak, static_cast<float>(qBound(0.0, std::abs(value), 1.0)));
         }
-        const int bucket = static_cast<int>(frame * bucketCount / frameCount);
-        peaks[bucket] = qMax(peaks.at(bucket), framePeak);
+        const int bucket = static_cast<int>(frame / framesPerBucket);
+        if (bucket < bucketCount)
+            peaks[bucket] = qMax(peaks.at(bucket), framePeak);
     }
     return peaks;
 }
