@@ -304,7 +304,33 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->timelineStartMs = clip.timelineStartMs;
         result->sourceInMs = clip.sourceInMs;
         result->durationMs = clip.durationMs;
+        result->brightness = clip.brightness; result->contrast = clip.contrast;
+        result->saturation = clip.saturation; result->shadows = clip.shadows;
+        result->midtones = clip.midtones; result->highlights = clip.highlights;
+        result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
+        result->blueCurve = clip.blueCurve;
     }
+    return true;
+}
+
+bool TimelineWidget::setClipColorSettings(int clipId, int brightness, int contrast, int saturation,
+                                              int shadows, int midtones, int highlights,
+                                              int redCurve, int greenCurve, int blueCurve)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    clip.brightness = qBound(-100, brightness, 100);
+    clip.contrast = qBound(-100, contrast, 100);
+    clip.saturation = qBound(0, saturation, 200);
+    clip.shadows = qBound(-100, shadows, 100);
+    clip.midtones = qBound(-100, midtones, 100);
+    clip.highlights = qBound(-100, highlights, 100);
+    clip.redCurve = qBound(-100, redCurve, 100);
+    clip.greenCurve = qBound(-100, greenCurve, 100);
+    clip.blueCurve = qBound(-100, blueCurve, 100);
+    emit timelineEdited();
+    update();
     return true;
 }
 
@@ -335,6 +361,11 @@ bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
         result->timelineStartMs = clip.timelineStartMs;
         result->sourceInMs = clip.sourceInMs;
         result->durationMs = clip.durationMs;
+        result->brightness = clip.brightness; result->contrast = clip.contrast;
+        result->saturation = clip.saturation; result->shadows = clip.shadows;
+        result->midtones = clip.midtones; result->highlights = clip.highlights;
+        result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
+        result->blueCurve = clip.blueCurve;
     }
     return true;
 }
@@ -356,6 +387,11 @@ bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *r
                 result->timelineStartMs = clip.timelineStartMs;
                 result->sourceInMs = clip.sourceInMs;
                 result->durationMs = clip.durationMs;
+        result->brightness = clip.brightness; result->contrast = clip.contrast;
+        result->saturation = clip.saturation; result->shadows = clip.shadows;
+        result->midtones = clip.midtones; result->highlights = clip.highlights;
+        result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
+        result->blueCurve = clip.blueCurve;
             }
             return true;
         }
@@ -388,6 +424,11 @@ bool TimelineWidget::nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *result)
         result->timelineStartMs = clip.timelineStartMs;
         result->sourceInMs = clip.sourceInMs;
         result->durationMs = clip.durationMs;
+        result->brightness = clip.brightness; result->contrast = clip.contrast;
+        result->saturation = clip.saturation; result->shadows = clip.shadows;
+        result->midtones = clip.midtones; result->highlights = clip.highlights;
+        result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
+        result->blueCurve = clip.blueCurve;
     }
     return true;
 }
@@ -608,6 +649,17 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("sourceInMs", static_cast<double>(clip.sourceInMs));
         item.insert("durationMs", static_cast<double>(clip.durationMs));
         item.insert("durationKnown", clip.durationKnown);
+        QJsonObject color;
+        color.insert("brightness", clip.brightness);
+        color.insert("contrast", clip.contrast);
+        color.insert("saturation", clip.saturation);
+        color.insert("shadows", clip.shadows);
+        color.insert("midtones", clip.midtones);
+        color.insert("highlights", clip.highlights);
+        color.insert("redCurve", clip.redCurve);
+        color.insert("greenCurve", clip.greenCurve);
+        color.insert("blueCurve", clip.blueCurve);
+        item.insert("color", color);
         result.append(item);
     }
     return result;
@@ -644,6 +696,16 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
             : kDefaultClipDurationMs;
         clip.durationMs = qMax(kMinimumClipDurationMs, clip.durationMs);
         clip.durationKnown = item.value("durationKnown").toBool(false);
+        const QJsonObject color = item.value("color").toObject();
+        clip.brightness = color.value("brightness").toInt(0);
+        clip.contrast = color.value("contrast").toInt(0);
+        clip.saturation = color.value("saturation").toInt(100);
+        clip.shadows = color.value("shadows").toInt(0);
+        clip.midtones = color.value("midtones").toInt(0);
+        clip.highlights = color.value("highlights").toInt(0);
+        clip.redCurve = color.value("redCurve").toInt(0);
+        clip.greenCurve = color.value("greenCurve").toInt(0);
+        clip.blueCurve = color.value("blueCurve").toInt(0);
 
         legacyTrackEnd[track] = qMax(legacyTrackEnd[track],
             clip.timelineStartMs + clip.durationMs);
