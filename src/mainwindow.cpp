@@ -486,6 +486,43 @@ void MainWindow::buildInterface()
         });
     inspectorLayout->addWidget(addKeyframeButton);
     inspectorLayout->addWidget(removeKeyframeButton);
+    auto *contrastKeyframeHeading = new QLabel("ANIMATION — CONTRAST");
+    contrastKeyframeHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(contrastKeyframeHeading);
+    auto *contrastKeyframeCountLabel = new QLabel("Contrast keyframes: 0");
+    contrastKeyframeCountLabel->setObjectName("mutedLabel");
+    inspectorLayout->addWidget(contrastKeyframeCountLabel);
+    auto *addContrastKeyframeButton = new QPushButton("Add / Update Contrast Keyframe");
+    auto *removeContrastKeyframeButton = new QPushButton("Remove Nearest Contrast Keyframe");
+    connect(addContrastKeyframeButton, &QPushButton::clicked, this,
+        [this, contrastKeyframeCountLabel, contrastSlider]() {
+            if (m_selectedTimelineClipId < 0) {
+                statusBar()->showMessage("Select a video clip before adding keyframes", 3500);
+                return;
+            }
+            if (m_timeline->addContrastKeyframe(m_selectedTimelineClipId,
+                    m_timeline->playheadMs(), contrastSlider->value())) {
+                contrastKeyframeCountLabel->setText(QString("Contrast keyframes: %1")
+                    .arg(m_timeline->contrastKeyframeCount(m_selectedTimelineClipId)));
+                statusBar()->showMessage("Contrast keyframe added at the playhead", 3000);
+                refreshPausedTimelinePreview();
+            }
+        });
+    connect(removeContrastKeyframeButton, &QPushButton::clicked, this,
+        [this, contrastKeyframeCountLabel]() {
+            if (m_selectedTimelineClipId < 0) return;
+            if (m_timeline->removeContrastKeyframeAt(
+                    m_selectedTimelineClipId, m_timeline->playheadMs())) {
+                contrastKeyframeCountLabel->setText(QString("Contrast keyframes: %1")
+                    .arg(m_timeline->contrastKeyframeCount(m_selectedTimelineClipId)));
+                statusBar()->showMessage("Nearest contrast keyframe removed", 3000);
+                refreshPausedTimelinePreview();
+            } else {
+                statusBar()->showMessage("No contrast keyframe close to the playhead", 3000);
+            }
+        });
+    inspectorLayout->addWidget(addContrastKeyframeButton);
+    inspectorLayout->addWidget(removeContrastKeyframeButton);
     inspectorLayout->addStretch(1);
     inspectorDock->setWidget(inspector);
     addDockWidget(Qt::RightDockWidgetArea, inspectorDock);
@@ -1192,7 +1229,9 @@ void MainWindow::refreshPausedTimelinePreview()
 
         const int animatedBrightness = m_timeline->evaluatedBrightness(
             clip.id, m_sequencePositionMs);
-        m_monitor->setTrackColorGrade(track, animatedBrightness, clip.contrast,
+        const int animatedContrast = m_timeline->evaluatedContrast(
+            clip.id, m_sequencePositionMs);
+        m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
         if (m_activeVideoClipIds[track] == clip.id
@@ -1278,7 +1317,9 @@ void MainWindow::syncVideoTracks()
 
         const int animatedBrightness = m_timeline->evaluatedBrightness(
             clip.id, m_sequencePositionMs);
-        m_monitor->setTrackColorGrade(track, animatedBrightness, clip.contrast,
+        const int animatedContrast = m_timeline->evaluatedContrast(
+            clip.id, m_sequencePositionMs);
+        m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
         if (clip.id == m_activeVideoClipIds[track]) {
@@ -1295,7 +1336,7 @@ void MainWindow::syncVideoTracks()
         m_videoTrackPlayers[track]->stop();
         m_monitor->clearFrame(track);
         m_activeVideoClipIds[track] = clip.id;
-        m_monitor->setTrackColorGrade(track, animatedBrightness, clip.contrast,
+        m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
         m_waitingForVideoTrack[track] = false;
