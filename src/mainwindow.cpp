@@ -348,9 +348,34 @@ void MainWindow::buildInterface()
     addWheelSlider("Midtones", midtoneWheel);
     addWheelSlider("Highlights", highlightWheel);
 
+    auto *curvesHeading = new QLabel("RGB TONE CURVES");
+    curvesHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(curvesHeading);
+    auto *redCurve = new QSlider(Qt::Horizontal);
+    auto *greenCurve = new QSlider(Qt::Horizontal);
+    auto *blueCurve = new QSlider(Qt::Horizontal);
+    auto addCurveSlider = [this, inspectorLayout, redCurve, greenCurve, blueCurve](
+            const QString &name, QSlider *slider) {
+        auto *label = new QLabel(name + " curve: 0");
+        label->setObjectName("mutedLabel");
+        slider->setRange(-100, 100);
+        slider->setValue(0);
+        connect(slider, &QSlider::valueChanged, this,
+            [this, label, name, redCurve, greenCurve, blueCurve](int value) {
+                label->setText(QString("%1 curve: %2").arg(name).arg(value));
+                m_monitor->setRgbCurves(redCurve->value(),
+                    greenCurve->value(), blueCurve->value());
+            });
+        inspectorLayout->addWidget(label);
+        inspectorLayout->addWidget(slider);
+    };
+    addCurveSlider("Red", redCurve);
+    addCurveSlider("Green", greenCurve);
+    addCurveSlider("Blue", blueCurve);
+
     auto *resetColor = new QPushButton("Reset Color Correction");
     connect(resetColor, &QPushButton::clicked, this,
-        [brightnessSlider, contrastSlider, saturationSlider]() {
+        [brightnessSlider, contrastSlider, saturationSlider, shadowWheel, midtoneWheel, highlightWheel, redCurve, greenCurve, blueCurve]() {
             brightnessSlider->setValue(0);
             contrastSlider->setValue(0);
             saturationSlider->setValue(100);
