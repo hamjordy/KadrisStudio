@@ -589,28 +589,34 @@ void MainWindow::activateSequencePosition()
 
 void MainWindow::handleSequenceMediaStatus()
 {
-    if (!m_sequencePlaying || !m_waitingForSequenceMedia) return;
+    if (!m_sequencePlaying) return;
 
-    if (m_player->mediaStatus() == QMediaPlayer::LoadedMedia
-        || m_player->mediaStatus() == QMediaPlayer::BufferedMedia) {
+    const QMediaPlayer::MediaStatus status = m_player->mediaStatus();
+    if (status == QMediaPlayer::EndOfMedia && !m_waitingForSequenceMedia) {
+        m_activeSequenceClipId = -1;
+        m_sequencePositionMs = qMax(m_sequencePositionMs, m_activeSequenceClipEndMs);
+        m_timeline->setPlayheadMs(m_sequencePositionMs);
+        updateSequenceTimeLabel();
+        if (m_sequenceClock.isValid()) m_sequenceClock.restart();
+        else m_sequenceClock.start();
+        activateSequencePosition();
+        return;
+    }
+
+    if (!m_waitingForSequenceMedia) return;
+
+    if (status == QMediaPlayer::LoadedMedia
+        || status == QMediaPlayer::BufferedMedia) {
         m_player->setPosition(m_pendingSequenceSourceMs);
         m_waitingForSequenceMedia = false;
         m_player->play();
         m_sequenceClock.start();
-    } else if (m_player->mediaStatus() == QMediaPlayer::InvalidMedia) {
+    } else if (status == QMediaPlayer::InvalidMedia) {
         m_waitingForSequenceMedia = false;
         m_activeSequenceClipId = -1;
         m_sequencePositionMs = m_activeSequenceClipEndMs;
         m_sequenceClock.start();
         statusBar()->showMessage("A timeline clip could not be decoded; skipping it", 6000);
-        activateSequencePosition();
-    } else if (m_player->mediaStatus() == QMediaPlayer::EndOfMedia) {
-        m_waitingForSequenceMedia = false;
-        m_activeSequenceClipId = -1;
-        m_sequencePositionMs = qMax(m_sequencePositionMs, m_activeSequenceClipEndMs);
-        m_timeline->setPlayheadMs(m_sequencePositionMs);
-        updateSequenceTimeLabel();
-        m_sequenceClock.start();
         activateSequencePosition();
     }
 }
