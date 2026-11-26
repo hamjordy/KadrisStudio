@@ -100,6 +100,28 @@ void TimelineWidget::removeNearestMarker()
     }
 }
 
+void TimelineWidget::goToNextMarker()
+{
+    qint64 target = std::numeric_limits<qint64>::max();
+    for (const Marker &marker : m_markers) {
+        if (marker.timeMs > m_playheadMs && marker.timeMs < target)
+            target = marker.timeMs;
+    }
+    if (target != std::numeric_limits<qint64>::max())
+        setPlayheadMs(target, true);
+}
+
+void TimelineWidget::goToPreviousMarker()
+{
+    qint64 target = -1;
+    for (const Marker &marker : m_markers) {
+        if (marker.timeMs < m_playheadMs && marker.timeMs > target)
+            target = marker.timeMs;
+    }
+    if (target >= 0)
+        setPlayheadMs(target, true);
+}
+
 QJsonArray TimelineWidget::markersToJson() const
 {
     QJsonArray result;
