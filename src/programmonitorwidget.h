@@ -22,6 +22,9 @@ public:
     void setColorCorrection(int brightness, int contrast, int saturation);
     void setColorWheels(int shadows, int midtones, int highlights);
     void setRgbCurves(int red, int green, int blue);
+    void setTrackColorGrade(int track, int brightness, int contrast, int saturation,
+                            int shadows, int midtones, int highlights,
+                            int red, int green, int blue);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -31,14 +34,11 @@ private:
 
     std::array<QImage, 3> m_frames;
     std::array<QImage, 3> m_correctedFrames;
-    int m_brightness = 0;
-    int m_contrast = 0;
-    int m_saturation = 100;
-    int m_shadowWarmth = 0;
-    int m_midtoneWarmth = 0;
-    int m_highlightWarmth = 0;
-    int m_redCurve = 0;
-    int m_greenCurve = 0;
-    int m_blueCurve = 0;
+    struct ColorGrade {
+        int brightness = 0, contrast = 0, saturation = 100;
+        int shadows = 0, midtones = 0, highlights = 0;
+        int red = 0, green = 0, blue = 0;
+    };
+    std::array<ColorGrade, 3> m_colorGrades;
     QString m_caption;
 };
