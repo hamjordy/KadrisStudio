@@ -1509,6 +1509,26 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
             }
         }
 
+        if (audio && (clip.fadeInMs > 0 || clip.fadeOutMs > 0)) {
+            const int fadeInWidth = qBound(0,
+                qRound(static_cast<double>(clip.fadeInMs) * m_pixelsPerSecond / 1000.0),
+                qMax(0, bounds.width() - 8));
+            const int fadeOutWidth = qBound(0,
+                qRound(static_cast<double>(clip.fadeOutMs) * m_pixelsPerSecond / 1000.0),
+                qMax(0, bounds.width() - 8));
+            const int centerY = bounds.top() + 25;
+            const int amplitude = qMax(2, (bounds.height() - 22) / 2);
+            p.setPen(QPen(QColor("#fff0b5"), 2, Qt::DashLine));
+            if (fadeInWidth > 0) {
+                p.drawLine(bounds.left() + 4, centerY + amplitude,
+                           bounds.left() + 4 + fadeInWidth, centerY);
+            }
+            if (fadeOutWidth > 0) {
+                p.drawLine(bounds.right() - 4, centerY + amplitude,
+                           bounds.right() - 4 - fadeOutWidth, centerY);
+            }
+        }
+
         if (selected) {
             p.setPen(QPen(QColor("#f4d18c"), 2));
             p.drawLine(bounds.left() + kTrimHandleWidth, bounds.top() + 5,
