@@ -479,6 +479,14 @@ void MainWindow::buildMenus()
     zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
+    QMenu *sequence = menuBar()->addMenu("&Sequence");
+    auto *addMarkerAction = sequence->addAction("Add Timeline Marker");
+    addMarkerAction->setShortcut(QKeySequence("M"));
+    connect(addMarkerAction, &QAction::triggered, m_timeline, &TimelineWidget::addMarker);
+    auto *removeMarkerAction = sequence->addAction("Remove Nearest Marker");
+    removeMarkerAction->setShortcut(QKeySequence("Shift+M"));
+    connect(removeMarkerAction, &QAction::triggered, m_timeline, &TimelineWidget::removeNearestMarker);
+
     QMenu *media = menuBar()->addMenu("&Media");
     auto *importAction = media->addAction("&Import Media...");
     importAction->setShortcut(QKeySequence("Ctrl+I"));
@@ -542,10 +550,11 @@ bool MainWindow::writeProject(const QString &path)
     for (const QString &item : m_mediaPaths) media.append(item);
     QJsonObject root;
     root.insert("format", "kadris-project");
-    root.insert("formatVersion", 2);
+    root.insert("formatVersion", 3);
     root.insert("projectName", QFileInfo(path).completeBaseName());
     root.insert("mediaFiles", media);
     root.insert("timelineClips", m_timeline->toJson());
+    root.insert("timelineMarkers", m_timeline->markersToJson());
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -571,13 +580,15 @@ bool MainWindow::readProject(const QString &path)
     const QJsonObject root = document.object();
     if (root.value("format").toString() != "kadris-project"
         || (root.value("formatVersion").toInt() != 1
-            && root.value("formatVersion").toInt() != 2)) return false;
+            && root.value("formatVersion").toInt() != 2
+            && root.value("formatVersion").toInt() != 3)) return false;
 
     m_mediaPaths.clear();
     m_mediaList->clear();
     for (const QJsonValue &value : root.value("mediaFiles").toArray())
         addMediaPath(value.toString());
     m_timeline->fromJson(root.value("timelineClips").toArray());
+    m_timeline->markersFromJson(root.value("timelineMarkers").toArray());
     resetTimelineHistory();
     m_projectPath = path;
     m_player->stop();
