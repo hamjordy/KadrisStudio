@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QPainter>
 #include <QPaintEvent>
+#include <QPointF>
 #include <QRectF>
 #include <QStringList>
 #include <cmath>
@@ -180,12 +181,13 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
     // Lower-numbered tracks are painted first; higher tracks composite above them.
-    for (const QImage &frame : m_correctedFrames) {
+    for (size_t trackIndex = 0; trackIndex < m_correctedFrames.size(); ++trackIndex) {
+        const QImage &frame = m_correctedFrames[trackIndex];
         if (frame.isNull()) continue;
 
         const QSize scaled = frame.size().scaled(
             target.size().toSize(), Qt::KeepAspectRatio);
-        const TrackTransform &transform = m_transforms[static_cast<size_t>(&frame - &m_correctedFrames[0])];
+        const TrackTransform &transform = m_transforms[trackIndex];
         const double width = scaled.width() * transform.scale / 100.0;
         const double height = scaled.height() * transform.scale / 100.0;
         const QPointF center(target.center().x() + target.width() * transform.x / 100.0,
