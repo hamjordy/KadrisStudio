@@ -151,6 +151,30 @@ bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
     return true;
 }
 
+bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *result) const
+{
+    if (track < 0 || track >= 3) return false;
+
+    for (int i = 0; i < m_clips.size(); ++i) {
+        const Clip &clip = m_clips.at(i);
+        if (clip.track != track) continue;
+
+        const qint64 clipEnd = clip.timelineStartMs + clip.durationMs;
+        if (positionMs >= clip.timelineStartMs && positionMs < clipEnd) {
+            if (result) {
+                result->id = clip.id;
+                result->path = clip.path;
+                result->track = clip.track;
+                result->timelineStartMs = clip.timelineStartMs;
+                result->sourceInMs = clip.sourceInMs;
+                result->durationMs = clip.durationMs;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 bool TimelineWidget::nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *result) const
 {
     int bestIndex = -1;

@@ -14,6 +14,8 @@ qt_add_executable(kadris-studio WIN32
     src/mainwindow.h
     src/timelinewidget.cpp
     src/timelinewidget.h
+    src/programmonitorwidget.cpp
+    src/programmonitorwidget.h
 )
 qt_add_resources(kadris-studio kadris_resources
     PREFIX "/"

@@ -7,7 +7,6 @@
 #include <QWidget>
 
 class QKeyEvent;
-class QMediaPlayer;
 class QMouseEvent;
 class QPaintEvent;
 
@@ -30,6 +29,7 @@ public:
     void addClip(const QString &path);
     void clearClips();
     bool clipAtTime(qint64 positionMs, ClipInfo *clip) const;
+    bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
     bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
     qint64 sequenceDurationMs() const;
     qint64 playheadMs() const;
