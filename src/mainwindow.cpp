@@ -180,7 +180,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipOpacitySlider->setValue(clip.opacity);
             m_clipBlendModeCombo->setCurrentIndex(clip.blendMode);
             m_clipAudioVolumeSlider->setValue(clip.audioVolume);
-            clipAudioMuteCheckBox->setChecked(clip.audioMuted);
+            m_clipAudioMuteCheckBox->setChecked(clip.audioMuted);
             m_clipFadeInSlider->setValue(clip.fadeInMs);
             m_clipFadeOutSlider->setValue(clip.fadeOutMs);
             if (clip.track < 3)
@@ -626,14 +626,14 @@ void MainWindow::buildInterface()
     });
     inspectorLayout->addWidget(audioVolumeLabel);
     inspectorLayout->addWidget(m_clipAudioVolumeSlider);
-    auto *clipAudioMuteCheckBox = new QCheckBox("Mute this clip");
-    connect(clipAudioMuteCheckBox, &QCheckBox::toggled, this, [this](bool muted) {
+    m_clipAudioMuteCheckBox = new QCheckBox("Mute this clip");
+    connect(m_clipAudioMuteCheckBox, &QCheckBox::toggled, this, [this](bool muted) {
         if (m_selectedTimelineClipId >= 0) {
             m_timeline->setClipAudioMuted(m_selectedTimelineClipId, muted);
             applyAudioMixerState();
         }
     });
-    inspectorLayout->addWidget(clipAudioMuteCheckBox);
+    inspectorLayout->addWidget(m_clipAudioMuteCheckBox);
     auto *fadeInLabel = new QLabel("Fade in: 0 ms");
     fadeInLabel->setObjectName("mutedLabel");
     m_clipFadeInSlider = new QSlider(Qt::Horizontal);
