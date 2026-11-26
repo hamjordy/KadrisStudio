@@ -43,6 +43,8 @@ public:
     void markersFromJson(const QJsonArray &markers);
     void clearClips();
     bool clipAtTime(qint64 positionMs, ClipInfo *clip) const;
+    int selectedClipId() const;
+    bool selectedClipInfo(ClipInfo *clip) const;
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
     bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
     qint64 sequenceDurationMs() const;
@@ -59,6 +61,7 @@ public:
 
 signals:
     void clipActivated(const QString &path);
+    void clipSelectionChanged(int clipId, const QString &path, int track);
     void playheadChanged(qint64 positionMs);
     void timelineEdited();
     void markersChanged();
