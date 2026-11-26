@@ -312,6 +312,7 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->blueCurve = clip.blueCurve;
         result->scale = clip.scale; result->positionX = clip.positionX;
         result->positionY = clip.positionY;
+        result->opacity = clip.opacity;
     }
     return true;
 }
@@ -484,6 +485,68 @@ int TimelineWidget::evaluatedContrast(int clipId, qint64 timelineTimeMs) const
 }
 
 
+
+
+bool TimelineWidget::setClipOpacity(int clipId, int opacity)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    m_clips[index].opacity = qBound(0, opacity, 100);
+    update(); emit timelineEdited(); return true;
+}
+bool TimelineWidget::addOpacityKeyframe(int clipId, qint64 timelineTimeMs, int opacity)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs);
+    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    for (Keyframe &keyframe : clip.opacityKeyframes) {
+        if (keyframe.timeMs == snappedTime) { keyframe.value = qBound(0, opacity, 100); update(); emit timelineEdited(); return true; }
+    }
+    clip.opacityKeyframes.append({snappedTime, static_cast<double>(qBound(0, opacity, 100))});
+    std::sort(clip.opacityKeyframes.begin(), clip.opacityKeyframes.end(), [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
+    update(); emit timelineEdited(); return true;
+}
+bool TimelineWidget::removeOpacityKeyframeAt(int clipId, qint64 timelineTimeMs)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qMax<qint64>(0, timelineTimeMs - clip.timelineStartMs);
+    int nearest = -1; qint64 distance = std::numeric_limits<qint64>::max();
+    for (int i = 0; i < clip.opacityKeyframes.size(); ++i) {
+        const qint64 candidate = qAbs(clip.opacityKeyframes.at(i).timeMs - localTime);
+        if (candidate < distance) { distance = candidate; nearest = i; }
+    }
+    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    clip.opacityKeyframes.removeAt(nearest); update(); emit timelineEdited(); return true;
+}
+int TimelineWidget::opacityKeyframeCount(int clipId) const
+{
+    const int index = indexForClipId(clipId);
+    return index < 0 ? 0 : m_clips.at(index).opacityKeyframes.size();
+}
+int TimelineWidget::evaluatedOpacity(int clipId, qint64 timelineTimeMs) const
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return 100;
+    const Clip &clip = m_clips.at(index);
+    const auto &frames = clip.opacityKeyframes;
+    if (frames.isEmpty()) return clip.opacity;
+    const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs);
+    if (localTime <= frames.first().timeMs) return qRound(frames.first().value);
+    if (localTime >= frames.last().timeMs) return qRound(frames.last().value);
+    for (int i = 1; i < frames.size(); ++i) {
+        const Keyframe &right = frames.at(i), &left = frames.at(i - 1);
+        if (localTime <= right.timeMs) {
+            const double span = static_cast<double>(right.timeMs - left.timeMs);
+            const double t = span <= 0.0 ? 0.0 : static_cast<double>(localTime - left.timeMs) / span;
+            return qBound(0, qRound(left.value + (right.value - left.value) * t), 100);
+        }
+    }
+    return clip.opacity;
+}
 
 bool TimelineWidget::setClipTransformSettings(int clipId, int scale, int positionX, int positionY)
 {
@@ -933,6 +996,13 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("scale", clip.scale);
         item.insert("positionX", clip.positionX);
         item.insert("positionY", clip.positionY);
+        item.insert("opacity", clip.opacity);
+        QJsonArray opacityKeyframes;
+        for (const Keyframe &keyframe : clip.opacityKeyframes) {
+            QJsonObject frame; frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
+            frame.insert("value", keyframe.value); opacityKeyframes.append(frame);
+        }
+        item.insert("opacityKeyframes", opacityKeyframes);
         QJsonArray transformKeyframes;
         for (const Clip::TransformKeyframe &keyframe : clip.transformKeyframes) {
             QJsonObject frame;
@@ -1018,6 +1088,17 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.scale = qBound(10, item.value("scale").toInt(100), 300);
         clip.positionX = qBound(-100, item.value("positionX").toInt(0), 100);
         clip.positionY = qBound(-100, item.value("positionY").toInt(0), 100);
+        clip.opacity = qBound(0, item.value("opacity").toInt(100), 100);
+        const QJsonArray opacityKeyframes = item.value("opacityKeyframes").toArray();
+        for (const QJsonValue &frameValue : opacityKeyframes) {
+            if (!frameValue.isObject()) continue;
+            const QJsonObject frame = frameValue.toObject();
+            Keyframe keyframe;
+            keyframe.timeMs = qBound<qint64>(0, kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())), clip.durationMs);
+            keyframe.value = qBound(0.0, frame.value("value").toDouble(100.0), 100.0);
+            clip.opacityKeyframes.append(keyframe);
+        }
+        std::sort(clip.opacityKeyframes.begin(), clip.opacityKeyframes.end(), [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
         const QJsonArray transformKeyframes = item.value("transformKeyframes").toArray();
         for (const QJsonValue &frameValue : transformKeyframes) {
             if (!frameValue.isObject()) continue;
