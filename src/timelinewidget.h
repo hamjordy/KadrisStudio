@@ -24,6 +24,9 @@ public:
         qint64 timelineStartMs = 0;
         qint64 sourceInMs = 0;
         qint64 durationMs = 0;
+        int brightness = 0, contrast = 0, saturation = 100;
+        int shadows = 0, midtones = 0, highlights = 0;
+        int redCurve = 0, greenCurve = 0, blueCurve = 0;
     };
 
     void addClip(const QString &path);
@@ -45,6 +48,9 @@ public:
     bool clipAtTime(qint64 positionMs, ClipInfo *clip) const;
     int selectedClipId() const;
     bool selectedClipInfo(ClipInfo *clip) const;
+    bool setClipColorSettings(int clipId, int brightness, int contrast, int saturation,
+                              int shadows, int midtones, int highlights,
+                              int redCurve, int greenCurve, int blueCurve);
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
     bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
     qint64 sequenceDurationMs() const;
@@ -84,6 +90,9 @@ private:
         qint64 sourceInMs = 0;
         qint64 durationMs = 5000;
         bool durationKnown = false;
+        int brightness = 0, contrast = 0, saturation = 100;
+        int shadows = 0, midtones = 0, highlights = 0;
+        int redCurve = 0, greenCurve = 0, blueCurve = 0;
     };
 
     enum class DragMode { None, Move, TrimLeft, TrimRight };
