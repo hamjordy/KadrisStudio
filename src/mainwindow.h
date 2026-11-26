@@ -2,6 +2,8 @@
 #include <QMainWindow>
 #include <QElapsedTimer>
 #include <QStringList>
+#include <QJsonArray>
+#include <QVector>
 #include <array>
 
 class QAudioOutput;
@@ -38,6 +40,9 @@ private slots:
     void syncAudioTracks();
     void handleAudioTrackStatus(int track);
     void applyAudioMixerState();
+    void undoTimelineEdit();
+    void redoTimelineEdit();
+    void resetTimelineHistory();
 
 private:
     void buildInterface();
@@ -85,6 +90,10 @@ private:
     QSlider *m_masterVolumeSlider = nullptr;
     float m_masterGain = 1.0f;
     TimelineWidget *m_timeline = nullptr;
+    QVector<QJsonArray> m_undoHistory;
+    QVector<QJsonArray> m_redoHistory;
+    QJsonArray m_lastTimelineState;
+    bool m_restoringTimeline = false;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
 };
