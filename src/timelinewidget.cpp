@@ -315,6 +315,7 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->opacity = clip.opacity;
         result->blendMode = clip.blendMode;
         result->audioVolume = clip.audioVolume;
+        result->audioMuted = clip.audioMuted;
         result->fadeInMs = clip.fadeInMs;
         result->fadeOutMs = clip.fadeOutMs;
     }
@@ -518,6 +519,17 @@ bool TimelineWidget::setClipAudioSettings(int clipId, int volume, int fadeInMs, 
     clip.audioVolume = qBound(0, volume, 100);
     clip.fadeInMs = qBound(0, fadeInMs, 5000);
     clip.fadeOutMs = qBound(0, fadeOutMs, 5000);
+    emit timelineEdited();
+    update();
+    return true;
+}
+
+bool TimelineWidget::setClipAudioMuted(int clipId, bool muted)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    if (m_clips[index].audioMuted == muted) return true;
+    m_clips[index].audioMuted = muted;
     emit timelineEdited();
     update();
     return true;
@@ -1085,6 +1097,7 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("opacity", clip.opacity);
         item.insert("blendMode", clip.blendMode);
         item.insert("audioVolume", clip.audioVolume);
+        item.insert("audioMuted", clip.audioMuted);
         item.insert("fadeInMs", clip.fadeInMs);
         item.insert("fadeOutMs", clip.fadeOutMs);
         QJsonArray audioVolumeKeyframes;
@@ -1187,6 +1200,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.opacity = qBound(0, item.value("opacity").toInt(100), 100);
         clip.blendMode = qBound(0, item.value("blendMode").toInt(0), 3);
         clip.audioVolume = qBound(0, item.value("audioVolume").toInt(100), 100);
+        clip.audioMuted = item.value("audioMuted").toBool(false);
         clip.fadeInMs = qBound(0, item.value("fadeInMs").toInt(0), 5000);
         clip.fadeOutMs = qBound(0, item.value("fadeOutMs").toInt(0), 5000);
         const QJsonArray audioVolumeKeyframes = item.value("audioVolumeKeyframes").toArray();
