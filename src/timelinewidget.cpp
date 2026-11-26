@@ -78,6 +78,7 @@ void TimelineWidget::addMarker()
     marker.label = QString("Marker %1").arg(m_markers.size() + 1);
     m_markers.append(marker);
     update();
+    emit markersChanged();
     emit timelineEdited();
 }
 
@@ -98,6 +99,7 @@ void TimelineWidget::removeNearestMarker()
     if (nearestIndex >= 0 && nearestDistance <= tolerance) {
         m_markers.removeAt(nearestIndex);
         update();
+        emit markersChanged();
         emit timelineEdited();
     }
 }
@@ -151,6 +153,7 @@ void TimelineWidget::markersFromJson(const QJsonArray &markers)
         m_markers.append(marker);
     }
     update();
+    emit markersChanged();
 }
 
 void TimelineWidget::addClip(const QString &path)
@@ -694,6 +697,7 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event)
                     if (!trimmedLabel.isEmpty()) {
                         m_markers[nearestIndex].label = trimmedLabel;
                         update();
+                        emit markersChanged();
                         emit timelineEdited();
                     }
                 }
