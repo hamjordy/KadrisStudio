@@ -52,6 +52,7 @@ signals:
     void clipActivated(const QString &path);
     void playheadChanged(qint64 positionMs);
     void timelineEdited();
+    void markersChanged();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
