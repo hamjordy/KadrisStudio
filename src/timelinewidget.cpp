@@ -104,6 +104,20 @@ void TimelineWidget::removeNearestMarker()
     }
 }
 
+bool TimelineWidget::removeMarkerAtTime(qint64 timeMs)
+{
+    for (int i = 0; i < m_markers.size(); ++i) {
+        if (m_markers.at(i).timeMs == timeMs) {
+            m_markers.removeAt(i);
+            update();
+            emit markersChanged();
+            emit timelineEdited();
+            return true;
+        }
+    }
+    return false;
+}
+
 void TimelineWidget::goToNextMarker()
 {
     qint64 target = std::numeric_limits<qint64>::max();
@@ -353,6 +367,7 @@ void TimelineWidget::clearClips()
 {
     m_clips.clear();
     m_markers.clear();
+    emit markersChanged();
     m_selectedClip = -1;
     m_nextClipId = 1;
     m_playheadMs = 0;
