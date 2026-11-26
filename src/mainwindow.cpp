@@ -406,8 +406,22 @@ void MainWindow::buildInterface()
         else
             statusBar()->showMessage("Timeline clip deleted", 3000);
     });
+    auto *zoomOutButton = new QPushButton("−");
+    zoomOutButton->setToolTip("Zoom timeline out");
+    auto *zoomResetButton = new QPushButton("100%");
+    zoomResetButton->setToolTip("Reset timeline zoom");
+    auto *zoomInButton = new QPushButton("+");
+    zoomInButton->setToolTip("Zoom timeline in");
+    connect(zoomOutButton, &QPushButton::clicked, m_timeline, &TimelineWidget::zoomOut);
+    connect(zoomResetButton, &QPushButton::clicked, m_timeline, &TimelineWidget::resetZoom);
+    connect(zoomInButton, &QPushButton::clicked, m_timeline, &TimelineWidget::zoomIn);
     timelineTools->addWidget(splitButton);
     timelineTools->addWidget(deleteButton);
+    timelineTools->addSpacing(12);
+    timelineTools->addWidget(new QLabel("ZOOM"));
+    timelineTools->addWidget(zoomOutButton);
+    timelineTools->addWidget(zoomResetButton);
+    timelineTools->addWidget(zoomInButton);
     timelineTools->addSpacing(12);
     timelineTools->addWidget(timelineHint);
     timelineTools->addStretch();
