@@ -29,6 +29,7 @@ public:
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
         int keyframeCount = 0;
         int scale = 100, positionX = 0, positionY = 0;
+        int opacity = 100;
     };
 
     void addClip(const QString &path);
@@ -56,6 +57,11 @@ public:
     bool addBrightnessKeyframe(int clipId, qint64 timelineTimeMs, int value);
     bool addContrastKeyframe(int clipId, qint64 timelineTimeMs, int value);
     bool setClipTransformSettings(int clipId, int scale, int positionX, int positionY);
+    bool setClipOpacity(int clipId, int opacity);
+    bool addOpacityKeyframe(int clipId, qint64 timelineTimeMs, int opacity);
+    bool removeOpacityKeyframeAt(int clipId, qint64 timelineTimeMs);
+    int opacityKeyframeCount(int clipId) const;
+    int evaluatedOpacity(int clipId, qint64 timelineTimeMs) const;
     bool addTransformKeyframe(int clipId, qint64 timelineTimeMs, int scale, int positionX, int positionY);
     bool removeTransformKeyframeAt(int clipId, qint64 timelineTimeMs);
     int transformKeyframeCount(int clipId) const;
@@ -112,6 +118,8 @@ private:
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
         QVector<Keyframe> brightnessKeyframes;
         QVector<Keyframe> contrastKeyframes;
+        int opacity = 100;
+        QVector<Keyframe> opacityKeyframes;
         struct TransformKeyframe { qint64 timeMs = 0; double scale = 100.0; double x = 0.0; double y = 0.0; };
         int scale = 100, positionX = 0, positionY = 0;
         QVector<TransformKeyframe> transformKeyframes;
