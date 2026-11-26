@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QListWidget>
 #include <QMediaPlayer>
 #include <QMenu>
 #include <QMenuBar>
@@ -436,6 +437,40 @@ void MainWindow::buildInterface()
     timelineLayout->addWidget(scroll, 1);
     timelineDock->setWidget(timelinePanel);
     addDockWidget(Qt::BottomDockWidgetArea, timelineDock);
+
+    auto *markerDock = new QDockWidget("Timeline Markers", this);
+    markerDock->setObjectName("timelineMarkersDock");
+    markerDock->setMinimumWidth(210);
+    auto *markerList = new QListWidget(markerDock);
+    markerList->setObjectName("timelineMarkerList");
+    markerList->setToolTip("Double-click a marker to move the playhead to it");
+    markerDock->setWidget(markerList);
+    addDockWidget(Qt::BottomDockWidgetArea, markerDock);
+    splitDockWidget(timelineDock, markerDock, Qt::Horizontal);
+
+    const auto refreshMarkerList = [this, markerList]() {
+        markerList->clear();
+        const QJsonArray markers = m_timeline->markersToJson();
+        for (const QJsonValue &value : markers) {
+            const QJsonObject marker = value.toObject();
+            const qint64 timeMs = static_cast<qint64>(marker.value("timeMs").toDouble());
+            const qint64 totalSeconds = timeMs / 1000;
+            const QString time = QString("%1:%2")
+                .arg(totalSeconds / 60, 2, 10, QLatin1Char('0'))
+                .arg(totalSeconds % 60, 2, 10, QLatin1Char('0'));
+            auto *item = new QListWidgetItem(
+                QString("%1   %2").arg(time, marker.value("label").toString()), markerList);
+            item->setData(Qt::UserRole, timeMs);
+        }
+    };
+    connect(m_timeline, &TimelineWidget::timelineEdited, this, refreshMarkerList);
+    connect(markerList, &QListWidget::itemDoubleClicked, this,
+        [this](QListWidgetItem *item) {
+            if (!item) return;
+            m_timeline->setPlayheadMs(item->data(Qt::UserRole).toLongLong(), true);
+        });
+    refreshMarkerList();
+
     resizeDocks({mediaDock, inspectorDock}, {260, 290}, Qt::Horizontal);
 }
 
