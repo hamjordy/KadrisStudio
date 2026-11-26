@@ -32,6 +32,7 @@ public:
     void resetZoom();
     void addMarker();
     void removeNearestMarker();
+    bool removeMarkerAtTime(qint64 timeMs);
     void goToNextMarker();
     void goToPreviousMarker();
     QJsonArray markersToJson() const;
