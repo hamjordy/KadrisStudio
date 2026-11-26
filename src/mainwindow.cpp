@@ -592,7 +592,7 @@ void MainWindow::buildInterface()
     inspectorLayout->addWidget(blendModeHeading);
     m_clipBlendModeCombo = new QComboBox();
     m_clipBlendModeCombo->addItems({"Normal", "Multiply", "Screen", "Overlay"});
-    connect(m_clipBlendModeCombo, &QComboBox::currentIndexChanged, this, [this](int mode) {
+    connect(m_clipBlendModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this, [this](int mode) {
         if (m_selectedTimelineClipId < 0) return;
         if (!m_timeline->setClipBlendMode(m_selectedTimelineClipId, mode)) return;
         TimelineWidget::ClipInfo clip;
