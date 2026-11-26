@@ -30,6 +30,10 @@ public:
     void zoomIn();
     void zoomOut();
     void resetZoom();
+    void addMarker();
+    void removeNearestMarker();
+    QJsonArray markersToJson() const;
+    void markersFromJson(const QJsonArray &markers);
     void clearClips();
     bool clipAtTime(qint64 positionMs, ClipInfo *clip) const;
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
@@ -76,7 +80,9 @@ private:
     int indexForClipId(int clipId) const;
     QString formatTime(qint64 milliseconds) const;
 
+    struct Marker { qint64 timeMs = 0; QString label; };
     QVector<Clip> m_clips;
+    QVector<Marker> m_markers;
     int m_selectedClip = -1;
     int m_nextClipId = 1;
     qint64 m_playheadMs = 0;
