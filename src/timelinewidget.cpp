@@ -1550,6 +1550,10 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
                 p.drawLine(previous, current);
                 previous = current;
             }
+            // Keep the final automation value visible through the end of the clip.
+            const QPoint clipEnd = automationPoint(clip.durationMs,
+                clip.audioVolumeKeyframes.last().value);
+            p.drawLine(previous, clipEnd);
             p.setBrush(QColor("#d8c5ff"));
             for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
                 const QPoint point = automationPoint(keyframe.timeMs, keyframe.value);
