@@ -49,6 +49,7 @@ public:
     qint64 playheadMs() const;
     void setPlayheadMs(qint64 positionMs, bool notify = false);
     bool splitSelectedClipAtPlayhead();
+    int splitAllClipsAtPlayhead();
     bool deleteSelectedClip();
     bool duplicateSelectedClip();
     bool rippleDeleteSelectedClip();
