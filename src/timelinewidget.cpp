@@ -1840,6 +1840,31 @@ void TimelineWidget::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+    // Page Up/Down jump between edit points across all timeline tracks.
+    if (event->key() == Qt::Key_PageUp || event->key() == Qt::Key_PageDown) {
+        const bool forward = event->key() == Qt::Key_PageDown;
+        qint64 target = forward
+            ? std::numeric_limits<qint64>::max() : -1;
+        for (const Clip &clip : m_clips) {
+            const qint64 editPoints[] = {
+                clip.timelineStartMs,
+                clip.timelineStartMs + clip.durationMs
+            };
+            for (qint64 point : editPoints) {
+                if (forward && point > m_playheadMs && point < target)
+                    target = point;
+                else if (!forward && point < m_playheadMs && point > target)
+                    target = point;
+            }
+        }
+        if ((forward && target != std::numeric_limits<qint64>::max())
+            || (!forward && target >= 0)) {
+            setPlayheadMs(target, true);
+        }
+        event->accept();
+        return;
+    }
+
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
         if (deleteSelectedClip()) {
             event->accept();
