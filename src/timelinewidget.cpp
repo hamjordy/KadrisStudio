@@ -442,6 +442,45 @@ bool TimelineWidget::splitSelectedClipAtPlayhead()
     return true;
 }
 
+int TimelineWidget::splitAllClipsAtPlayhead()
+{
+    const qint64 splitTime = kTimelineTimebase.snapMilliseconds(
+        qMax<qint64>(0, m_playheadMs));
+    int splitCount = 0;
+    int lastRightClip = -1;
+
+    // Iterate backwards so inserting right-hand segments never invalidates
+    // the indices of clips that are still waiting to be examined.
+    for (int i = m_clips.size() - 1; i >= 0; --i) {
+        const Clip original = m_clips.at(i);
+        if (isTrackLocked(original.track)) continue;
+
+        const qint64 clipEnd = original.timelineStartMs + original.durationMs;
+        if (splitTime <= original.timelineStartMs + kMinimumClipDurationMs
+            || splitTime >= clipEnd - kMinimumClipDurationMs) continue;
+
+        const qint64 leftDuration = splitTime - original.timelineStartMs;
+        Clip right = original;
+        right.id = m_nextClipId++;
+        right.timelineStartMs = splitTime;
+        right.sourceInMs += leftDuration;
+        right.durationMs -= leftDuration;
+
+        m_clips[i].durationMs = leftDuration;
+        m_clips.insert(i + 1, right);
+        lastRightClip = i + 1;
+        ++splitCount;
+    }
+
+    if (splitCount == 0) return 0;
+
+    m_selectedClip = lastRightClip;
+    updateCanvasSize();
+    update();
+    emit timelineEdited();
+    return splitCount;
+}
+
 bool TimelineWidget::deleteSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
