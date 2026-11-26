@@ -313,6 +313,7 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->scale = clip.scale; result->positionX = clip.positionX;
         result->positionY = clip.positionY;
         result->opacity = clip.opacity;
+        result->blendMode = clip.blendMode;
     }
     return true;
 }
@@ -485,6 +486,18 @@ int TimelineWidget::evaluatedContrast(int clipId, qint64 timelineTimeMs) const
 }
 
 
+
+
+
+bool TimelineWidget::setClipBlendMode(int clipId, int blendMode)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    m_clips[index].blendMode = qBound(0, blendMode, 3);
+    update();
+    emit timelineEdited();
+    return true;
+}
 
 
 bool TimelineWidget::setClipOpacity(int clipId, int opacity)
@@ -997,6 +1010,7 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("positionX", clip.positionX);
         item.insert("positionY", clip.positionY);
         item.insert("opacity", clip.opacity);
+        item.insert("blendMode", clip.blendMode);
         QJsonArray opacityKeyframes;
         for (const Keyframe &keyframe : clip.opacityKeyframes) {
             QJsonObject frame; frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
@@ -1089,6 +1103,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.positionX = qBound(-100, item.value("positionX").toInt(0), 100);
         clip.positionY = qBound(-100, item.value("positionY").toInt(0), 100);
         clip.opacity = qBound(0, item.value("opacity").toInt(100), 100);
+        clip.blendMode = qBound(0, item.value("blendMode").toInt(0), 3);
         const QJsonArray opacityKeyframes = item.value("opacityKeyframes").toArray();
         for (const QJsonValue &frameValue : opacityKeyframes) {
             if (!frameValue.isObject()) continue;
