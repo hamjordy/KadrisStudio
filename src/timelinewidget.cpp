@@ -310,6 +310,8 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->midtones = clip.midtones; result->highlights = clip.highlights;
         result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
         result->blueCurve = clip.blueCurve;
+        result->scale = clip.scale; result->positionX = clip.positionX;
+        result->positionY = clip.positionY;
     }
     return true;
 }
@@ -482,6 +484,104 @@ int TimelineWidget::evaluatedContrast(int clipId, qint64 timelineTimeMs) const
 }
 
 
+
+bool TimelineWidget::setClipTransformSettings(int clipId, int scale, int positionX, int positionY)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    clip.scale = qBound(10, scale, 300);
+    clip.positionX = qBound(-100, positionX, 100);
+    clip.positionY = qBound(-100, positionY, 100);
+    update();
+    emit timelineEdited();
+    return true;
+}
+
+bool TimelineWidget::addTransformKeyframe(int clipId, qint64 timelineTimeMs,
+                                           int scale, int positionX, int positionY)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
+                                            clip.durationMs);
+    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    for (Clip::TransformKeyframe &keyframe : clip.transformKeyframes) {
+        if (keyframe.timeMs == snappedTime) {
+            keyframe.scale = qBound(10, scale, 300);
+            keyframe.x = qBound(-100, positionX, 100);
+            keyframe.y = qBound(-100, positionY, 100);
+            update(); emit timelineEdited(); return true;
+        }
+    }
+    clip.transformKeyframes.append({snappedTime, static_cast<double>(qBound(10, scale, 300)),
+        static_cast<double>(qBound(-100, positionX, 100)),
+        static_cast<double>(qBound(-100, positionY, 100))});
+    std::sort(clip.transformKeyframes.begin(), clip.transformKeyframes.end(),
+        [](const Clip::TransformKeyframe &a, const Clip::TransformKeyframe &b) {
+            return a.timeMs < b.timeMs;
+        });
+    update(); emit timelineEdited(); return true;
+}
+
+bool TimelineWidget::removeTransformKeyframeAt(int clipId, qint64 timelineTimeMs)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qMax<qint64>(0, timelineTimeMs - clip.timelineStartMs);
+    int nearest = -1;
+    qint64 distance = std::numeric_limits<qint64>::max();
+    for (int i = 0; i < clip.transformKeyframes.size(); ++i) {
+        const qint64 candidate = qAbs(clip.transformKeyframes.at(i).timeMs - localTime);
+        if (candidate < distance) { distance = candidate; nearest = i; }
+    }
+    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    clip.transformKeyframes.removeAt(nearest);
+    update(); emit timelineEdited(); return true;
+}
+
+int TimelineWidget::transformKeyframeCount(int clipId) const
+{
+    const int index = indexForClipId(clipId);
+    return index < 0 ? 0 : m_clips.at(index).transformKeyframes.size();
+}
+
+void TimelineWidget::evaluatedTransform(int clipId, qint64 timelineTimeMs,
+                                         int *scale, int *positionX, int *positionY) const
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return;
+    const Clip &clip = m_clips.at(index);
+    double s = clip.scale, x = clip.positionX, y = clip.positionY;
+    const auto &frames = clip.transformKeyframes;
+    if (!frames.isEmpty()) {
+        const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
+                                                clip.durationMs);
+        const Clip::TransformKeyframe *left = &frames.first();
+        const Clip::TransformKeyframe *right = &frames.last();
+        if (localTime <= frames.first().timeMs) right = left;
+        else if (localTime >= frames.last().timeMs) left = right;
+        else {
+            for (int i = 1; i < frames.size(); ++i) {
+                if (localTime <= frames.at(i).timeMs) {
+                    left = &frames.at(i - 1); right = &frames.at(i); break;
+                }
+            }
+        }
+        const double span = static_cast<double>(right->timeMs - left->timeMs);
+        const double t = span <= 0.0 ? 0.0
+            : qBound(0.0, static_cast<double>(localTime - left->timeMs) / span, 1.0);
+        s = left->scale + (right->scale - left->scale) * t;
+        x = left->x + (right->x - left->x) * t;
+        y = left->y + (right->y - left->y) * t;
+    }
+    if (scale) *scale = qBound(10, qRound(s), 300);
+    if (positionX) *positionX = qBound(-100, qRound(x), 100);
+    if (positionY) *positionY = qBound(-100, qRound(y), 100);
+}
+
 bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
 {
     int bestIndex = -1;
@@ -514,6 +614,8 @@ bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
         result->midtones = clip.midtones; result->highlights = clip.highlights;
         result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
         result->blueCurve = clip.blueCurve;
+        result->scale = clip.scale; result->positionX = clip.positionX;
+        result->positionY = clip.positionY;
     }
     return true;
 }
@@ -540,6 +642,8 @@ bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *r
         result->midtones = clip.midtones; result->highlights = clip.highlights;
         result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
         result->blueCurve = clip.blueCurve;
+        result->scale = clip.scale; result->positionX = clip.positionX;
+        result->positionY = clip.positionY;
             }
             return true;
         }
@@ -577,6 +681,8 @@ bool TimelineWidget::nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *result)
         result->midtones = clip.midtones; result->highlights = clip.highlights;
         result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
         result->blueCurve = clip.blueCurve;
+        result->scale = clip.scale; result->positionX = clip.positionX;
+        result->positionY = clip.positionY;
     }
     return true;
 }
@@ -824,6 +930,19 @@ QJsonArray TimelineWidget::toJson() const
             contrastKeyframes.append(frame);
         }
         item.insert("contrastKeyframes", contrastKeyframes);
+        item.insert("scale", clip.scale);
+        item.insert("positionX", clip.positionX);
+        item.insert("positionY", clip.positionY);
+        QJsonArray transformKeyframes;
+        for (const Clip::TransformKeyframe &keyframe : clip.transformKeyframes) {
+            QJsonObject frame;
+            frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
+            frame.insert("scale", keyframe.scale);
+            frame.insert("x", keyframe.x);
+            frame.insert("y", keyframe.y);
+            transformKeyframes.append(frame);
+        }
+        item.insert("transformKeyframes", transformKeyframes);
         result.append(item);
     }
     return result;
@@ -896,6 +1015,27 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         }
         std::sort(clip.contrastKeyframes.begin(), clip.contrastKeyframes.end(),
             [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
+        clip.scale = qBound(10, item.value("scale").toInt(100), 300);
+        clip.positionX = qBound(-100, item.value("positionX").toInt(0), 100);
+        clip.positionY = qBound(-100, item.value("positionY").toInt(0), 100);
+        const QJsonArray transformKeyframes = item.value("transformKeyframes").toArray();
+        for (const QJsonValue &frameValue : transformKeyframes) {
+            if (!frameValue.isObject()) continue;
+            const QJsonObject frame = frameValue.toObject();
+            Clip::TransformKeyframe keyframe;
+            keyframe.timeMs = qBound<qint64>(0,
+                kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
+                clip.durationMs);
+            keyframe.scale = qBound(10.0, frame.value("scale").toDouble(100.0), 300.0);
+            keyframe.x = qBound(-100.0, frame.value("x").toDouble(0.0), 100.0);
+            keyframe.y = qBound(-100.0, frame.value("y").toDouble(0.0), 100.0);
+            clip.transformKeyframes.append(keyframe);
+        }
+        std::sort(clip.transformKeyframes.begin(), clip.transformKeyframes.end(),
+            [](const Clip::TransformKeyframe &a, const Clip::TransformKeyframe &b) {
+                return a.timeMs < b.timeMs;
+            });
+
 
 
         legacyTrackEnd[track] = qMax(legacyTrackEnd[track],
