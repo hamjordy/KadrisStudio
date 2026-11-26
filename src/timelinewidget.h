@@ -33,6 +33,7 @@ public:
         int blendMode = 0;
         int audioVolume = 100;
         bool audioMuted = false;
+        QVector<float> waveformPeaks;
         int fadeInMs = 0, fadeOutMs = 0;
     };
 
