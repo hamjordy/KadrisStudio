@@ -443,7 +443,8 @@ void MainWindow::buildInterface()
     markerDock->setMinimumWidth(210);
     auto *markerList = new QListWidget(markerDock);
     markerList->setObjectName("timelineMarkerList");
-    markerList->setToolTip("Double-click a marker to move the playhead to it");
+    markerList->setToolTip("Double-click a marker to move the playhead to it; right-click to remove it");
+    markerList->setContextMenuPolicy(Qt::CustomContextMenu);
     markerDock->setWidget(markerList);
     addDockWidget(Qt::BottomDockWidgetArea, markerDock);
     splitDockWidget(timelineDock, markerDock, Qt::Horizontal);
@@ -461,9 +462,34 @@ void MainWindow::buildInterface()
             auto *item = new QListWidgetItem(
                 QString("%1   %2").arg(time, marker.value("label").toString()), markerList);
             item->setData(Qt::UserRole, timeMs);
+            if (timeMs == m_timeline->playheadMs()) {
+                item->setBackground(QColor("#49305f"));
+                item->setForeground(QColor("#ffffff"));
+            }
         }
     };
     connect(m_timeline, &TimelineWidget::markersChanged, this, refreshMarkerList);
+    connect(m_timeline, &TimelineWidget::playheadChanged, this,
+        [markerList](qint64 positionMs) {
+            for (int i = 0; i < markerList->count(); ++i) {
+                auto *item = markerList->item(i);
+                const bool active = item->data(Qt::UserRole).toLongLong() == positionMs;
+                item->setBackground(active ? QColor("#49305f") : QColor());
+                item->setForeground(active ? QColor("#ffffff") : QColor());
+            }
+        });
+    connect(markerList, &QListWidget::customContextMenuRequested, this,
+        [this, markerList](const QPoint &position) {
+            auto *item = markerList->itemAt(position);
+            if (!item) return;
+            QMenu menu(markerList);
+            QAction *removeAction = menu.addAction("Remove Marker");
+            if (menu.exec(markerList->mapToGlobal(position)) == removeAction) {
+                const qint64 timeMs = item->data(Qt::UserRole).toLongLong();
+                if (m_timeline->removeMarkerAtTime(timeMs))
+                    statusBar()->showMessage("Timeline marker removed", 3000);
+            }
+        });
     connect(markerList, &QListWidget::itemDoubleClicked, this,
         [this](QListWidgetItem *item) {
             if (!item) return;
