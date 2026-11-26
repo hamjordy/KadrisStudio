@@ -3,6 +3,7 @@
 
 #include <QFileInfo>
 #include <QInputDialog>
+#include <QLineEdit>
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QMediaPlayer>
