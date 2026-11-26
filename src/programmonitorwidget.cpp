@@ -53,62 +53,67 @@ void ProgramMonitorWidget::setCaption(const QString &caption)
 
 void ProgramMonitorWidget::setColorCorrection(int brightness, int contrast, int saturation)
 {
-    brightness = qBound(-100, brightness, 100);
-    contrast = qBound(-100, contrast, 100);
-    saturation = qBound(0, saturation, 200);
-    if (m_brightness == brightness && m_contrast == contrast
-        && m_saturation == saturation) return;
-    m_brightness = brightness;
-    m_contrast = contrast;
-    m_saturation = saturation;
-    rebuildCorrectedFrames();
-    update();
+    for (int track = 0; track < 3; ++track) {
+        const ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
+        setTrackColorGrade(track, brightness, contrast, saturation,
+            grade.shadows, grade.midtones, grade.highlights,
+            grade.red, grade.green, grade.blue);
+    }
 }
-
 
 void ProgramMonitorWidget::setColorWheels(int shadows, int midtones, int highlights)
 {
-    shadows = qBound(-100, shadows, 100);
-    midtones = qBound(-100, midtones, 100);
-    highlights = qBound(-100, highlights, 100);
-    if (m_shadowWarmth == shadows && m_midtoneWarmth == midtones
-        && m_highlightWarmth == highlights) return;
-    m_shadowWarmth = shadows;
-    m_midtoneWarmth = midtones;
-    m_highlightWarmth = highlights;
-    rebuildCorrectedFrames();
-    update();
+    for (int track = 0; track < 3; ++track) {
+        const ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
+        setTrackColorGrade(track, grade.brightness, grade.contrast, grade.saturation,
+            shadows, midtones, highlights, grade.red, grade.green, grade.blue);
+    }
 }
 
 void ProgramMonitorWidget::setRgbCurves(int red, int green, int blue)
 {
-    red = qBound(-100, red, 100);
-    green = qBound(-100, green, 100);
-    blue = qBound(-100, blue, 100);
-    if (m_redCurve == red && m_greenCurve == green && m_blueCurve == blue) return;
-    m_redCurve = red;
-    m_greenCurve = green;
-    m_blueCurve = blue;
+    for (int track = 0; track < 3; ++track) {
+        const ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
+        setTrackColorGrade(track, grade.brightness, grade.contrast, grade.saturation,
+            grade.shadows, grade.midtones, grade.highlights, red, green, blue);
+    }
+}
+
+void ProgramMonitorWidget::setTrackColorGrade(int track, int brightness, int contrast,
+    int saturation, int shadows, int midtones, int highlights, int red, int green, int blue)
+{
+    if (track < 0 || track >= 3) return;
+    ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
+    grade.brightness = qBound(-100, brightness, 100);
+    grade.contrast = qBound(-100, contrast, 100);
+    grade.saturation = qBound(0, saturation, 200);
+    grade.shadows = qBound(-100, shadows, 100);
+    grade.midtones = qBound(-100, midtones, 100);
+    grade.highlights = qBound(-100, highlights, 100);
+    grade.red = qBound(-100, red, 100);
+    grade.green = qBound(-100, green, 100);
+    grade.blue = qBound(-100, blue, 100);
     rebuildCorrectedFrames();
     update();
 }
 
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
-    const double contrastFactor = (259.0 * (m_contrast + 255.0))
-        / (255.0 * (259.0 - m_contrast));
     for (size_t index = 0; index < m_frames.size(); ++index) {
         if (m_frames[index].isNull()) {
             m_correctedFrames[index] = QImage();
             continue;
         }
+        const ColorGrade &grade = m_colorGrades[index];
+        const double contrastFactor = (259.0 * (grade.contrast + 255.0))
+            / (255.0 * (259.0 - grade.contrast));
         QImage image = m_frames[index].convertToFormat(QImage::Format_ARGB32);
         for (int y = 0; y < image.height(); ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
             for (int x = 0; x < image.width(); ++x) {
                 const QRgb pixel = line[x];
                 int red = qBound(0, qRound(contrastFactor * (qRed(pixel) - 128) + 128)
-                                     + m_brightness, 255);
+                                     + grade.brightness, 255);
                 int green = qBound(0, qRound(contrastFactor * (qGreen(pixel) - 128) + 128)
                                        + m_brightness, 255);
                 int blue = qBound(0, qRound(contrastFactor * (qBlue(pixel) - 128) + 128)
@@ -118,19 +123,19 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
                     const double normalized = channel / 255.0;
                     return qBound(0, qRound(std::pow(normalized, gamma) * 255.0), 255);
                 };
-                red = applyCurve(red, m_redCurve);
-                green = applyCurve(green, m_greenCurve);
-                blue = applyCurve(blue, m_blueCurve);
+                red = applyCurve(red, grade.red);
+                green = applyCurve(green, grade.green);
+                blue = applyCurve(blue, grade.blue);
                 const double luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0;
                 const double shadowWeight = qBound(0.0, (0.65 - luminance) / 0.65, 1.0);
                 const double highlightWeight = qBound(0.0, (luminance - 0.35) / 0.65, 1.0);
                 const double midtoneWeight = qBound(0.0, 1.0 - std::abs(luminance - 0.5) / 0.5, 1.0);
-                const double warmth = (m_shadowWarmth * shadowWeight
-                    + m_midtoneWarmth * midtoneWeight
-                    + m_highlightWarmth * highlightWeight) / 100.0;
+                const double warmth = (grade.shadows * shadowWeight
+                    + grade.midtones * midtoneWeight
+                    + grade.highlights * highlightWeight) / 100.0;
                 red = qBound(0, red + qRound(warmth * 42.0), 255);
                 blue = qBound(0, blue - qRound(warmth * 42.0), 255);
-                if (m_saturation != 100) {
+                if (grade.saturation != 100) {
                     QColor color(red, green, blue);
                     int hue = 0, sat = 0, value = 0, alpha = 255;
                     color.getHsv(&hue, &sat, &value, &alpha);
