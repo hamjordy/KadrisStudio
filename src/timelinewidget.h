@@ -2,10 +2,10 @@
 #include <QJsonArray>
 #include <QWidget>
 #include <QVector>
+#include <QRect>
 
 class QMouseEvent;
 class QPaintEvent;
-class QRect;
 
 class TimelineWidget final : public QWidget
 {

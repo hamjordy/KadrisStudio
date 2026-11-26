@@ -4,6 +4,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QSizePolicy>
+#include <QStringList>
 
 namespace {
 constexpr int kTrackTop = 42;

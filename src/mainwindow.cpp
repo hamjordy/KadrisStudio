@@ -15,6 +15,7 @@
 #include <QMediaPlayer>
 #include <QMenu>
 #include <QMenuBar>
+#include <QKeySequence>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
