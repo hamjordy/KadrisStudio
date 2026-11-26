@@ -115,9 +115,9 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
                 int red = qBound(0, qRound(contrastFactor * (qRed(pixel) - 128) + 128)
                                      + grade.brightness, 255);
                 int green = qBound(0, qRound(contrastFactor * (qGreen(pixel) - 128) + 128)
-                                       + m_brightness, 255);
+                                       + grade.brightness, 255);
                 int blue = qBound(0, qRound(contrastFactor * (qBlue(pixel) - 128) + 128)
-                                      + m_brightness, 255);
+                                      + grade.brightness, 255);
                 const auto applyCurve = [](int channel, int amount) {
                     const double gamma = std::pow(2.0, -amount / 100.0);
                     const double normalized = channel / 255.0;
@@ -139,7 +139,7 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
                     QColor color(red, green, blue);
                     int hue = 0, sat = 0, value = 0, alpha = 255;
                     color.getHsv(&hue, &sat, &value, &alpha);
-                    color.setHsv(hue, qBound(0, sat * m_saturation / 100, 255),
+                    color.setHsv(hue, qBound(0, sat * grade.saturation / 100, 255),
                                  value, alpha);
                     red = color.red(); green = color.green(); blue = color.blue();
                 }
