@@ -1529,6 +1529,37 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
             }
         }
 
+        if (audio && !clip.audioVolumeKeyframes.isEmpty()
+            && clip.durationMs > 0 && bounds.width() > 12) {
+            const int centerY = bounds.top() + 25;
+            const int amplitude = qMax(2, (bounds.height() - 22) / 2);
+            const int leftX = bounds.left() + 4;
+            const int usableWidth = qMax(1, bounds.width() - 8);
+            auto automationPoint = [&](qint64 timeMs, double volume) {
+                const double position = qBound(0.0,
+                    static_cast<double>(timeMs) / clip.durationMs, 1.0);
+                const int x = leftX + qRound(position * usableWidth);
+                const int y = centerY + amplitude
+                    - qRound(qBound(0.0, volume, 100.0) * amplitude * 2.0 / 100.0);
+                return QPoint(x, y);
+            };
+            p.setPen(QPen(QColor("#b99aff"), 2));
+            QPoint previous = automationPoint(0, clip.audioVolume);
+            for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
+                const QPoint current = automationPoint(keyframe.timeMs, keyframe.value);
+                p.drawLine(previous, current);
+                previous = current;
+            }
+            p.setBrush(QColor("#d8c5ff"));
+            for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
+                const QPoint point = automationPoint(keyframe.timeMs, keyframe.value);
+                p.drawPolygon(QPolygon({QPoint(point.x(), point.y() - 4),
+                                        QPoint(point.x() + 4, point.y()),
+                                        QPoint(point.x(), point.y() + 4),
+                                        QPoint(point.x() - 4, point.y())}));
+            }
+        }
+
         if (selected) {
             p.setPen(QPen(QColor("#f4d18c"), 2));
             p.drawLine(bounds.left() + kTrimHandleWidth, bounds.top() + 5,
