@@ -457,6 +457,35 @@ bool TimelineWidget::deleteSelectedClip()
     return true;
 }
 
+bool TimelineWidget::rippleDeleteSelectedClip()
+{
+    if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
+
+    const Clip selected = m_clips.at(m_selectedClip);
+    if (isTrackLocked(selected.track)) return false;
+
+    const qint64 rippleStart = selected.timelineStartMs;
+    const qint64 rippleEnd = selected.timelineStartMs + selected.durationMs;
+    const qint64 rippleDuration = selected.durationMs;
+    const int removedId = selected.id;
+
+    m_clips.removeAt(m_selectedClip);
+    for (Clip &clip : m_clips) {
+        if (clip.timelineStartMs >= rippleEnd && !isTrackLocked(clip.track))
+            clip.timelineStartMs = qMax<qint64>(0,
+                kTimelineTimebase.snapMilliseconds(clip.timelineStartMs - rippleDuration));
+    }
+
+    Q_UNUSED(removedId);
+    m_selectedClip = -1;
+    m_playheadMs = rippleStart;
+    updateCanvasSize();
+    update();
+    emit playheadChanged(m_playheadMs);
+    emit timelineEdited();
+    return true;
+}
+
 bool TimelineWidget::duplicateSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
