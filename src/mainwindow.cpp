@@ -74,7 +74,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_sequencePositionMs = position;
             updateSequenceTimeLabel();
             if (m_sequencePlaying) {
-                m_sequenceClock.restart();
+                m_activeSequenceClipId = -1;
+                m_waitingForSequenceMedia = false;
+                m_player->stop();
+                m_sequenceClock.invalidate();
                 activateSequencePosition();
             }
         });
@@ -461,6 +464,7 @@ void MainWindow::toggleSequencePlayback()
     }
 
     m_sequencePlaying = true;
+    m_playButton->setEnabled(false);
     m_sequenceButton->setText("Pause Timeline");
     m_sequenceTimer->start();
     activateSequencePosition();
@@ -485,6 +489,7 @@ void MainWindow::stopSequencePlayback(bool resetToStart)
         m_player->setSource(QUrl());
     }
     if (m_sequenceButton) m_sequenceButton->setText("Play Timeline");
+    if (m_playButton) m_playButton->setEnabled(true);
 
     if (resetToStart) {
         m_sequencePositionMs = 0;
@@ -535,8 +540,9 @@ void MainWindow::activateSequencePosition()
     TimelineWidget::ClipInfo clip;
     if (m_timeline->clipAtTime(m_sequencePositionMs, &clip)) {
         if (clip.id == m_activeSequenceClipId) {
-            if (!m_waitingForSequenceMedia
-                && m_player->playbackState() != QMediaPlayer::PlayingState) {
+            if (m_waitingForSequenceMedia) {
+                handleSequenceMediaStatus();
+            } else if (m_player->playbackState() != QMediaPlayer::PlayingState) {
                 m_player->play();
                 if (!m_sequenceClock.isValid()) m_sequenceClock.start();
             }
@@ -597,6 +603,15 @@ void MainWindow::handleSequenceMediaStatus()
         m_sequencePositionMs = m_activeSequenceClipEndMs;
         m_sequenceClock.start();
         statusBar()->showMessage("A timeline clip could not be decoded; skipping it", 6000);
+        activateSequencePosition();
+    } else if (m_player->mediaStatus() == QMediaPlayer::EndOfMedia) {
+        m_waitingForSequenceMedia = false;
+        m_activeSequenceClipId = -1;
+        m_sequencePositionMs = qMax(m_sequencePositionMs, m_activeSequenceClipEndMs);
+        m_timeline->setPlayheadMs(m_sequencePositionMs);
+        updateSequenceTimeLabel();
+        m_sequenceClock.start();
+        activateSequencePosition();
     }
 }
 
