@@ -1493,12 +1493,12 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
             const int centerY = bounds.top() + 25;
             const int amplitude = qMax(2, (bounds.height() - 22) / 2);
             p.setPen(QPen(selected ? QColor("#ffe0a0") : QColor("#d7ad62"), 1));
+            const int peakCount = static_cast<int>(clip.waveformPeaks.size());
             for (int x = bounds.left() + 4; x < bounds.right() - 3; ++x) {
                 const double relative = static_cast<double>(x - bounds.left() - 4)
                     / qMax(1, bounds.width() - 8);
                 const int sampleIndex = std::clamp(
-                    static_cast<int>(relative * clip.waveformPeaks.size()),
-                    0, clip.waveformPeaks.size() - 1);
+                    static_cast<int>(relative * peakCount), 0, peakCount - 1);
                 const int peakHeight = std::max(1,
                     qRound(clip.waveformPeaks.at(sampleIndex) * amplitude));
                 p.drawLine(x, centerY - peakHeight, x, centerY + peakHeight);
