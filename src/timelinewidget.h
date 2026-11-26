@@ -53,9 +53,13 @@ public:
                               int shadows, int midtones, int highlights,
                               int redCurve, int greenCurve, int blueCurve);
     bool addBrightnessKeyframe(int clipId, qint64 timelineTimeMs, int value);
+    bool addContrastKeyframe(int clipId, qint64 timelineTimeMs, int value);
     bool removeBrightnessKeyframeAt(int clipId, qint64 timelineTimeMs);
+    bool removeContrastKeyframeAt(int clipId, qint64 timelineTimeMs);
     int brightnessKeyframeCount(int clipId) const;
+    int contrastKeyframeCount(int clipId) const;
     int evaluatedBrightness(int clipId, qint64 timelineTimeMs) const;
+    int evaluatedContrast(int clipId, qint64 timelineTimeMs) const;
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
     bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
     qint64 sequenceDurationMs() const;
@@ -101,6 +105,7 @@ private:
         int shadows = 0, midtones = 0, highlights = 0;
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
         QVector<Keyframe> brightnessKeyframes;
+        QVector<Keyframe> contrastKeyframes;
     };
 
     enum class DragMode { None, Move, TrimLeft, TrimRight };
