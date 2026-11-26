@@ -323,6 +323,31 @@ void MainWindow::buildInterface()
     addMonitorSlider("Brightness", brightnessSlider, -100, 100, 0);
     addMonitorSlider("Contrast", contrastSlider, -100, 100, 0);
     addMonitorSlider("Saturation", saturationSlider, 0, 200, 100);
+    auto *wheelsHeading = new QLabel("COLOR WHEELS — WARM / COOL");
+    wheelsHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(wheelsHeading);
+    auto *shadowWheel = new QSlider(Qt::Horizontal);
+    auto *midtoneWheel = new QSlider(Qt::Horizontal);
+    auto *highlightWheel = new QSlider(Qt::Horizontal);
+    auto addWheelSlider = [this, inspectorLayout, shadowWheel, midtoneWheel, highlightWheel](
+            const QString &name, QSlider *slider) {
+        auto *label = new QLabel(name + ": 0");
+        label->setObjectName("mutedLabel");
+        slider->setRange(-100, 100);
+        slider->setValue(0);
+        connect(slider, &QSlider::valueChanged, this,
+            [this, label, name, shadowWheel, midtoneWheel, highlightWheel](int value) {
+                label->setText(QString("%1: %2").arg(name).arg(value));
+                m_monitor->setColorWheels(shadowWheel->value(),
+                    midtoneWheel->value(), highlightWheel->value());
+            });
+        inspectorLayout->addWidget(label);
+        inspectorLayout->addWidget(slider);
+    };
+    addWheelSlider("Shadows", shadowWheel);
+    addWheelSlider("Midtones", midtoneWheel);
+    addWheelSlider("Highlights", highlightWheel);
+
     auto *resetColor = new QPushButton("Reset Color Correction");
     connect(resetColor, &QPushButton::clicked, this,
         [brightnessSlider, contrastSlider, saturationSlider]() {
