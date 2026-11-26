@@ -162,7 +162,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 syncAudioTracks();
             }
         });
-    m_lastTimelineState = m_timeline->toJson();
+    connect(m_timeline, &TimelineWidget::trackStateChanged, this,
+        [this](int track) {
+            if (track >= 0 && track < 3 && m_sequencePlaying) syncVideoTracks();
+            if (track >= 3 && track < 5) applyAudioMixerState();
+            statusBar()->showMessage(QString("%1 %2")
+                .arg(track < 3 ? "VIDEO" : "AUDIO")
+                .arg(track < 3 ? track + 1 : track - 2) + " track settings updated", 2500);
+        });
+        m_lastTimelineState = m_timeline->toJson();
     connect(m_timeline, &TimelineWidget::timelineEdited, this,
         [this]() {
             const QJsonArray currentState = m_timeline->toJson();
@@ -620,11 +628,12 @@ bool MainWindow::writeProject(const QString &path)
     for (const QString &item : m_mediaPaths) media.append(item);
     QJsonObject root;
     root.insert("format", "kadris-project");
-    root.insert("formatVersion", 3);
+    root.insert("formatVersion", 4);
     root.insert("projectName", QFileInfo(path).completeBaseName());
     root.insert("mediaFiles", media);
     root.insert("timelineClips", m_timeline->toJson());
     root.insert("timelineMarkers", m_timeline->markersToJson());
+    root.insert("timelineTrackStates", m_timeline->trackStatesToJson());
 
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -651,7 +660,8 @@ bool MainWindow::readProject(const QString &path)
     if (root.value("format").toString() != "kadris-project"
         || (root.value("formatVersion").toInt() != 1
             && root.value("formatVersion").toInt() != 2
-            && root.value("formatVersion").toInt() != 3)) return false;
+            && root.value("formatVersion").toInt() != 3
+            && root.value("formatVersion").toInt() != 4)) return false;
 
     m_mediaPaths.clear();
     m_mediaList->clear();
@@ -659,6 +669,7 @@ bool MainWindow::readProject(const QString &path)
         addMediaPath(value.toString());
     m_timeline->fromJson(root.value("timelineClips").toArray());
     m_timeline->markersFromJson(root.value("timelineMarkers").toArray());
+    m_timeline->trackStatesFromJson(root.value("timelineTrackStates").toArray());
     resetTimelineHistory();
     m_projectPath = path;
     m_player->stop();
@@ -904,6 +915,17 @@ void MainWindow::syncVideoTracks()
     if (!m_sequencePlaying) return;
 
     for (int track = 0; track < 3; ++track) {
+        if (m_timeline->isTrackMuted(track)) {
+            if (m_activeVideoClipIds[track] != -1) {
+                m_videoTrackPlayers[track]->stop();
+                m_videoTrackPlayers[track]->setSource(QUrl());
+                m_activeVideoClipIds[track] = -1;
+                m_waitingForVideoTrack[track] = false;
+                m_failedVideoTrack[track] = false;
+                m_monitor->clearFrame(track);
+            }
+            continue;
+        }
         TimelineWidget::ClipInfo clip;
         const bool hasClip = m_timeline->clipAtTimeOnTrack(
             m_sequencePositionMs, track, &clip);
@@ -1002,7 +1024,8 @@ void MainWindow::applyAudioMixerState()
         const bool mutedBySolo = anySolo && !m_audioTrackSolo[track];
         output->setVolume(qBound(0.0f,
             m_audioTrackGains[track] * m_masterGain, 1.0f));
-        output->setMuted(m_audioTrackMuted[track] || mutedBySolo);
+        output->setMuted(m_audioTrackMuted[track] || mutedBySolo
+            || (m_timeline && m_timeline->isTrackMuted(track + 3)));
     }
 }
 
