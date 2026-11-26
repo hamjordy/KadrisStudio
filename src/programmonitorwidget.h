@@ -27,6 +27,7 @@ public:
                             int red, int green, int blue);
     void setTrackTransform(int track, int scale, int positionX, int positionY);
     void setTrackOpacity(int track, int opacity);
+    void setTrackBlendMode(int track, int blendMode);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -42,7 +43,7 @@ private:
         int red = 0, green = 0, blue = 0;
     };
     std::array<ColorGrade, 3> m_colorGrades;
-    struct TrackTransform { int scale = 100; int x = 0; int y = 0; int opacity = 100; };
+    struct TrackTransform { int scale = 100; int x = 0; int y = 0; int opacity = 100; int blendMode = 0; };
     std::array<TrackTransform, 3> m_transforms;
     QString m_caption;
 };
