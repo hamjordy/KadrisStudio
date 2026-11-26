@@ -23,6 +23,7 @@
 #include <QStatusBar>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
+#include <QToolBar>
 #include <QVBoxLayout>
 #include <QVideoWidget>
 #include <QUrl>
