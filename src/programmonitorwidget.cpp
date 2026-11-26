@@ -20,6 +20,7 @@ void ProgramMonitorWidget::setFrame(int track, const QImage &frame)
         return;
 
     m_frames[static_cast<size_t>(track)] = frame;
+    rebuildCorrectedFrames();
     update();
 }
 
@@ -29,12 +30,15 @@ void ProgramMonitorWidget::clearFrame(int track)
         return;
 
     m_frames[static_cast<size_t>(track)] = QImage();
+    m_correctedFrames[static_cast<size_t>(track)] = QImage();
     update();
 }
 
 void ProgramMonitorWidget::clearAllFrames()
 {
     for (QImage &frame : m_frames)
+        frame = QImage();
+    for (QImage &frame : m_correctedFrames)
         frame = QImage();
     update();
 }
@@ -43,6 +47,55 @@ void ProgramMonitorWidget::setCaption(const QString &caption)
 {
     m_caption = caption;
     update();
+}
+
+void ProgramMonitorWidget::setColorCorrection(int brightness, int contrast, int saturation)
+{
+    brightness = qBound(-100, brightness, 100);
+    contrast = qBound(-100, contrast, 100);
+    saturation = qBound(0, saturation, 200);
+    if (m_brightness == brightness && m_contrast == contrast
+        && m_saturation == saturation) return;
+    m_brightness = brightness;
+    m_contrast = contrast;
+    m_saturation = saturation;
+    rebuildCorrectedFrames();
+    update();
+}
+
+void ProgramMonitorWidget::rebuildCorrectedFrames()
+{
+    const double contrastFactor = (259.0 * (m_contrast + 255.0))
+        / (255.0 * (259.0 - m_contrast));
+    for (size_t index = 0; index < m_frames.size(); ++index) {
+        if (m_frames[index].isNull()) {
+            m_correctedFrames[index] = QImage();
+            continue;
+        }
+        QImage image = m_frames[index].convertToFormat(QImage::Format_ARGB32);
+        for (int y = 0; y < image.height(); ++y) {
+            QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+            for (int x = 0; x < image.width(); ++x) {
+                const QRgb pixel = line[x];
+                int red = qBound(0, qRound(contrastFactor * (qRed(pixel) - 128) + 128)
+                                     + m_brightness, 255);
+                int green = qBound(0, qRound(contrastFactor * (qGreen(pixel) - 128) + 128)
+                                       + m_brightness, 255);
+                int blue = qBound(0, qRound(contrastFactor * (qBlue(pixel) - 128) + 128)
+                                      + m_brightness, 255);
+                if (m_saturation != 100) {
+                    QColor color(red, green, blue);
+                    int hue = 0, sat = 0, value = 0, alpha = 255;
+                    color.getHsv(&hue, &sat, &value, &alpha);
+                    color.setHsv(hue, qBound(0, sat * m_saturation / 100, 255),
+                                 value, alpha);
+                    red = color.red(); green = color.green(); blue = color.blue();
+                }
+                line[x] = qRgba(red, green, blue, qAlpha(pixel));
+            }
+        }
+        m_correctedFrames[index] = image;
+    }
 }
 
 void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
@@ -57,7 +110,7 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
     // Lower-numbered tracks are painted first; higher tracks composite above them.
-    for (const QImage &frame : m_frames) {
+    for (const QImage &frame : m_correctedFrames) {
         if (frame.isNull()) continue;
 
         const QSize scaled = frame.size().scaled(
