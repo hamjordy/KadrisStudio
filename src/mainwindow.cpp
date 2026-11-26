@@ -159,6 +159,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             const QSignalBlocker t1(m_clipTransformSliders[1]);
             const QSignalBlocker t2(m_clipTransformSliders[2]);
             const QSignalBlocker opacityBlocker(m_clipOpacitySlider);
+            const QSignalBlocker blendBlocker(m_clipBlendModeCombo);
             m_clipColorSliders[0]->setValue(clip.brightness);
             m_clipColorSliders[1]->setValue(clip.contrast);
             m_clipColorSliders[2]->setValue(clip.saturation);
@@ -172,9 +173,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipTransformSliders[1]->setValue(clip.positionX);
             m_clipTransformSliders[2]->setValue(clip.positionY);
             m_clipOpacitySlider->setValue(clip.opacity);
+            m_clipBlendModeCombo->setCurrentIndex(clip.blendMode);
             if (clip.track < 3)
                 m_monitor->setTrackTransform(clip.track, clip.scale, clip.positionX, clip.positionY);
             if (clip.track < 3) m_monitor->setTrackOpacity(clip.track, clip.opacity);
+            if (clip.track < 3) m_monitor->setTrackBlendMode(clip.track, clip.blendMode);
             if (clip.track < 3) {
                 m_monitor->setTrackColorGrade(clip.track, clip.brightness, clip.contrast,
                     clip.saturation, clip.shadows, clip.midtones, clip.highlights,
@@ -584,6 +587,19 @@ void MainWindow::buildInterface()
     });
     inspectorLayout->addWidget(opacityLabel);
     inspectorLayout->addWidget(m_clipOpacitySlider);
+    auto *blendModeHeading = new QLabel("BLEND MODE");
+    blendModeHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(blendModeHeading);
+    m_clipBlendModeCombo = new QComboBox();
+    m_clipBlendModeCombo->addItems({"Normal", "Multiply", "Screen", "Overlay"});
+    connect(m_clipBlendModeCombo, &QComboBox::currentIndexChanged, this, [this](int mode) {
+        if (m_selectedTimelineClipId < 0) return;
+        if (!m_timeline->setClipBlendMode(m_selectedTimelineClipId, mode)) return;
+        TimelineWidget::ClipInfo clip;
+        if (m_timeline->selectedClipInfo(&clip) && clip.track < 3)
+            m_monitor->setTrackBlendMode(clip.track, mode);
+    });
+    inspectorLayout->addWidget(m_clipBlendModeCombo);
     auto *opacityKeyframeHeading = new QLabel("ANIMATION — OPACITY");
     opacityKeyframeHeading->setObjectName("sectionTitle");
     inspectorLayout->addWidget(opacityKeyframeHeading);
@@ -1362,6 +1378,7 @@ void MainWindow::refreshPausedTimelinePreview()
             &animatedScale, &animatedX, &animatedY);
         m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
         m_monitor->setTrackOpacity(track, m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+        m_monitor->setTrackBlendMode(track, clip.blendMode);
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
@@ -1455,6 +1472,7 @@ void MainWindow::syncVideoTracks()
             &animatedScale, &animatedX, &animatedY);
         m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
         m_monitor->setTrackOpacity(track, m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+        m_monitor->setTrackBlendMode(track, clip.blendMode);
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
