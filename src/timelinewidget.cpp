@@ -1801,6 +1801,16 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event)
 
 void TimelineWidget::keyPressEvent(QKeyEvent *event)
 {
+    if (event->modifiers().testFlag(Qt::ControlModifier)
+        && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right)) {
+        if (event->key() == Qt::Key_Left)
+            goToPreviousMarker();
+        else
+            goToNextMarker();
+        event->accept();
+        return;
+    }
+
     if (event->modifiers().testFlag(Qt::AltModifier)
         && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right)) {
         const int direction = event->key() == Qt::Key_Left ? -1 : 1;
