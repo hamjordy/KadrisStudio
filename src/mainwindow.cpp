@@ -158,6 +158,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             const QSignalBlocker t0(m_clipTransformSliders[0]);
             const QSignalBlocker t1(m_clipTransformSliders[1]);
             const QSignalBlocker t2(m_clipTransformSliders[2]);
+            const QSignalBlocker opacityBlocker(m_clipOpacitySlider);
             m_clipColorSliders[0]->setValue(clip.brightness);
             m_clipColorSliders[1]->setValue(clip.contrast);
             m_clipColorSliders[2]->setValue(clip.saturation);
@@ -170,8 +171,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipTransformSliders[0]->setValue(clip.scale);
             m_clipTransformSliders[1]->setValue(clip.positionX);
             m_clipTransformSliders[2]->setValue(clip.positionY);
+            m_clipOpacitySlider->setValue(clip.opacity);
             if (clip.track < 3)
                 m_monitor->setTrackTransform(clip.track, clip.scale, clip.positionX, clip.positionY);
+            if (clip.track < 3) m_monitor->setTrackOpacity(clip.track, clip.opacity);
             if (clip.track < 3) {
                 m_monitor->setTrackColorGrade(clip.track, clip.brightness, clip.contrast,
                     clip.saturation, clip.shadows, clip.midtones, clip.highlights,
@@ -563,6 +566,51 @@ void MainWindow::buildInterface()
         inspectorLayout->addWidget(label);
         inspectorLayout->addWidget(m_clipTransformSliders[static_cast<size_t>(i)]);
     }
+    auto *opacityHeading = new QLabel("OPACITY");
+    opacityHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(opacityHeading);
+    m_clipOpacitySlider = new QSlider(Qt::Horizontal);
+    m_clipOpacitySlider->setRange(0, 100);
+    m_clipOpacitySlider->setValue(100);
+    auto *opacityLabel = new QLabel("Opacity: 100%");
+    opacityLabel->setObjectName("mutedLabel");
+    connect(m_clipOpacitySlider, &QSlider::valueChanged, this, [this, opacityLabel](int value) {
+        opacityLabel->setText(QString("Opacity: %1%").arg(value));
+        if (m_selectedTimelineClipId < 0) return;
+        m_timeline->setClipOpacity(m_selectedTimelineClipId, value);
+        TimelineWidget::ClipInfo clip;
+        if (m_timeline->selectedClipInfo(&clip) && clip.track < 3)
+            m_monitor->setTrackOpacity(clip.track, value);
+    });
+    inspectorLayout->addWidget(opacityLabel);
+    inspectorLayout->addWidget(m_clipOpacitySlider);
+    auto *opacityKeyframeHeading = new QLabel("ANIMATION — OPACITY");
+    opacityKeyframeHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(opacityKeyframeHeading);
+    auto *opacityKeyframeCountLabel = new QLabel("Opacity keyframes: 0");
+    opacityKeyframeCountLabel->setObjectName("mutedLabel");
+    inspectorLayout->addWidget(opacityKeyframeCountLabel);
+    auto *addOpacityKeyframeButton = new QPushButton("Add / Update Opacity Keyframe");
+    auto *removeOpacityKeyframeButton = new QPushButton("Remove Nearest Opacity Keyframe");
+    connect(addOpacityKeyframeButton, &QPushButton::clicked, this, [this, opacityKeyframeCountLabel]() {
+        if (m_selectedTimelineClipId < 0) return;
+        if (m_timeline->addOpacityKeyframe(m_selectedTimelineClipId, m_timeline->playheadMs(),
+                m_clipOpacitySlider->value())) {
+            opacityKeyframeCountLabel->setText(QString("Opacity keyframes: %1")
+                .arg(m_timeline->opacityKeyframeCount(m_selectedTimelineClipId)));
+            refreshPausedTimelinePreview();
+        }
+    });
+    connect(removeOpacityKeyframeButton, &QPushButton::clicked, this, [this, opacityKeyframeCountLabel]() {
+        if (m_selectedTimelineClipId < 0) return;
+        if (m_timeline->removeOpacityKeyframeAt(m_selectedTimelineClipId, m_timeline->playheadMs())) {
+            opacityKeyframeCountLabel->setText(QString("Opacity keyframes: %1")
+                .arg(m_timeline->opacityKeyframeCount(m_selectedTimelineClipId)));
+            refreshPausedTimelinePreview();
+        }
+    });
+    inspectorLayout->addWidget(addOpacityKeyframeButton);
+    inspectorLayout->addWidget(removeOpacityKeyframeButton);
     auto *transformKeyframeHeading = new QLabel("ANIMATION — TRANSFORM");
     transformKeyframeHeading->setObjectName("sectionTitle");
     inspectorLayout->addWidget(transformKeyframeHeading);
@@ -1313,6 +1361,7 @@ void MainWindow::refreshPausedTimelinePreview()
         m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
             &animatedScale, &animatedX, &animatedY);
         m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
+        m_monitor->setTrackOpacity(track, m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
@@ -1405,6 +1454,7 @@ void MainWindow::syncVideoTracks()
         m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
             &animatedScale, &animatedX, &animatedY);
         m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
+        m_monitor->setTrackOpacity(track, m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
