@@ -463,7 +463,7 @@ void MainWindow::buildInterface()
             item->setData(Qt::UserRole, timeMs);
         }
     };
-    connect(m_timeline, &TimelineWidget::timelineEdited, this, refreshMarkerList);
+    connect(m_timeline, &TimelineWidget::markersChanged, this, refreshMarkerList);
     connect(markerList, &QListWidget::itemDoubleClicked, this,
         [this](QListWidgetItem *item) {
             if (!item) return;
