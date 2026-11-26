@@ -468,6 +468,17 @@ void MainWindow::buildMenus()
     redoAction->setShortcut(QKeySequence("Ctrl+Shift+Z"));
     connect(redoAction, &QAction::triggered, this, &MainWindow::redoTimelineEdit);
 
+    QMenu *view = menuBar()->addMenu("&View");
+    auto *zoomInAction = view->addAction("Zoom Timeline In");
+    zoomInAction->setShortcut(QKeySequence("Ctrl++"));
+    connect(zoomInAction, &QAction::triggered, m_timeline, &TimelineWidget::zoomIn);
+    auto *zoomOutAction = view->addAction("Zoom Timeline Out");
+    zoomOutAction->setShortcut(QKeySequence("Ctrl+-"));
+    connect(zoomOutAction, &QAction::triggered, m_timeline, &TimelineWidget::zoomOut);
+    auto *zoomResetAction = view->addAction("Reset Timeline Zoom");
+    zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
+    connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
+
     QMenu *media = menuBar()->addMenu("&Media");
     auto *importAction = media->addAction("&Import Media...");
     importAction->setShortcut(QKeySequence("Ctrl+I"));
