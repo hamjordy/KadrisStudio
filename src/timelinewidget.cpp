@@ -26,6 +26,7 @@ constexpr int kPixelsPerSecond = 80;
 constexpr int kClipMinimumWidth = 18;
 constexpr qint64 kDefaultClipDurationMs = 5000;
 constexpr qint64 kMinimumClipDurationMs = 250;
+constexpr qint64 kSnapIntervalMs = 40; // 25 fps: one frame is 40 ms.
 const FrameTimebase kTimelineTimebase(25, 1);
 constexpr int kTrimHandleWidth = 8;
 constexpr int kTrackCount = 5;
