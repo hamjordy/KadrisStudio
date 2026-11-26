@@ -2,6 +2,7 @@
 #include "frame_timebase.h"
 
 #include <QFileInfo>
+#include <QInputDialog>
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QMediaPlayer>
@@ -661,6 +662,46 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
     }
 
     QWidget::mousePressEvent(event);
+}
+
+
+void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        const QPoint pos = event->position().toPoint();
+        if (pos.y() >= kHeaderHeight && pos.y() <= kHeaderHeight + 34) {
+            int nearestIndex = -1;
+            int nearestDistance = 13;
+            for (int i = 0; i < m_markers.size(); ++i) {
+                const int markerX = kTimelineStartX
+                    + qRound(static_cast<double>(m_markers.at(i).timeMs)
+                             * m_pixelsPerSecond / 1000.0);
+                const int distance = qAbs(markerX - pos.x());
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearestIndex = i;
+                }
+            }
+
+            if (nearestIndex >= 0) {
+                bool accepted = false;
+                const QString label = QInputDialog::getText(
+                    this, "Rename Timeline Marker", "Marker name:",
+                    QLineEdit::Normal, m_markers.at(nearestIndex).label, &accepted);
+                if (accepted) {
+                    const QString trimmedLabel = label.trimmed();
+                    if (!trimmedLabel.isEmpty()) {
+                        m_markers[nearestIndex].label = trimmedLabel;
+                        update();
+                        emit timelineEdited();
+                    }
+                }
+                event->accept();
+                return;
+            }
+        }
+    }
+    QWidget::mouseDoubleClickEvent(event);
 }
 
 void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
