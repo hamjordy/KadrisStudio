@@ -74,7 +74,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
         connect(m_videoTrackSinks[track], &QVideoSink::videoFrameChanged, this,
             [this, track](const QVideoFrame &frame) {
-                if (m_sequencePlaying && m_monitor && frame.isValid())
+                if (m_monitor && frame.isValid()
+                    && (m_sequencePlaying || m_activeVideoClipIds[track] >= 0))
                     m_monitor->setFrame(track, frame.toImage());
             });
         connect(m_videoTrackPlayers[track], &QMediaPlayer::mediaStatusChanged, this,
@@ -162,6 +163,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 }
                 syncVideoTracks();
                 syncAudioTracks();
+            } else {
+                refreshPausedTimelinePreview();
             }
         });
     connect(m_timeline, &TimelineWidget::trackStateChanged, this,
@@ -551,6 +554,14 @@ void MainWindow::buildMenus()
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
     QMenu *sequence = menuBar()->addMenu("&Sequence");
+    auto *previousFrameAction = sequence->addAction("Previous Frame");
+    previousFrameAction->setShortcut(QKeySequence("Left"));
+    connect(previousFrameAction, &QAction::triggered, this,
+            [this]() { stepSequenceFrame(-1); });
+    auto *nextFrameAction = sequence->addAction("Next Frame");
+    nextFrameAction->setShortcut(QKeySequence("Right"));
+    connect(nextFrameAction, &QAction::triggered, this,
+            [this]() { stepSequenceFrame(1); });
     auto *splitAllAction = sequence->addAction("Add Edit to All Tracks");
     splitAllAction->setShortcut(QKeySequence("Ctrl+Shift+K"));
     connect(splitAllAction, &QAction::triggered, this, [this]() {
@@ -947,6 +958,76 @@ void MainWindow::tickSequencePlayback()
     syncAudioTracks();
 }
 
+void MainWindow::refreshPausedTimelinePreview()
+{
+    if (m_sequencePlaying || !m_timeline || !m_monitor) return;
+
+    m_player->stop();
+    m_monitor->setCaption("Timeline preview");
+    for (int track = 0; track < 3; ++track) {
+        auto *player = m_videoTrackPlayers[track];
+        TimelineWidget::ClipInfo clip;
+        const bool hasClip = !m_timeline->isTrackMuted(track)
+            && m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip);
+        if (!hasClip) {
+            player->stop();
+            player->setSource(QUrl());
+            m_activeVideoClipIds[track] = -1;
+            m_waitingForVideoTrack[track] = false;
+            m_failedVideoTrack[track] = false;
+            m_monitor->clearFrame(track);
+            continue;
+        }
+
+        if (m_activeVideoClipIds[track] == clip.id
+            && !m_waitingForVideoTrack[track]
+            && !m_failedVideoTrack[track]) {
+            player->setPosition(qMax<qint64>(0,
+                clip.sourceInMs + m_sequencePositionMs - clip.timelineStartMs));
+            player->pause();
+            continue;
+        }
+
+        player->stop();
+        m_monitor->clearFrame(track);
+        m_activeVideoClipIds[track] = clip.id;
+        m_waitingForVideoTrack[track] = false;
+        m_failedVideoTrack[track] = false;
+        if (!QFileInfo::exists(clip.path)) {
+            m_failedVideoTrack[track] = true;
+            continue;
+        }
+        m_waitingForVideoTrack[track] = true;
+        player->setSource(QUrl::fromLocalFile(clip.path));
+        handleVideoTrackStatus(track);
+    }
+
+    for (int track = 0; track < 2; ++track) {
+        m_audioTrackPlayers[track]->pause();
+        m_activeAudioClipIds[track] = -1;
+        m_waitingForAudioTrack[track] = false;
+        m_failedAudioTrack[track] = false;
+    }
+}
+
+void MainWindow::stepSequenceFrame(int direction)
+{
+    if (m_sequencePlaying) {
+        statusBar()->showMessage("Pause the timeline before frame stepping", 2500);
+        return;
+    }
+    const FrameTimebase timebase(25, 1);
+    const qint64 currentFrame = timebase.millisecondsToFrame(m_sequencePositionMs);
+    const qint64 targetFrame = qMax<qint64>(0, currentFrame + direction);
+    const qint64 durationFrames = timebase.millisecondsToFrame(
+        m_timeline->sequenceDurationMs());
+    m_sequencePositionMs = timebase.frameToMilliseconds(
+        qMin(targetFrame, durationFrames));
+    m_timeline->setPlayheadMs(m_sequencePositionMs);
+    updateSequenceTimeLabel();
+    refreshPausedTimelinePreview();
+}
+
 void MainWindow::syncVideoTracks()
 {
     if (!m_sequencePlaying) return;
@@ -1012,9 +1093,32 @@ void MainWindow::syncVideoTracks()
 
 void MainWindow::handleVideoTrackStatus(int track)
 {
-    if (track < 0 || track >= 3 || !m_sequencePlaying) return;
+    if (track < 0 || track >= 3) return;
 
     QMediaPlayer *player = m_videoTrackPlayers[track];
+    if (!m_sequencePlaying) {
+        if (!m_waitingForVideoTrack[track]) return;
+        const auto status = player->mediaStatus();
+        if (status == QMediaPlayer::LoadedMedia
+            || status == QMediaPlayer::BufferedMedia) {
+            TimelineWidget::ClipInfo clip;
+            if (!m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip)
+                || clip.id != m_activeVideoClipIds[track]) {
+                m_waitingForVideoTrack[track] = false;
+                return;
+            }
+            const qint64 sourcePosition =
+                clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+            player->setPosition(qMax<qint64>(0, sourcePosition));
+            m_waitingForVideoTrack[track] = false;
+            player->pause();
+        } else if (status == QMediaPlayer::InvalidMedia
+                   || status == QMediaPlayer::EndOfMedia) {
+            m_waitingForVideoTrack[track] = false;
+            m_failedVideoTrack[track] = true;
+        }
+        return;
+    }
     const QMediaPlayer::MediaStatus status = player->mediaStatus();
 
     // Do not restart a source from frame zero if it ends before the timeline clip does.
