@@ -1234,6 +1234,10 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         m_nextClipId = qMax(m_nextClipId, clip.id + 1);
         clip.path = path;
         clip.track = track;
+        if (track >= 3 && QFileInfo(path).suffix().compare(
+                "wav", Qt::CaseInsensitive) == 0 && QFileInfo::exists(path)) {
+            clip.waveformPeaks = readWaveformPeaks(path);
+        }
         clip.timelineStartMs = item.contains("timelineStartMs")
             ? static_cast<qint64>(item.value("timelineStartMs").toDouble())
             : legacyTrackEnd[track];
