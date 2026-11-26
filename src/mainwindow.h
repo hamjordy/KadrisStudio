@@ -8,6 +8,7 @@
 #include <array>
 
 class QAudioOutput;
+class QCheckBox;
 class QLabel;
 class QMediaPlayer;
 class QPushButton;
@@ -99,6 +100,7 @@ private:
     QSlider *m_clipOpacitySlider = nullptr;
     QComboBox *m_clipBlendModeCombo = nullptr;
     QSlider *m_clipAudioVolumeSlider = nullptr;
+    QCheckBox *m_clipAudioMuteCheckBox = nullptr;
     QSlider *m_clipFadeInSlider = nullptr;
     QSlider *m_clipFadeOutSlider = nullptr;
     int m_selectedTimelineClipId = -1;
