@@ -562,6 +562,29 @@ void MainWindow::buildMenus()
     nextFrameAction->setShortcut(QKeySequence("Right"));
     connect(nextFrameAction, &QAction::triggered, this,
             [this]() { stepSequenceFrame(1); });
+
+    auto *reverseStepAction = sequence->addAction("J - Previous Frame");
+    reverseStepAction->setShortcut(QKeySequence("J"));
+    reverseStepAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(reverseStepAction, &QAction::triggered, this, [this]() {
+        if (m_sequencePlaying)
+            toggleSequencePlayback();
+        stepSequenceFrame(-1);
+    });
+    auto *pauseAction = sequence->addAction("K - Pause Timeline");
+    pauseAction->setShortcut(QKeySequence("K"));
+    pauseAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(pauseAction, &QAction::triggered, this, [this]() {
+        if (m_sequencePlaying)
+            toggleSequencePlayback();
+    });
+    auto *playAction = sequence->addAction("L - Play Timeline");
+    playAction->setShortcut(QKeySequence("L"));
+    playAction->setShortcutContext(Qt::ApplicationShortcut);
+    connect(playAction, &QAction::triggered, this, [this]() {
+        if (!m_sequencePlaying)
+            toggleSequencePlayback();
+    });
     auto *splitAllAction = sequence->addAction("Add Edit to All Tracks");
     splitAllAction->setShortcut(QKeySequence("Ctrl+Shift+K"));
     connect(splitAllAction, &QAction::triggered, this, [this]() {
