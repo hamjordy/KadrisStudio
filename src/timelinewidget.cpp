@@ -447,7 +447,7 @@ int TimelineWidget::splitAllClipsAtPlayhead()
     const qint64 splitTime = kTimelineTimebase.snapMilliseconds(
         qMax<qint64>(0, m_playheadMs));
     int splitCount = 0;
-    int lastRightClip = -1;
+    int lastRightClipId = -1;
 
     // Iterate backwards so inserting right-hand segments never invalidates
     // the indices of clips that are still waiting to be examined.
@@ -468,13 +468,13 @@ int TimelineWidget::splitAllClipsAtPlayhead()
 
         m_clips[i].durationMs = leftDuration;
         m_clips.insert(i + 1, right);
-        lastRightClip = i + 1;
+        lastRightClipId = right.id;
         ++splitCount;
     }
 
     if (splitCount == 0) return 0;
 
-    m_selectedClip = lastRightClip;
+    m_selectedClip = indexForClipId(lastRightClipId);
     updateCanvasSize();
     update();
     emit timelineEdited();
