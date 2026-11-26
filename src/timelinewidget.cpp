@@ -408,6 +408,80 @@ int TimelineWidget::evaluatedBrightness(int clipId, qint64 timelineTimeMs) const
     return clip.brightness;
 }
 
+bool TimelineWidget::addContrastKeyframe(int clipId, qint64 timelineTimeMs, int value)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
+                                            clip.durationMs);
+    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    for (Keyframe &keyframe : clip.contrastKeyframes) {
+        if (keyframe.timeMs == snappedTime) {
+            keyframe.value = qBound(-100, value, 100);
+            update();
+            emit timelineEdited();
+            return true;
+        }
+    }
+    clip.contrastKeyframes.append({snappedTime, static_cast<double>(qBound(-100, value, 100))});
+    std::sort(clip.contrastKeyframes.begin(), clip.contrastKeyframes.end(),
+        [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
+    update();
+    emit timelineEdited();
+    return true;
+}
+
+bool TimelineWidget::removeContrastKeyframeAt(int clipId, qint64 timelineTimeMs)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qMax<qint64>(0, timelineTimeMs - clip.timelineStartMs);
+    int nearest = -1;
+    qint64 distance = std::numeric_limits<qint64>::max();
+    for (int i = 0; i < clip.contrastKeyframes.size(); ++i) {
+        const qint64 candidate = qAbs(clip.contrastKeyframes.at(i).timeMs - localTime);
+        if (candidate < distance) { distance = candidate; nearest = i; }
+    }
+    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    clip.contrastKeyframes.removeAt(nearest);
+    update();
+    emit timelineEdited();
+    return true;
+}
+
+int TimelineWidget::contrastKeyframeCount(int clipId) const
+{
+    const int index = indexForClipId(clipId);
+    return index < 0 ? 0 : m_clips.at(index).contrastKeyframes.size();
+}
+
+int TimelineWidget::evaluatedContrast(int clipId, qint64 timelineTimeMs) const
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return 0;
+    const Clip &clip = m_clips.at(index);
+    if (clip.contrastKeyframes.isEmpty()) return clip.contrast;
+    const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
+                                            clip.durationMs);
+    const auto &frames = clip.contrastKeyframes;
+    if (localTime <= frames.first().timeMs) return qRound(frames.first().value);
+    if (localTime >= frames.last().timeMs) return qRound(frames.last().value);
+    for (int i = 1; i < frames.size(); ++i) {
+        const Keyframe &right = frames.at(i);
+        const Keyframe &left = frames.at(i - 1);
+        if (localTime <= right.timeMs) {
+            const double span = static_cast<double>(right.timeMs - left.timeMs);
+            const double t = span <= 0.0 ? 0.0
+                : static_cast<double>(localTime - left.timeMs) / span;
+            return qBound(-100, qRound(left.value + (right.value - left.value) * t), 100);
+        }
+    }
+    return clip.contrast;
+}
+
+
 bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
 {
     int bestIndex = -1;
@@ -742,6 +816,14 @@ QJsonArray TimelineWidget::toJson() const
             keyframes.append(frame);
         }
         item.insert("brightnessKeyframes", keyframes);
+        QJsonArray contrastKeyframes;
+        for (const Keyframe &keyframe : clip.contrastKeyframes) {
+            QJsonObject frame;
+            frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
+            frame.insert("value", keyframe.value);
+            contrastKeyframes.append(frame);
+        }
+        item.insert("contrastKeyframes", contrastKeyframes);
         result.append(item);
     }
     return result;
@@ -801,6 +883,20 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         }
         std::sort(clip.brightnessKeyframes.begin(), clip.brightnessKeyframes.end(),
             [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
+        const QJsonArray contrastKeyframes = item.value("contrastKeyframes").toArray();
+        for (const QJsonValue &frameValue : contrastKeyframes) {
+            if (!frameValue.isObject()) continue;
+            const QJsonObject frame = frameValue.toObject();
+            Keyframe keyframe;
+            keyframe.timeMs = qBound<qint64>(0,
+                kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
+                clip.durationMs);
+            keyframe.value = qBound(-100.0, frame.value("value").toDouble(), 100.0);
+            clip.contrastKeyframes.append(keyframe);
+        }
+        std::sort(clip.contrastKeyframes.begin(), clip.contrastKeyframes.end(),
+            [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
+
 
         legacyTrackEnd[track] = qMax(legacyTrackEnd[track],
             clip.timelineStartMs + clip.durationMs);
