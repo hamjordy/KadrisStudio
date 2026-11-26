@@ -305,7 +305,7 @@ void MainWindow::buildInterface()
     auto *brightnessSlider = new QSlider(Qt::Horizontal);
     auto *contrastSlider = new QSlider(Qt::Horizontal);
     auto *saturationSlider = new QSlider(Qt::Horizontal);
-    auto addMonitorSlider = [this, inspectorLayout](const QString &name,
+    auto addMonitorSlider = [this, inspectorLayout, brightnessSlider, contrastSlider, saturationSlider](const QString &name,
             QSlider *slider, int minimum, int maximum, int initial) {
         auto *label = new QLabel(QString("%1: %2").arg(name).arg(initial));
         label->setObjectName("mutedLabel");
