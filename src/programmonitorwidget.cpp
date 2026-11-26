@@ -85,15 +85,19 @@ void ProgramMonitorWidget::setTrackColorGrade(int track, int brightness, int con
 {
     if (track < 0 || track >= 3) return;
     ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
-    grade.brightness = qBound(-100, brightness, 100);
-    grade.contrast = qBound(-100, contrast, 100);
-    grade.saturation = qBound(0, saturation, 200);
-    grade.shadows = qBound(-100, shadows, 100);
-    grade.midtones = qBound(-100, midtones, 100);
-    grade.highlights = qBound(-100, highlights, 100);
-    grade.red = qBound(-100, red, 100);
-    grade.green = qBound(-100, green, 100);
-    grade.blue = qBound(-100, blue, 100);
+    const ColorGrade next{
+        qBound(-100, brightness, 100), qBound(-100, contrast, 100),
+        qBound(0, saturation, 200), qBound(-100, shadows, 100),
+        qBound(-100, midtones, 100), qBound(-100, highlights, 100),
+        qBound(-100, red, 100), qBound(-100, green, 100),
+        qBound(-100, blue, 100)
+    };
+    if (grade.brightness == next.brightness && grade.contrast == next.contrast
+        && grade.saturation == next.saturation && grade.shadows == next.shadows
+        && grade.midtones == next.midtones && grade.highlights == next.highlights
+        && grade.red == next.red && grade.green == next.green && grade.blue == next.blue)
+        return;
+    grade = next;
     rebuildCorrectedFrames();
     update();
 }
