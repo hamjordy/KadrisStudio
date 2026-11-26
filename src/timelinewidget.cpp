@@ -61,6 +61,74 @@ void TimelineWidget::resetZoom()
     update();
 }
 
+void TimelineWidget::addMarker()
+{
+    const qint64 markerTime = kTimelineTimebase.snapMilliseconds(m_playheadMs);
+    for (const Marker &marker : m_markers) {
+        if (marker.timeMs == markerTime) {
+            m_playheadMs = marker.timeMs;
+            update();
+            return;
+        }
+    }
+    Marker marker;
+    marker.timeMs = markerTime;
+    marker.label = QString("Marker %1").arg(m_markers.size() + 1);
+    m_markers.append(marker);
+    update();
+    emit timelineEdited();
+}
+
+void TimelineWidget::removeNearestMarker()
+{
+    if (m_markers.isEmpty()) return;
+    int nearestIndex = -1;
+    qint64 nearestDistance = std::numeric_limits<qint64>::max();
+    for (int i = 0; i < m_markers.size(); ++i) {
+        const qint64 distance = qAbs(m_markers.at(i).timeMs - m_playheadMs);
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = i;
+        }
+    }
+    const qint64 tolerance = qMax<qint64>(
+        kSnapIntervalMs, qRound64(12.0 * 1000.0 / m_pixelsPerSecond));
+    if (nearestIndex >= 0 && nearestDistance <= tolerance) {
+        m_markers.removeAt(nearestIndex);
+        update();
+        emit timelineEdited();
+    }
+}
+
+QJsonArray TimelineWidget::markersToJson() const
+{
+    QJsonArray result;
+    for (const Marker &marker : m_markers) {
+        QJsonObject item;
+        item.insert("timeMs", static_cast<double>(marker.timeMs));
+        item.insert("label", marker.label);
+        result.append(item);
+    }
+    return result;
+}
+
+void TimelineWidget::markersFromJson(const QJsonArray &markers)
+{
+    m_markers.clear();
+    for (const QJsonValue &value : markers) {
+        if (!value.isObject()) continue;
+        const QJsonObject item = value.toObject();
+        Marker marker;
+        marker.timeMs = kTimelineTimebase.snapMilliseconds(
+            qMax<qint64>(0, static_cast<qint64>(item.value("timeMs").toDouble())));
+        marker.label = item.value("label").toString();
+        if (marker.label.isEmpty())
+            marker.label = QString("Marker %1").arg(m_markers.size() + 1);
+        m_markers.append(marker);
+    }
+    update();
+}
+
 void TimelineWidget::addClip(const QString &path)
 {
     if (path.isEmpty()) return;
@@ -257,6 +325,7 @@ int TimelineWidget::indexForClipId(int clipId) const
 void TimelineWidget::clearClips()
 {
     m_clips.clear();
+    m_markers.clear();
     m_selectedClip = -1;
     m_nextClipId = 1;
     m_playheadMs = 0;
@@ -436,6 +505,20 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
 
     p.setPen(QColor("#81909e"));
     p.drawText(QRect(12, 0, 108, kHeaderHeight), Qt::AlignVCenter, "TRACKS");
+
+    for (const Marker &marker : m_markers) {
+        const int markerX = kTimelineStartX
+            + qRound(static_cast<double>(marker.timeMs) * m_pixelsPerSecond / 1000.0);
+        p.setPen(QPen(QColor("#d78cff"), 1, Qt::DashLine));
+        p.drawLine(markerX, kHeaderHeight, markerX, height() - 8);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor("#d78cff"));
+        p.drawPolygon(QPolygon({QPoint(markerX - 5, kHeaderHeight),
+                                QPoint(markerX + 5, kHeaderHeight),
+                                QPoint(markerX, kHeaderHeight + 9)}));
+        p.setPen(QColor("#f1d8ff"));
+        p.drawText(markerX + 7, kHeaderHeight + 14, marker.label);
+    }
 
     const qint64 visibleEndMs = qMax<qint64>(60000,
         static_cast<qint64>(width() - kTimelineStartX) * 1000 / m_pixelsPerSecond);
@@ -667,6 +750,15 @@ void TimelineWidget::keyPressEvent(QKeyEvent *event)
     if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
         const qint64 direction = event->key() == Qt::Key_Left ? -1 : 1;
         setPlayheadMs(m_playheadMs + direction * stepMs, true);
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_M) {
+        if (event->modifiers().testFlag(Qt::ShiftModifier))
+            removeNearestMarker();
+        else
+            addMarker();
         event->accept();
         return;
     }
