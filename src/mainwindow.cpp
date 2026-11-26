@@ -487,6 +487,15 @@ void MainWindow::buildMenus()
     removeMarkerAction->setShortcut(QKeySequence("Shift+M"));
     connect(removeMarkerAction, &QAction::triggered, m_timeline, &TimelineWidget::removeNearestMarker);
 
+    auto *previousMarkerAction = sequence->addAction("Previous Marker");
+    previousMarkerAction->setShortcut(QKeySequence("Ctrl+Alt+Left"));
+    connect(previousMarkerAction, &QAction::triggered,
+            m_timeline, &TimelineWidget::goToPreviousMarker);
+    auto *nextMarkerAction = sequence->addAction("Next Marker");
+    nextMarkerAction->setShortcut(QKeySequence("Ctrl+Alt+Right"));
+    connect(nextMarkerAction, &QAction::triggered,
+            m_timeline, &TimelineWidget::goToNextMarker);
+
     QMenu *media = menuBar()->addMenu("&Media");
     auto *importAction = media->addAction("&Import Media...");
     importAction->setShortcut(QKeySequence("Ctrl+I"));
