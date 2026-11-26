@@ -1,4 +1,5 @@
 #include "timelinewidget.h"
+#include "frame_timebase.h"
 
 #include <QFileInfo>
 #include <QJsonObject>
@@ -25,7 +26,7 @@ constexpr int kPixelsPerSecond = 80;
 constexpr int kClipMinimumWidth = 18;
 constexpr qint64 kDefaultClipDurationMs = 5000;
 constexpr qint64 kMinimumClipDurationMs = 250;
-constexpr qint64 kSnapIntervalMs = 100;
+const FrameTimebase kTimelineTimebase(25, 1);
 constexpr int kTrimHandleWidth = 8;
 constexpr int kTrackCount = 5;
 }
@@ -219,7 +220,7 @@ qint64 TimelineWidget::playheadMs() const
 
 void TimelineWidget::setPlayheadMs(qint64 positionMs, bool notify)
 {
-    m_playheadMs = qMax<qint64>(0, positionMs);
+    m_playheadMs = kTimelineTimebase.snapMilliseconds(qMax<qint64>(0, positionMs));
     update();
     if (notify) emit playheadChanged(m_playheadMs);
 }

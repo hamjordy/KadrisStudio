@@ -25,7 +25,7 @@ This roadmap describes planned work. A feature is complete only after implementa
 - [x] Time-based multi-track clip model and track assignment
 - [x] Select, move, trim, split, and delete
 - [x] Basic timeline snapping (100 ms)
-- [ ] Frame-rate-aware timebase and sub-frame precision
+- [x] Rational frame-rate timebase utility (24, 25, and 30000/1001 fps supported)\n- [x] 25 fps frame snapping for timeline playhead and clip move/trim operations\n- [ ] User-selectable sequence frame rate and frame-accurate playback/rendering
 - [ ] Ripple and roll editing
 - [ ] Markers and advanced track controls
 - [ ] Undo/redo command stack
