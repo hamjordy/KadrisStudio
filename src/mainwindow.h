@@ -71,6 +71,7 @@ private:
     QLabel *m_sequenceTimeLabel = nullptr;
     QTimer *m_sequenceTimer = nullptr;
     QElapsedTimer m_sequenceClock;
+    qint64 m_sequenceClockOriginMs = 0;
     bool m_sequencePlaying = false;
     qint64 m_sequencePositionMs = 0;
     std::array<QMediaPlayer *, 3> m_videoTrackPlayers{};
