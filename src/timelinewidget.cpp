@@ -523,6 +523,63 @@ bool TimelineWidget::setClipAudioSettings(int clipId, int volume, int fadeInMs, 
     return true;
 }
 
+bool TimelineWidget::addAudioVolumeKeyframe(int clipId, qint64 timelineTimeMs, int volume)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = kTimelineTimebase.snapMilliseconds(qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs));
+    const double value = qBound(0, volume, 100);
+    for (Keyframe &keyframe : clip.audioVolumeKeyframes) {
+        if (keyframe.timeMs == localTime) { keyframe.value = value; update(); emit timelineEdited(); return true; }
+    }
+    clip.audioVolumeKeyframes.append({localTime, value});
+    std::sort(clip.audioVolumeKeyframes.begin(), clip.audioVolumeKeyframes.end(), [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
+    update(); emit timelineEdited(); return true;
+}
+
+bool TimelineWidget::removeAudioVolumeKeyframeAt(int clipId, qint64 timelineTimeMs)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return false;
+    Clip &clip = m_clips[index];
+    const qint64 localTime = qMax<qint64>(0, timelineTimeMs - clip.timelineStartMs);
+    int nearest = -1; qint64 distance = std::numeric_limits<qint64>::max();
+    for (int i = 0; i < clip.audioVolumeKeyframes.size(); ++i) {
+        const qint64 candidate = qAbs(clip.audioVolumeKeyframes.at(i).timeMs - localTime);
+        if (candidate < distance) { distance = candidate; nearest = i; }
+    }
+    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    clip.audioVolumeKeyframes.removeAt(nearest); update(); emit timelineEdited(); return true;
+}
+
+int TimelineWidget::audioVolumeKeyframeCount(int clipId) const
+{
+    const int index = indexForClipId(clipId);
+    return index < 0 ? 0 : m_clips.at(index).audioVolumeKeyframes.size();
+}
+
+int TimelineWidget::evaluatedAudioVolume(int clipId, qint64 timelineTimeMs) const
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0) return 100;
+    const Clip &clip = m_clips.at(index);
+    const auto &frames = clip.audioVolumeKeyframes;
+    if (frames.isEmpty()) return clip.audioVolume;
+    const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs);
+    if (localTime <= frames.first().timeMs) return qRound(frames.first().value);
+    if (localTime >= frames.last().timeMs) return qRound(frames.last().value);
+    for (int i = 1; i < frames.size(); ++i) {
+        const Keyframe &right = frames.at(i), &left = frames.at(i - 1);
+        if (localTime <= right.timeMs) {
+            const double span = static_cast<double>(right.timeMs - left.timeMs);
+            const double t = span <= 0.0 ? 0.0 : static_cast<double>(localTime - left.timeMs) / span;
+            return qBound(0, qRound(left.value + (right.value - left.value) * t), 100);
+        }
+    }
+    return clip.audioVolume;
+}
+
 bool TimelineWidget::addOpacityKeyframe(int clipId, qint64 timelineTimeMs, int opacity)
 {
     const int index = indexForClipId(clipId);
@@ -1030,6 +1087,12 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("audioVolume", clip.audioVolume);
         item.insert("fadeInMs", clip.fadeInMs);
         item.insert("fadeOutMs", clip.fadeOutMs);
+        QJsonArray audioVolumeKeyframes;
+        for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
+            QJsonObject frame; frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
+            frame.insert("value", keyframe.value); audioVolumeKeyframes.append(frame);
+        }
+        item.insert("audioVolumeKeyframes", audioVolumeKeyframes);
         QJsonArray opacityKeyframes;
         for (const Keyframe &keyframe : clip.opacityKeyframes) {
             QJsonObject frame; frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
@@ -1126,6 +1189,16 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.audioVolume = qBound(0, item.value("audioVolume").toInt(100), 100);
         clip.fadeInMs = qBound(0, item.value("fadeInMs").toInt(0), 5000);
         clip.fadeOutMs = qBound(0, item.value("fadeOutMs").toInt(0), 5000);
+        const QJsonArray audioVolumeKeyframes = item.value("audioVolumeKeyframes").toArray();
+        for (const QJsonValue &frameValue : audioVolumeKeyframes) {
+            if (!frameValue.isObject()) continue;
+            const QJsonObject frame = frameValue.toObject();
+            Keyframe keyframe;
+            keyframe.timeMs = qBound<qint64>(0, kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())), clip.durationMs);
+            keyframe.value = qBound(0.0, frame.value("value").toDouble(100.0), 100.0);
+            clip.audioVolumeKeyframes.append(keyframe);
+        }
+        std::sort(clip.audioVolumeKeyframes.begin(), clip.audioVolumeKeyframes.end(), [](const Keyframe &a, const Keyframe &b) { return a.timeMs < b.timeMs; });
         const QJsonArray opacityKeyframes = item.value("opacityKeyframes").toArray();
         for (const QJsonValue &frameValue : opacityKeyframes) {
             if (!frameValue.isObject()) continue;
