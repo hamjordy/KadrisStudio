@@ -161,8 +161,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 syncAudioTracks();
             }
         });
+    m_lastTimelineState = m_timeline->toJson();
     connect(m_timeline, &TimelineWidget::timelineEdited, this,
         [this]() {
+            const QJsonArray currentState = m_timeline->toJson();
+            if (!m_restoringTimeline && currentState != m_lastTimelineState) {
+                m_undoHistory.append(m_lastTimelineState);
+                if (m_undoHistory.size() > 100) m_undoHistory.removeFirst();
+                m_redoHistory.clear();
+                m_lastTimelineState = currentState;
+            }
             if (m_sequencePlaying) {
                 stopSequencePlayback(false);
                 statusBar()->showMessage("Timeline changed — playback stopped", 4000);
@@ -438,6 +446,14 @@ void MainWindow::buildMenus()
     exitAction->setShortcut(QKeySequence::Quit);
     connect(exitAction, &QAction::triggered, this, [this]() { close(); });
 
+    QMenu *edit = menuBar()->addMenu("&Edit");
+    auto *undoAction = edit->addAction("Undo Timeline Edit");
+    undoAction->setShortcut(QKeySequence::Undo);
+    connect(undoAction, &QAction::triggered, this, &MainWindow::undoTimelineEdit);
+    auto *redoAction = edit->addAction("Redo Timeline Edit");
+    redoAction->setShortcut(QKeySequence("Ctrl+Shift+Z"));
+    connect(redoAction, &QAction::triggered, this, &MainWindow::redoTimelineEdit);
+
     QMenu *media = menuBar()->addMenu("&Media");
     auto *importAction = media->addAction("&Import Media...");
     importAction->setShortcut(QKeySequence("Ctrl+I"));
@@ -460,6 +476,7 @@ void MainWindow::newProject()
     m_mediaPaths.clear();
     m_mediaList->clear();
     m_timeline->clearClips();
+    resetTimelineHistory();
     m_player->stop();
     m_player->setSource(QUrl());
     m_sourceLabel->setText("No source loaded");
@@ -536,6 +553,7 @@ bool MainWindow::readProject(const QString &path)
     for (const QJsonValue &value : root.value("mediaFiles").toArray())
         addMediaPath(value.toString());
     m_timeline->fromJson(root.value("timelineClips").toArray());
+    resetTimelineHistory();
     m_projectPath = path;
     m_player->stop();
     m_player->setSource(QUrl());
@@ -543,6 +561,48 @@ bool MainWindow::readProject(const QString &path)
     updateWindowTitle();
     statusBar()->showMessage("Project opened", 4000);
     return true;
+}
+
+
+void MainWindow::resetTimelineHistory()
+{
+    m_undoHistory.clear();
+    m_redoHistory.clear();
+    m_lastTimelineState = m_timeline ? m_timeline->toJson() : QJsonArray{};
+}
+
+void MainWindow::undoTimelineEdit()
+{
+    if (m_undoHistory.isEmpty()) {
+        statusBar()->showMessage("Nothing to undo", 2500);
+        return;
+    }
+
+    stopSequencePlayback(false);
+    m_redoHistory.append(m_timeline->toJson());
+    const QJsonArray previousState = m_undoHistory.takeLast();
+    m_restoringTimeline = true;
+    m_timeline->fromJson(previousState);
+    m_restoringTimeline = false;
+    m_lastTimelineState = previousState;
+    statusBar()->showMessage("Timeline edit undone", 2500);
+}
+
+void MainWindow::redoTimelineEdit()
+{
+    if (m_redoHistory.isEmpty()) {
+        statusBar()->showMessage("Nothing to redo", 2500);
+        return;
+    }
+
+    stopSequencePlayback(false);
+    m_undoHistory.append(m_timeline->toJson());
+    const QJsonArray nextState = m_redoHistory.takeLast();
+    m_restoringTimeline = true;
+    m_timeline->fromJson(nextState);
+    m_restoringTimeline = false;
+    m_lastTimelineState = nextState;
+    statusBar()->showMessage("Timeline edit restored", 2500);
 }
 
 void MainWindow::importMedia()
