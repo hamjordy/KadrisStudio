@@ -52,6 +52,7 @@ public:
     bool deleteSelectedClip();
     bool duplicateSelectedClip();
     bool rippleDeleteSelectedClip();
+    bool nudgeSelectedClip(int frameDirection);
     QJsonArray toJson() const;
     void fromJson(const QJsonArray &clips);
 
