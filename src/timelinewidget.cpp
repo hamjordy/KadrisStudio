@@ -609,6 +609,28 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event)
 
 void TimelineWidget::keyPressEvent(QKeyEvent *event)
 {
+    const qint64 stepMs = event->modifiers().testFlag(Qt::ShiftModifier)
+        ? 1000 : kSnapIntervalMs;
+
+    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
+        const qint64 direction = event->key() == Qt::Key_Left ? -1 : 1;
+        setPlayheadMs(m_playheadMs + direction * stepMs, true);
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Home) {
+        setPlayheadMs(0, true);
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_End) {
+        setPlayheadMs(sequenceDurationMs(), true);
+        event->accept();
+        return;
+    }
+
     if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
         if (deleteSelectedClip()) {
             event->accept();
