@@ -549,6 +549,15 @@ void MainWindow::buildMenus()
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
     QMenu *sequence = menuBar()->addMenu("&Sequence");
+    auto *rippleDeleteAction = sequence->addAction("Ripple Delete Selected Clip");
+    rippleDeleteAction->setShortcut(QKeySequence("Shift+Delete"));
+    connect(rippleDeleteAction, &QAction::triggered, this, [this]() {
+        if (!m_timeline->rippleDeleteSelectedClip())
+            statusBar()->showMessage("Select a clip on an unlocked track to ripple delete", 3500);
+        else
+            statusBar()->showMessage("Clip removed and following unlocked clips rippled left", 3500);
+    });
+
     auto *duplicateClipAction = sequence->addAction("Duplicate Selected Clip");
     duplicateClipAction->setShortcut(QKeySequence("Ctrl+D"));
     connect(duplicateClipAction, &QAction::triggered, this, [this]() {
