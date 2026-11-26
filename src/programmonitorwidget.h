@@ -21,6 +21,7 @@ public:
     void setCaption(const QString &caption);
     void setColorCorrection(int brightness, int contrast, int saturation);
     void setColorWheels(int shadows, int midtones, int highlights);
+    void setRgbCurves(int red, int green, int blue);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -36,5 +37,8 @@ private:
     int m_shadowWarmth = 0;
     int m_midtoneWarmth = 0;
     int m_highlightWarmth = 0;
+    int m_redCurve = 0;
+    int m_greenCurve = 0;
+    int m_blueCurve = 0;
     QString m_caption;
 };
