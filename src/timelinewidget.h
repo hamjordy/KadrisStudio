@@ -50,6 +50,7 @@ public:
     void setPlayheadMs(qint64 positionMs, bool notify = false);
     bool splitSelectedClipAtPlayhead();
     bool deleteSelectedClip();
+    bool duplicateSelectedClip();
     QJsonArray toJson() const;
     void fromJson(const QJsonArray &clips);
 
