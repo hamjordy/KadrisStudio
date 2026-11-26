@@ -160,6 +160,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             const QSignalBlocker t2(m_clipTransformSliders[2]);
             const QSignalBlocker opacityBlocker(m_clipOpacitySlider);
             const QSignalBlocker blendBlocker(m_clipBlendModeCombo);
+            const QSignalBlocker audioVolumeBlocker(m_clipAudioVolumeSlider);
+            const QSignalBlocker fadeInBlocker(m_clipFadeInSlider);
+            const QSignalBlocker fadeOutBlocker(m_clipFadeOutSlider);
             m_clipColorSliders[0]->setValue(clip.brightness);
             m_clipColorSliders[1]->setValue(clip.contrast);
             m_clipColorSliders[2]->setValue(clip.saturation);
@@ -174,6 +177,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipTransformSliders[2]->setValue(clip.positionY);
             m_clipOpacitySlider->setValue(clip.opacity);
             m_clipBlendModeCombo->setCurrentIndex(clip.blendMode);
+            m_clipAudioVolumeSlider->setValue(clip.audioVolume);
+            m_clipFadeInSlider->setValue(clip.fadeInMs);
+            m_clipFadeOutSlider->setValue(clip.fadeOutMs);
             if (clip.track < 3)
                 m_monitor->setTrackTransform(clip.track, clip.scale, clip.positionX, clip.positionY);
             if (clip.track < 3) m_monitor->setTrackOpacity(clip.track, clip.opacity);
@@ -600,6 +606,49 @@ void MainWindow::buildInterface()
             m_monitor->setTrackBlendMode(clip.track, mode);
     });
     inspectorLayout->addWidget(m_clipBlendModeCombo);
+    auto *audioClipHeading = new QLabel("CLIP AUDIO");
+    audioClipHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(audioClipHeading);
+    auto *audioVolumeLabel = new QLabel("Clip volume: 100%");
+    audioVolumeLabel->setObjectName("mutedLabel");
+    m_clipAudioVolumeSlider = new QSlider(Qt::Horizontal);
+    m_clipAudioVolumeSlider->setRange(0, 100);
+    m_clipAudioVolumeSlider->setValue(100);
+    connect(m_clipAudioVolumeSlider, &QSlider::valueChanged, this, [this, audioVolumeLabel](int) {
+        audioVolumeLabel->setText(QString("Clip volume: %1%").arg(m_clipAudioVolumeSlider->value()));
+        if (m_selectedTimelineClipId < 0) return;
+        m_timeline->setClipAudioSettings(m_selectedTimelineClipId, m_clipAudioVolumeSlider->value(),
+            m_clipFadeInSlider->value(), m_clipFadeOutSlider->value());
+        applyAudioMixerState();
+    });
+    inspectorLayout->addWidget(audioVolumeLabel);
+    inspectorLayout->addWidget(m_clipAudioVolumeSlider);
+    auto *fadeInLabel = new QLabel("Fade in: 0 ms");
+    fadeInLabel->setObjectName("mutedLabel");
+    m_clipFadeInSlider = new QSlider(Qt::Horizontal);
+    m_clipFadeInSlider->setRange(0, 5000);
+    m_clipFadeInSlider->setSingleStep(100);
+    m_clipFadeInSlider->setPageStep(500);
+    connect(m_clipFadeInSlider, &QSlider::valueChanged, this, [this, fadeInLabel](int value) {
+        fadeInLabel->setText(QString("Fade in: %1 ms").arg(value));
+        if (m_selectedTimelineClipId >= 0)
+            m_timeline->setClipAudioSettings(m_selectedTimelineClipId, m_clipAudioVolumeSlider->value(), value, m_clipFadeOutSlider->value());
+    });
+    inspectorLayout->addWidget(fadeInLabel);
+    inspectorLayout->addWidget(m_clipFadeInSlider);
+    auto *fadeOutLabel = new QLabel("Fade out: 0 ms");
+    fadeOutLabel->setObjectName("mutedLabel");
+    m_clipFadeOutSlider = new QSlider(Qt::Horizontal);
+    m_clipFadeOutSlider->setRange(0, 5000);
+    m_clipFadeOutSlider->setSingleStep(100);
+    m_clipFadeOutSlider->setPageStep(500);
+    connect(m_clipFadeOutSlider, &QSlider::valueChanged, this, [this, fadeOutLabel](int value) {
+        fadeOutLabel->setText(QString("Fade out: %1 ms").arg(value));
+        if (m_selectedTimelineClipId >= 0)
+            m_timeline->setClipAudioSettings(m_selectedTimelineClipId, m_clipAudioVolumeSlider->value(), m_clipFadeInSlider->value(), value);
+    });
+    inspectorLayout->addWidget(fadeOutLabel);
+    inspectorLayout->addWidget(m_clipFadeOutSlider);
     auto *opacityKeyframeHeading = new QLabel("ANIMATION — OPACITY");
     opacityKeyframeHeading->setObjectName("sectionTitle");
     inspectorLayout->addWidget(opacityKeyframeHeading);
@@ -1582,8 +1631,19 @@ void MainWindow::applyAudioMixerState()
         if (!output) continue;
 
         const bool mutedBySolo = anySolo && !m_audioTrackSolo[track];
+        float clipGain = 1.0f;
+        TimelineWidget::ClipInfo clip;
+        if (m_timeline && m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track + 3, &clip)) {
+            clipGain = clip.audioVolume / 100.0f;
+            const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs);
+            if (clip.fadeInMs > 0 && localMs < clip.fadeInMs)
+                clipGain *= static_cast<float>(localMs) / clip.fadeInMs;
+            const qint64 remainingMs = qMax<qint64>(0, clip.durationMs - localMs);
+            if (clip.fadeOutMs > 0 && remainingMs < clip.fadeOutMs)
+                clipGain *= static_cast<float>(remainingMs) / clip.fadeOutMs;
+        }
         output->setVolume(qBound(0.0f,
-            m_audioTrackGains[track] * m_masterGain, 1.0f));
+            m_audioTrackGains[track] * m_masterGain * clipGain, 1.0f));
         output->setMuted(m_audioTrackMuted[track] || mutedBySolo
             || (m_timeline && m_timeline->isTrackMuted(track + 3)));
     }
@@ -1657,6 +1717,7 @@ void MainWindow::syncAudioTracks()
         player->setSource(QUrl::fromLocalFile(clip.path));
         handleAudioTrackStatus(audioTrack);
     }
+    applyAudioMixerState();
 }
 
 void MainWindow::handleAudioTrackStatus(int audioTrack)
