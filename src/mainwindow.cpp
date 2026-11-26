@@ -292,13 +292,63 @@ void MainWindow::buildInterface()
     auto *inspectorLayout = new QVBoxLayout(inspector);
     auto *inspectorHeading = new QLabel("SOURCE INFORMATION");
     inspectorHeading->setObjectName("sectionTitle");
-    m_inspectorLabel = new QLabel("Select a media item to load it in the source monitor.\n\n"
-                                  "Clip properties and effect controls are planned for later milestones.");
+    m_inspectorLabel = new QLabel("Select a media item to load it in the source monitor.");
     m_inspectorLabel->setObjectName("mutedLabel");
     m_inspectorLabel->setWordWrap(true);
     m_inspectorLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
     inspectorLayout->addWidget(inspectorHeading);
-    inspectorLayout->addWidget(m_inspectorLabel, 1);
+    inspectorLayout->addWidget(m_inspectorLabel);
+
+    auto *colorHeading = new QLabel("COLOR CORRECTION");
+    colorHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(colorHeading);
+    auto addColorControl = [this, inspectorLayout](const QString &name,
+            int minimum, int maximum, int initial, const QString &suffix,
+            std::function<void(int, int, int)> apply) {
+        auto *label = new QLabel(QString("%1: %2%3").arg(name).arg(initial).arg(suffix));
+        label->setObjectName("mutedLabel");
+        auto *slider = new QSlider(Qt::Horizontal);
+        slider->setRange(minimum, maximum);
+        slider->setValue(initial);
+        connect(slider, &QSlider::valueChanged, this,
+            [this, label, name, suffix, apply, slider](int value) {
+                label->setText(QString("%1: %2%3").arg(name).arg(value).arg(suffix));
+                apply(value, 0, 0);
+            });
+        inspectorLayout->addWidget(label);
+        inspectorLayout->addWidget(slider);
+        return slider;
+    };
+    auto *brightnessSlider = new QSlider(Qt::Horizontal);
+    auto *contrastSlider = new QSlider(Qt::Horizontal);
+    auto *saturationSlider = new QSlider(Qt::Horizontal);
+    auto addMonitorSlider = [this, inspectorLayout](const QString &name,
+            QSlider *slider, int minimum, int maximum, int initial) {
+        auto *label = new QLabel(QString("%1: %2").arg(name).arg(initial));
+        label->setObjectName("mutedLabel");
+        slider->setRange(minimum, maximum);
+        slider->setValue(initial);
+        connect(slider, &QSlider::valueChanged, this,
+            [this, label, name, brightnessSlider, contrastSlider, saturationSlider](int value) {
+                label->setText(QString("%1: %2").arg(name).arg(value));
+                m_monitor->setColorCorrection(brightnessSlider->value(),
+                    contrastSlider->value(), saturationSlider->value());
+            });
+        inspectorLayout->addWidget(label);
+        inspectorLayout->addWidget(slider);
+    };
+    addMonitorSlider("Brightness", brightnessSlider, -100, 100, 0);
+    addMonitorSlider("Contrast", contrastSlider, -100, 100, 0);
+    addMonitorSlider("Saturation", saturationSlider, 0, 200, 100);
+    auto *resetColor = new QPushButton("Reset Color Correction");
+    connect(resetColor, &QPushButton::clicked, this,
+        [brightnessSlider, contrastSlider, saturationSlider]() {
+            brightnessSlider->setValue(0);
+            contrastSlider->setValue(0);
+            saturationSlider->setValue(100);
+        });
+    inspectorLayout->addWidget(resetColor);
+    inspectorLayout->addStretch(1);
     inspectorDock->setWidget(inspector);
     addDockWidget(Qt::RightDockWidgetArea, inspectorDock);
 
