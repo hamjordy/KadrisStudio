@@ -51,6 +51,7 @@ public:
     bool splitSelectedClipAtPlayhead();
     bool deleteSelectedClip();
     bool duplicateSelectedClip();
+    bool rippleDeleteSelectedClip();
     QJsonArray toJson() const;
     void fromJson(const QJsonArray &clips);
 
