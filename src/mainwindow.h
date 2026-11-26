@@ -2,6 +2,7 @@
 #include <QMainWindow>
 #include <QElapsedTimer>
 #include <QStringList>
+#include <array>
 
 class QAudioOutput;
 class QLabel;
@@ -10,7 +11,8 @@ class QPushButton;
 class QSlider;
 class QTreeWidget;
 class QTimer;
-class QVideoWidget;
+class QVideoSink;
+class ProgramMonitorWidget;
 class TimelineWidget;
 
 class MainWindow final : public QMainWindow
@@ -31,8 +33,8 @@ private slots:
     void toggleSequencePlayback();
     void stopSequencePlayback(bool resetToStart = true);
     void tickSequencePlayback();
-    void activateSequencePosition();
-    void handleSequenceMediaStatus();
+    void syncVideoTracks();
+    void handleVideoTrackStatus(int track);
 
 private:
     void buildInterface();
@@ -53,7 +55,8 @@ private:
     QLabel *m_inspectorLabel = nullptr;
     QLabel *m_sourceLabel = nullptr;
     QLabel *m_timeLabel = nullptr;
-    QVideoWidget *m_videoWidget = nullptr;
+    ProgramMonitorWidget *m_monitor = nullptr;
+    QVideoSink *m_sourceSink = nullptr;
     QSlider *m_seekSlider = nullptr;
     QPushButton *m_playButton = nullptr;
     QPushButton *m_sequenceButton = nullptr;
@@ -61,11 +64,12 @@ private:
     QTimer *m_sequenceTimer = nullptr;
     QElapsedTimer m_sequenceClock;
     bool m_sequencePlaying = false;
-    bool m_waitingForSequenceMedia = false;
-    int m_activeSequenceClipId = -1;
     qint64 m_sequencePositionMs = 0;
-    qint64 m_pendingSequenceSourceMs = 0;
-    qint64 m_activeSequenceClipEndMs = 0;
+    std::array<QMediaPlayer *, 3> m_videoTrackPlayers{};
+    std::array<QVideoSink *, 3> m_videoTrackSinks{};
+    std::array<int, 3> m_activeVideoClipIds{{-1, -1, -1}};
+    std::array<bool, 3> m_waitingForVideoTrack{{false, false, false}};
+    std::array<bool, 3> m_failedVideoTrack{{false, false, false}};
     TimelineWidget *m_timeline = nullptr;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;

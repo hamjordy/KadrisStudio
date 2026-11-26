@@ -30,7 +30,8 @@ This roadmap describes planned work. A feature is complete only after implementa
 - [ ] Markers and advanced track controls
 - [ ] Undo/redo command stack
 - [x] Basic video sequence playback across timeline clips
-- [ ] Compositing of overlapping video tracks and frame-accurate timeline clock
+- [x] Preview compositing of active clips across three video tracks
+- [ ] Frame-accurate compositing clock and rendered sequence pipeline
 - [ ] Separate audio-track playback and mixing
 
 ## Milestone 3 — Rendering and media engine
