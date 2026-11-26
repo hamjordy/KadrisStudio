@@ -153,7 +153,7 @@ bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
 
 bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *result) const
 {
-    if (track < 0 || track >= 3) return false;
+    if (track < 0 || track >= kTrackCount) return false;
 
     for (int i = 0; i < m_clips.size(); ++i) {
         const Clip &clip = m_clips.at(i);

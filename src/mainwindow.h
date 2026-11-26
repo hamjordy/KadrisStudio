@@ -35,6 +35,8 @@ private slots:
     void tickSequencePlayback();
     void syncVideoTracks();
     void handleVideoTrackStatus(int track);
+    void syncAudioTracks();
+    void handleAudioTrackStatus(int track);
 
 private:
     void buildInterface();
@@ -70,6 +72,11 @@ private:
     std::array<int, 3> m_activeVideoClipIds{{-1, -1, -1}};
     std::array<bool, 3> m_waitingForVideoTrack{{false, false, false}};
     std::array<bool, 3> m_failedVideoTrack{{false, false, false}};
+    std::array<QMediaPlayer *, 2> m_audioTrackPlayers{};
+    std::array<QAudioOutput *, 2> m_audioTrackOutputs{};
+    std::array<int, 2> m_activeAudioClipIds{{-1, -1}};
+    std::array<bool, 2> m_waitingForAudioTrack{{false, false}};
+    std::array<bool, 2> m_failedAudioTrack{{false, false}};
     TimelineWidget *m_timeline = nullptr;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;

@@ -70,6 +70,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             });
     }
 
+    for (int track = 0; track < 2; ++track) {
+        m_audioTrackPlayers[track] = new QMediaPlayer(this);
+        m_audioTrackOutputs[track] = new QAudioOutput(this);
+        m_audioTrackOutputs[track]->setVolume(0.8f);
+        m_audioTrackPlayers[track]->setAudioOutput(m_audioTrackOutputs[track]);
+
+        connect(m_audioTrackPlayers[track], &QMediaPlayer::mediaStatusChanged, this,
+            [this, track](QMediaPlayer::MediaStatus) {
+                handleAudioTrackStatus(track);
+            });
+        connect(m_audioTrackPlayers[track], &QMediaPlayer::errorOccurred, this,
+            [this, track](QMediaPlayer::Error, const QString &message) {
+                m_waitingForAudioTrack[track] = false;
+                m_failedAudioTrack[track] = true;
+                statusBar()->showMessage(
+                    QString("Audio track %1: %2").arg(track + 1).arg(message), 7000);
+            });
+    }
+
     buildInterface();
     buildMenus();
 
@@ -111,7 +130,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                     m_failedVideoTrack[track] = false;
                     m_monitor->clearFrame(track);
                 }
+                for (int track = 0; track < 2; ++track) {
+                    m_audioTrackPlayers[track]->stop();
+                    m_audioTrackPlayers[track]->setSource(QUrl());
+                    m_activeAudioClipIds[track] = -1;
+                    m_waitingForAudioTrack[track] = false;
+                    m_failedAudioTrack[track] = false;
+                }
                 syncVideoTracks();
+                syncAudioTracks();
             }
         });
     connect(m_timeline, &TimelineWidget::timelineEdited, this,
@@ -187,6 +214,24 @@ void MainWindow::buildInterface()
     sequenceTransport->addStretch();
     sequenceTransport->addWidget(new QLabel("TIMELINE POSITION"));
     sequenceTransport->addWidget(m_sequenceTimeLabel);
+    sequenceTransport->addSpacing(18);
+    sequenceTransport->addWidget(new QLabel("MASTER"));
+    auto *masterVolume = new QSlider(Qt::Horizontal);
+    masterVolume->setRange(0, 100);
+    masterVolume->setValue(80);
+    masterVolume->setFixedWidth(110);
+    auto *masterVolumeLabel = new QLabel("80%");
+    masterVolumeLabel->setObjectName("timecodeLabel");
+    connect(masterVolume, &QSlider::valueChanged, this,
+        [this, masterVolumeLabel](int value) {
+            const float volume = static_cast<float>(value) / 100.0f;
+            for (QAudioOutput *output : m_audioTrackOutputs) {
+                if (output) output->setVolume(volume);
+            }
+            masterVolumeLabel->setText(QString("%1%").arg(value));
+        });
+    sequenceTransport->addWidget(masterVolume);
+    sequenceTransport->addWidget(masterVolumeLabel);
     layout->addLayout(sequenceTransport);
     setCentralWidget(central);
 
@@ -482,6 +527,8 @@ void MainWindow::toggleSequencePlayback()
         m_sequenceClock.invalidate();
         for (int track = 0; track < 3; ++track)
             m_videoTrackPlayers[track]->pause();
+        for (int track = 0; track < 2; ++track)
+            m_audioTrackPlayers[track]->pause();
         m_sequenceButton->setText("Play Timeline");
         statusBar()->showMessage("Timeline playback paused", 3000);
         return;
@@ -500,16 +547,35 @@ void MainWindow::toggleSequencePlayback()
     m_player->stop();
     m_monitor->clearAllFrames();
     m_monitor->setCaption("Timeline playback");
+
+    // Rebuild every active source from the current playhead. This also makes
+    // pause -> seek -> resume start at the correct source positions.
+    for (int track = 0; track < 3; ++track) {
+        m_videoTrackPlayers[track]->stop();
+        m_videoTrackPlayers[track]->setSource(QUrl());
+        m_activeVideoClipIds[track] = -1;
+        m_waitingForVideoTrack[track] = false;
+        m_failedVideoTrack[track] = false;
+    }
+    for (int track = 0; track < 2; ++track) {
+        m_audioTrackPlayers[track]->stop();
+        m_audioTrackPlayers[track]->setSource(QUrl());
+        m_activeAudioClipIds[track] = -1;
+        m_waitingForAudioTrack[track] = false;
+        m_failedAudioTrack[track] = false;
+    }
+
     m_sequencePlaying = true;
     m_playButton->setEnabled(false);
     m_sequenceButton->setText("Pause Timeline");
     m_sequenceClock.start();
     m_sequenceTimer->start();
     syncVideoTracks();
+    syncAudioTracks();
 
     statusBar()->showMessage(
-        "Timeline playback combines active clips from VIDEO 1, VIDEO 2, and VIDEO 3. Audio tracks are not mixed yet.",
-        6500);
+        "Timeline playback: video layers and synchronized AUDIO 1 / AUDIO 2 playback.",
+        5500);
 }
 
 void MainWindow::stopSequencePlayback(bool resetToStart)
@@ -524,6 +590,13 @@ void MainWindow::stopSequencePlayback(bool resetToStart)
         m_activeVideoClipIds[track] = -1;
         m_waitingForVideoTrack[track] = false;
         m_failedVideoTrack[track] = false;
+    }
+    for (int track = 0; track < 2; ++track) {
+        m_audioTrackPlayers[track]->stop();
+        m_audioTrackPlayers[track]->setSource(QUrl());
+        m_activeAudioClipIds[track] = -1;
+        m_waitingForAudioTrack[track] = false;
+        m_failedAudioTrack[track] = false;
     }
 
     if (m_monitor) {
@@ -561,6 +634,7 @@ void MainWindow::tickSequencePlayback()
     m_timeline->setPlayheadMs(m_sequencePositionMs);
     updateSequenceTimeLabel();
     syncVideoTracks();
+    syncAudioTracks();
 }
 
 void MainWindow::syncVideoTracks()
@@ -652,6 +726,122 @@ void MainWindow::handleVideoTrackStatus(int track)
         m_monitor->clearFrame(track);
         statusBar()->showMessage(
             QString("Could not play media on VIDEO %1").arg(track + 1), 6000);
+    }
+}
+
+void MainWindow::syncAudioTracks()
+{
+    if (!m_sequencePlaying) return;
+
+    constexpr int firstAudioTrack = 3; // Timeline track 4 is AUDIO 1.
+    for (int audioTrack = 0; audioTrack < 2; ++audioTrack) {
+        const int timelineTrack = firstAudioTrack + audioTrack;
+        QMediaPlayer *player = m_audioTrackPlayers[audioTrack];
+
+        TimelineWidget::ClipInfo clip;
+        const bool hasClip = m_timeline->clipAtTimeOnTrack(
+            m_sequencePositionMs, timelineTrack, &clip);
+
+        if (!hasClip) {
+            if (m_activeAudioClipIds[audioTrack] != -1) {
+                player->stop();
+                player->setSource(QUrl());
+                m_activeAudioClipIds[audioTrack] = -1;
+                m_waitingForAudioTrack[audioTrack] = false;
+                m_failedAudioTrack[audioTrack] = false;
+            }
+            continue;
+        }
+
+        const qint64 sourcePosition =
+            clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+
+        if (clip.id == m_activeAudioClipIds[audioTrack]) {
+            if (m_waitingForAudioTrack[audioTrack]) {
+                handleAudioTrackStatus(audioTrack);
+                continue;
+            }
+            if (m_failedAudioTrack[audioTrack]) continue;
+
+            if (player->duration() > 0 && sourcePosition >= player->duration()) {
+                player->stop();
+                m_failedAudioTrack[audioTrack] = true;
+                continue;
+            }
+
+            if (player->playbackState() == QMediaPlayer::PlayingState) {
+                // Correct noticeable decoder drift without constantly seeking.
+                if (qAbs(player->position() - sourcePosition) > 300)
+                    player->setPosition(sourcePosition);
+            } else {
+                player->setPosition(qMax<qint64>(0, sourcePosition));
+                player->play();
+            }
+            continue;
+        }
+
+        player->stop();
+        m_activeAudioClipIds[audioTrack] = clip.id;
+        m_waitingForAudioTrack[audioTrack] = false;
+        m_failedAudioTrack[audioTrack] = false;
+
+        if (!QFileInfo::exists(clip.path)) {
+            m_failedAudioTrack[audioTrack] = true;
+            statusBar()->showMessage(
+                QString("Missing media on AUDIO %1: %2")
+                    .arg(audioTrack + 1).arg(QFileInfo(clip.path).fileName()), 6000);
+            continue;
+        }
+
+        m_waitingForAudioTrack[audioTrack] = true;
+        player->setSource(QUrl::fromLocalFile(clip.path));
+        handleAudioTrackStatus(audioTrack);
+    }
+}
+
+void MainWindow::handleAudioTrackStatus(int audioTrack)
+{
+    if (audioTrack < 0 || audioTrack >= 2 || !m_sequencePlaying) return;
+
+    QMediaPlayer *player = m_audioTrackPlayers[audioTrack];
+    const QMediaPlayer::MediaStatus status = player->mediaStatus();
+
+    if (status == QMediaPlayer::EndOfMedia
+        && !m_waitingForAudioTrack[audioTrack]) {
+        m_failedAudioTrack[audioTrack] = true;
+        return;
+    }
+
+    if (!m_waitingForAudioTrack[audioTrack]) return;
+
+    if (status == QMediaPlayer::LoadedMedia
+        || status == QMediaPlayer::BufferedMedia) {
+        constexpr int firstAudioTrack = 3;
+        TimelineWidget::ClipInfo clip;
+        if (!m_timeline->clipAtTimeOnTrack(
+                m_sequencePositionMs, firstAudioTrack + audioTrack, &clip)
+            || clip.id != m_activeAudioClipIds[audioTrack]) {
+            m_waitingForAudioTrack[audioTrack] = false;
+            return;
+        }
+
+        const qint64 sourcePosition =
+            clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+        if (player->duration() > 0 && sourcePosition >= player->duration()) {
+            m_waitingForAudioTrack[audioTrack] = false;
+            m_failedAudioTrack[audioTrack] = true;
+            return;
+        }
+
+        player->setPosition(qMax<qint64>(0, sourcePosition));
+        m_waitingForAudioTrack[audioTrack] = false;
+        player->play();
+    } else if (status == QMediaPlayer::InvalidMedia
+        || status == QMediaPlayer::EndOfMedia) {
+        m_waitingForAudioTrack[audioTrack] = false;
+        m_failedAudioTrack[audioTrack] = true;
+        statusBar()->showMessage(
+            QString("Could not play media on AUDIO %1").arg(audioTrack + 1), 6000);
     }
 }
 

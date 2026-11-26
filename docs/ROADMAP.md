@@ -32,7 +32,8 @@ This roadmap describes planned work. A feature is complete only after implementa
 - [x] Basic video sequence playback across timeline clips
 - [x] Preview compositing of active clips across three video tracks
 - [ ] Frame-accurate compositing clock and rendered sequence pipeline
-- [ ] Separate audio-track playback and mixing
+- [x] Basic synchronized playback on AUDIO 1 and AUDIO 2 with master volume
+- [ ] Per-track mixer controls, meters, routing, and audio processing
 
 ## Milestone 3 — Rendering and media engine
 - [ ] FFmpeg integration with documented license/build choices
