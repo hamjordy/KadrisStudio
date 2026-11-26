@@ -102,6 +102,19 @@ void ProgramMonitorWidget::setTrackColorGrade(int track, int brightness, int con
     update();
 }
 
+
+void ProgramMonitorWidget::setTrackTransform(int track, int scale, int positionX, int positionY)
+{
+    if (track < 0 || track >= 3) return;
+    TrackTransform &transform = m_transforms[static_cast<size_t>(track)];
+    const TrackTransform next{qBound(10, scale, 300),
+        qBound(-100, positionX, 100), qBound(-100, positionY, 100)};
+    if (transform.scale == next.scale && transform.x == next.x && transform.y == next.y)
+        return;
+    transform = next;
+    update();
+}
+
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
     for (size_t index = 0; index < m_frames.size(); ++index) {
@@ -172,10 +185,13 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
 
         const QSize scaled = frame.size().scaled(
             target.size().toSize(), Qt::KeepAspectRatio);
-        const QRectF destination(
-            target.center().x() - scaled.width() / 2.0,
-            target.center().y() - scaled.height() / 2.0,
-            scaled.width(), scaled.height());
+        const TrackTransform &transform = m_transforms[static_cast<size_t>(&frame - &m_correctedFrames[0])];
+        const double width = scaled.width() * transform.scale / 100.0;
+        const double height = scaled.height() * transform.scale / 100.0;
+        const QPointF center(target.center().x() + target.width() * transform.x / 100.0,
+                             target.center().y() + target.height() * transform.y / 100.0);
+        const QRectF destination(center.x() - width / 2.0, center.y() - height / 2.0,
+                                 width, height);
         painter.drawImage(destination, frame);
         drewFrame = true;
     }
