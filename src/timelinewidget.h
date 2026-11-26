@@ -28,6 +28,7 @@ public:
         int shadows = 0, midtones = 0, highlights = 0;
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
         int keyframeCount = 0;
+        int scale = 100, positionX = 0, positionY = 0;
     };
 
     void addClip(const QString &path);
@@ -54,6 +55,11 @@ public:
                               int redCurve, int greenCurve, int blueCurve);
     bool addBrightnessKeyframe(int clipId, qint64 timelineTimeMs, int value);
     bool addContrastKeyframe(int clipId, qint64 timelineTimeMs, int value);
+    bool setClipTransformSettings(int clipId, int scale, int positionX, int positionY);
+    bool addTransformKeyframe(int clipId, qint64 timelineTimeMs, int scale, int positionX, int positionY);
+    bool removeTransformKeyframeAt(int clipId, qint64 timelineTimeMs);
+    int transformKeyframeCount(int clipId) const;
+    void evaluatedTransform(int clipId, qint64 timelineTimeMs, int *scale, int *positionX, int *positionY) const;
     bool removeBrightnessKeyframeAt(int clipId, qint64 timelineTimeMs);
     bool removeContrastKeyframeAt(int clipId, qint64 timelineTimeMs);
     int brightnessKeyframeCount(int clipId) const;
@@ -106,6 +112,9 @@ private:
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
         QVector<Keyframe> brightnessKeyframes;
         QVector<Keyframe> contrastKeyframes;
+        struct TransformKeyframe { qint64 timeMs = 0; double scale = 100.0; double x = 0.0; double y = 0.0; };
+        int scale = 100, positionX = 0, positionY = 0;
+        QVector<TransformKeyframe> transformKeyframes;
     };
 
     enum class DragMode { None, Move, TrimLeft, TrimRight };
