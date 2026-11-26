@@ -6,7 +6,8 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QRectF>
-#include <QStringList>\n#include <cmath>
+#include <QStringList>
+#include <cmath>
 
 ProgramMonitorWidget::ProgramMonitorWidget(QWidget *parent)
     : QWidget(parent)
