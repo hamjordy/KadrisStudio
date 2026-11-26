@@ -4,6 +4,7 @@
 #include "frame_timebase.h"
 
 #include <QAction>
+#include <QCheckBox>
 #include <QAudioOutput>
 #include <QDockWidget>
 #include <QElapsedTimer>
@@ -161,6 +162,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             const QSignalBlocker opacityBlocker(m_clipOpacitySlider);
             const QSignalBlocker blendBlocker(m_clipBlendModeCombo);
             const QSignalBlocker audioVolumeBlocker(m_clipAudioVolumeSlider);
+            const QSignalBlocker clipAudioMuteBlocker(clipAudioMuteCheckBox);
             const QSignalBlocker fadeInBlocker(m_clipFadeInSlider);
             const QSignalBlocker fadeOutBlocker(m_clipFadeOutSlider);
             m_clipColorSliders[0]->setValue(clip.brightness);
@@ -178,6 +180,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipOpacitySlider->setValue(clip.opacity);
             m_clipBlendModeCombo->setCurrentIndex(clip.blendMode);
             m_clipAudioVolumeSlider->setValue(clip.audioVolume);
+            clipAudioMuteCheckBox->setChecked(clip.audioMuted);
             m_clipFadeInSlider->setValue(clip.fadeInMs);
             m_clipFadeOutSlider->setValue(clip.fadeOutMs);
             if (clip.track < 3)
@@ -623,6 +626,14 @@ void MainWindow::buildInterface()
     });
     inspectorLayout->addWidget(audioVolumeLabel);
     inspectorLayout->addWidget(m_clipAudioVolumeSlider);
+    auto *clipAudioMuteCheckBox = new QCheckBox("Mute this clip");
+    connect(clipAudioMuteCheckBox, &QCheckBox::toggled, this, [this](bool muted) {
+        if (m_selectedTimelineClipId >= 0) {
+            m_timeline->setClipAudioMuted(m_selectedTimelineClipId, muted);
+            applyAudioMixerState();
+        }
+    });
+    inspectorLayout->addWidget(clipAudioMuteCheckBox);
     auto *fadeInLabel = new QLabel("Fade in: 0 ms");
     fadeInLabel->setObjectName("mutedLabel");
     m_clipFadeInSlider = new QSlider(Qt::Horizontal);
@@ -1653,9 +1664,11 @@ void MainWindow::applyAudioMixerState()
 
         const bool mutedBySolo = anySolo && !m_audioTrackSolo[track];
         float clipGain = 1.0f;
+        bool clipMuted = false;
         TimelineWidget::ClipInfo clip;
         if (m_timeline && m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track + 3, &clip)) {
             clipGain = m_timeline->evaluatedAudioVolume(clip.id, m_sequencePositionMs) / 100.0f;
+            clipMuted = clip.audioMuted;
             const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs);
             if (clip.fadeInMs > 0 && localMs < clip.fadeInMs)
                 clipGain *= static_cast<float>(localMs) / clip.fadeInMs;
@@ -1666,7 +1679,7 @@ void MainWindow::applyAudioMixerState()
         output->setVolume(qBound(0.0f,
             m_audioTrackGains[track] * m_masterGain * clipGain, 1.0f));
         output->setMuted(m_audioTrackMuted[track] || mutedBySolo
-            || (m_timeline && m_timeline->isTrackMuted(track + 3)));
+            || clipMuted || (m_timeline && m_timeline->isTrackMuted(track + 3)));
     }
 }
 
