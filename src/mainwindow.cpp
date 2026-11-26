@@ -649,6 +649,27 @@ void MainWindow::buildInterface()
     });
     inspectorLayout->addWidget(fadeOutLabel);
     inspectorLayout->addWidget(m_clipFadeOutSlider);
+    auto *audioKeyframeCountLabel = new QLabel("Volume keyframes: 0");
+    audioKeyframeCountLabel->setObjectName("mutedLabel");
+    inspectorLayout->addWidget(audioKeyframeCountLabel);
+    auto *addAudioKeyframeButton = new QPushButton("Add / Update Volume Keyframe");
+    auto *removeAudioKeyframeButton = new QPushButton("Remove Nearest Volume Keyframe");
+    connect(addAudioKeyframeButton, &QPushButton::clicked, this, [this, audioKeyframeCountLabel]() {
+        if (m_selectedTimelineClipId < 0) return;
+        if (m_timeline->addAudioVolumeKeyframe(m_selectedTimelineClipId, m_timeline->playheadMs(), m_clipAudioVolumeSlider->value())) {
+            audioKeyframeCountLabel->setText(QString("Volume keyframes: %1").arg(m_timeline->audioVolumeKeyframeCount(m_selectedTimelineClipId)));
+            applyAudioMixerState();
+        }
+    });
+    connect(removeAudioKeyframeButton, &QPushButton::clicked, this, [this, audioKeyframeCountLabel]() {
+        if (m_selectedTimelineClipId < 0) return;
+        if (m_timeline->removeAudioVolumeKeyframeAt(m_selectedTimelineClipId, m_timeline->playheadMs())) {
+            audioKeyframeCountLabel->setText(QString("Volume keyframes: %1").arg(m_timeline->audioVolumeKeyframeCount(m_selectedTimelineClipId)));
+            applyAudioMixerState();
+        }
+    });
+    inspectorLayout->addWidget(addAudioKeyframeButton);
+    inspectorLayout->addWidget(removeAudioKeyframeButton);
     auto *opacityKeyframeHeading = new QLabel("ANIMATION — OPACITY");
     opacityKeyframeHeading->setObjectName("sectionTitle");
     inspectorLayout->addWidget(opacityKeyframeHeading);
@@ -1634,7 +1655,7 @@ void MainWindow::applyAudioMixerState()
         float clipGain = 1.0f;
         TimelineWidget::ClipInfo clip;
         if (m_timeline && m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track + 3, &clip)) {
-            clipGain = clip.audioVolume / 100.0f;
+            clipGain = m_timeline->evaluatedAudioVolume(clip.id, m_sequencePositionMs) / 100.0f;
             const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs);
             if (clip.fadeInMs > 0 && localMs < clip.fadeInMs)
                 clipGain *= static_cast<float>(localMs) / clip.fadeInMs;
