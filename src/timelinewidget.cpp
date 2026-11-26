@@ -486,6 +486,28 @@ bool TimelineWidget::rippleDeleteSelectedClip()
     return true;
 }
 
+bool TimelineWidget::nudgeSelectedClip(int frameDirection)
+{
+    if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()
+        || frameDirection == 0) return false;
+
+    Clip &clip = m_clips[m_selectedClip];
+    if (isTrackLocked(clip.track)) return false;
+
+    const qint64 previousStart = clip.timelineStartMs;
+    const qint64 requestedStart = previousStart
+        + (frameDirection < 0 ? -kSnapIntervalMs : kSnapIntervalMs);
+    clip.timelineStartMs = kTimelineTimebase.snapMilliseconds(
+        qMax<qint64>(0, requestedStart));
+
+    if (clip.timelineStartMs == previousStart) return false;
+
+    updateCanvasSize();
+    update();
+    emit timelineEdited();
+    return true;
+}
+
 bool TimelineWidget::duplicateSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
@@ -944,6 +966,14 @@ void TimelineWidget::mouseReleaseEvent(QMouseEvent *event)
 
 void TimelineWidget::keyPressEvent(QKeyEvent *event)
 {
+    if (event->modifiers().testFlag(Qt::AltModifier)
+        && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right)) {
+        const int direction = event->key() == Qt::Key_Left ? -1 : 1;
+        nudgeSelectedClip(direction);
+        event->accept();
+        return;
+    }
+
     const qint64 stepMs = event->modifiers().testFlag(Qt::ShiftModifier)
         ? 1000 : kSnapIntervalMs;
 
