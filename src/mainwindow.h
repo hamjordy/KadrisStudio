@@ -98,6 +98,9 @@ private:
     std::array<QSlider *, 3> m_clipTransformSliders{};
     QSlider *m_clipOpacitySlider = nullptr;
     QComboBox *m_clipBlendModeCombo = nullptr;
+    QSlider *m_clipAudioVolumeSlider = nullptr;
+    QSlider *m_clipFadeInSlider = nullptr;
+    QSlider *m_clipFadeOutSlider = nullptr;
     int m_selectedTimelineClipId = -1;
     QVector<QJsonArray> m_undoHistory;
     QVector<QJsonArray> m_redoHistory;
