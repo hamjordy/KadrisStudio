@@ -446,6 +446,46 @@ void MainWindow::buildInterface()
             blueCurve->setValue(0);
         });
     inspectorLayout->addWidget(resetColor);
+
+    auto *keyframeHeading = new QLabel("ANIMATION — BRIGHTNESS");
+    keyframeHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(keyframeHeading);
+    auto *keyframeCountLabel = new QLabel("Brightness keyframes: 0");
+    keyframeCountLabel->setObjectName("mutedLabel");
+    inspectorLayout->addWidget(keyframeCountLabel);
+    auto *addKeyframeButton = new QPushButton("Add / Update Keyframe");
+    auto *removeKeyframeButton = new QPushButton("Remove Nearest Keyframe");
+    addKeyframeButton->setToolTip("Store the current brightness at the timeline playhead");
+    removeKeyframeButton->setToolTip("Remove the nearest brightness keyframe to the playhead");
+    connect(addKeyframeButton, &QPushButton::clicked, this,
+        [this, keyframeCountLabel, brightnessSlider]() {
+            if (m_selectedTimelineClipId < 0) {
+                statusBar()->showMessage("Select a video clip before adding keyframes", 3500);
+                return;
+            }
+            if (m_timeline->addBrightnessKeyframe(m_selectedTimelineClipId,
+                    m_timeline->playheadMs(), brightnessSlider->value())) {
+                keyframeCountLabel->setText(QString("Brightness keyframes: %1")
+                    .arg(m_timeline->brightnessKeyframeCount(m_selectedTimelineClipId)));
+                statusBar()->showMessage("Brightness keyframe added at the playhead", 3000);
+                refreshPausedTimelinePreview();
+            }
+        });
+    connect(removeKeyframeButton, &QPushButton::clicked, this,
+        [this, keyframeCountLabel]() {
+            if (m_selectedTimelineClipId < 0) return;
+            if (m_timeline->removeBrightnessKeyframeAt(
+                    m_selectedTimelineClipId, m_timeline->playheadMs())) {
+                keyframeCountLabel->setText(QString("Brightness keyframes: %1")
+                    .arg(m_timeline->brightnessKeyframeCount(m_selectedTimelineClipId)));
+                statusBar()->showMessage("Nearest brightness keyframe removed", 3000);
+                refreshPausedTimelinePreview();
+            } else {
+                statusBar()->showMessage("No brightness keyframe close to the playhead", 3000);
+            }
+        });
+    inspectorLayout->addWidget(addKeyframeButton);
+    inspectorLayout->addWidget(removeKeyframeButton);
     inspectorLayout->addStretch(1);
     inspectorDock->setWidget(inspector);
     addDockWidget(Qt::RightDockWidgetArea, inspectorDock);
@@ -1150,6 +1190,11 @@ void MainWindow::refreshPausedTimelinePreview()
             continue;
         }
 
+        const int animatedBrightness = m_timeline->evaluatedBrightness(
+            clip.id, m_sequencePositionMs);
+        m_monitor->setTrackColorGrade(track, animatedBrightness, clip.contrast,
+            clip.saturation, clip.shadows, clip.midtones, clip.highlights,
+            clip.redCurve, clip.greenCurve, clip.blueCurve);
         if (m_activeVideoClipIds[track] == clip.id
             && !m_waitingForVideoTrack[track]
             && !m_failedVideoTrack[track]) {
@@ -1231,6 +1276,11 @@ void MainWindow::syncVideoTracks()
             continue;
         }
 
+        const int animatedBrightness = m_timeline->evaluatedBrightness(
+            clip.id, m_sequencePositionMs);
+        m_monitor->setTrackColorGrade(track, animatedBrightness, clip.contrast,
+            clip.saturation, clip.shadows, clip.midtones, clip.highlights,
+            clip.redCurve, clip.greenCurve, clip.blueCurve);
         if (clip.id == m_activeVideoClipIds[track]) {
             if (m_waitingForVideoTrack[track]) {
                 handleVideoTrackStatus(track);
@@ -1245,7 +1295,7 @@ void MainWindow::syncVideoTracks()
         m_videoTrackPlayers[track]->stop();
         m_monitor->clearFrame(track);
         m_activeVideoClipIds[track] = clip.id;
-        m_monitor->setTrackColorGrade(track, clip.brightness, clip.contrast,
+        m_monitor->setTrackColorGrade(track, animatedBrightness, clip.contrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
         m_waitingForVideoTrack[track] = false;
