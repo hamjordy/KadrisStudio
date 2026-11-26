@@ -116,6 +116,17 @@ void ProgramMonitorWidget::setTrackTransform(int track, int scale, int positionX
     update();
 }
 
+
+void ProgramMonitorWidget::setTrackOpacity(int track, int opacity)
+{
+    if (track < 0 || track >= 3) return;
+    TrackTransform &transform = m_transforms[static_cast<size_t>(track)];
+    const int nextOpacity = qBound(0, opacity, 100);
+    if (transform.opacity == nextOpacity) return;
+    transform.opacity = nextOpacity;
+    update();
+}
+
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
     for (size_t index = 0; index < m_frames.size(); ++index) {
@@ -194,7 +205,9 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
                              target.center().y() + target.height() * transform.y / 100.0);
         const QRectF destination(center.x() - width / 2.0, center.y() - height / 2.0,
                                  width, height);
+        painter.setOpacity(transform.opacity / 100.0);
         painter.drawImage(destination, frame);
+        painter.setOpacity(1.0);
         drewFrame = true;
     }
 
