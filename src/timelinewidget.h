@@ -27,6 +27,7 @@ public:
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
+        int keyframeCount = 0;
     };
 
     void addClip(const QString &path);
@@ -51,6 +52,10 @@ public:
     bool setClipColorSettings(int clipId, int brightness, int contrast, int saturation,
                               int shadows, int midtones, int highlights,
                               int redCurve, int greenCurve, int blueCurve);
+    bool addBrightnessKeyframe(int clipId, qint64 timelineTimeMs, int value);
+    bool removeBrightnessKeyframeAt(int clipId, qint64 timelineTimeMs);
+    int brightnessKeyframeCount(int clipId) const;
+    int evaluatedBrightness(int clipId, qint64 timelineTimeMs) const;
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
     bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
     qint64 sequenceDurationMs() const;
@@ -82,6 +87,8 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
 
 private:
+    struct Keyframe { qint64 timeMs = 0; double value = 0.0; };
+
     struct Clip {
         int id = 0;
         QString path;
@@ -93,6 +100,7 @@ private:
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
+        QVector<Keyframe> brightnessKeyframes;
     };
 
     enum class DragMode { None, Move, TrimLeft, TrimRight };
