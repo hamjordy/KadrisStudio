@@ -22,7 +22,6 @@ constexpr int kTrackTop = 44;
 constexpr int kTrackHeight = 34;
 constexpr int kTrackGap = 7;
 constexpr int kTimelineStartX = 142;
-constexpr int kPixelsPerSecond = 80;
 constexpr int kClipMinimumWidth = 18;
 constexpr qint64 kDefaultClipDurationMs = 5000;
 constexpr qint64 kMinimumClipDurationMs = 250;
@@ -39,6 +38,27 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent)
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
+}
+
+void TimelineWidget::zoomIn()
+{
+    m_pixelsPerSecond = qMin(240, m_pixelsPerSecond + 20);
+    updateCanvasSize();
+    update();
+}
+
+void TimelineWidget::zoomOut()
+{
+    m_pixelsPerSecond = qMax(20, m_pixelsPerSecond - 20);
+    updateCanvasSize();
+    update();
+}
+
+void TimelineWidget::resetZoom()
+{
+    m_pixelsPerSecond = 80;
+    updateCanvasSize();
+    update();
 }
 
 void TimelineWidget::addClip(const QString &path)
@@ -354,10 +374,10 @@ QRect TimelineWidget::clipRect(int index) const
 
     const Clip &clip = m_clips.at(index);
     const int x = kTimelineStartX
-        + qRound(static_cast<double>(clip.timelineStartMs) * kPixelsPerSecond / 1000.0);
+        + qRound(static_cast<double>(clip.timelineStartMs) * m_pixelsPerSecond / 1000.0);
     const int y = kTrackTop + clip.track * (kTrackHeight + kTrackGap);
     const int width = qMax(kClipMinimumWidth,
-        qRound(static_cast<double>(clip.durationMs) * kPixelsPerSecond / 1000.0));
+        qRound(static_cast<double>(clip.durationMs) * m_pixelsPerSecond / 1000.0));
     return QRect(x, y, width, kTrackHeight);
 }
 
@@ -380,7 +400,7 @@ qint64 TimelineWidget::timeAt(int x) const
 {
     const int relativeX = qMax(0, x - kTimelineStartX);
     return qMax<qint64>(0, qRound64(
-        static_cast<double>(relativeX) * 1000.0 / kPixelsPerSecond));
+        static_cast<double>(relativeX) * 1000.0 / m_pixelsPerSecond));
 }
 
 void TimelineWidget::updateCanvasSize()
@@ -393,7 +413,7 @@ void TimelineWidget::updateCanvasSize()
 
     const int contentWidth = kTimelineStartX
         + qRound(static_cast<double>(furthestEnd + 10000)
-                 * kPixelsPerSecond / 1000.0);
+                 * m_pixelsPerSecond / 1000.0);
     setMinimumWidth(qMax(1100, contentWidth));
     updateGeometry();
 }
@@ -418,9 +438,9 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
     p.drawText(QRect(12, 0, 108, kHeaderHeight), Qt::AlignVCenter, "TRACKS");
 
     const qint64 visibleEndMs = qMax<qint64>(60000,
-        static_cast<qint64>(width() - kTimelineStartX) * 1000 / kPixelsPerSecond);
+        static_cast<qint64>(width() - kTimelineStartX) * 1000 / m_pixelsPerSecond);
     for (qint64 seconds = 0; seconds <= visibleEndMs / 1000; seconds += 1) {
-        const int x = kTimelineStartX + static_cast<int>(seconds * kPixelsPerSecond);
+        const int x = kTimelineStartX + static_cast<int>(seconds * m_pixelsPerSecond);
         const bool major = (seconds % 5 == 0);
         p.setPen(QPen(major ? QColor("#46545f") : QColor("#26313b"),
                       major ? 1.4 : 1.0));
@@ -482,7 +502,7 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
     }
 
     const int playheadX = kTimelineStartX
-        + qRound(static_cast<double>(m_playheadMs) * kPixelsPerSecond / 1000.0);
+        + qRound(static_cast<double>(m_playheadMs) * m_pixelsPerSecond / 1000.0);
     p.setPen(QPen(QColor("#f0c879"), 2));
     p.drawLine(playheadX, 0, playheadX, height() - 6);
     p.setBrush(QColor("#f0c879"));
@@ -549,7 +569,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
     const QPoint pos = event->position().toPoint();
     const int deltaPixels = pos.x() - m_dragOrigin.x();
     qint64 deltaMs = qRound64(
-        static_cast<double>(deltaPixels) * 1000.0 / kPixelsPerSecond);
+        static_cast<double>(deltaPixels) * 1000.0 / m_pixelsPerSecond);
     deltaMs = qRound64(static_cast<double>(deltaMs) / kSnapIntervalMs)
         * kSnapIntervalMs;
 
