@@ -2,7 +2,7 @@
 
 Independent open-source desktop video-editor project for Windows 11.
 
-**Status: early prototype (0.1.0).** This first increment provides a native Qt application shell, media import, source playback, project save/open, and a basic timeline visualization. It is not yet a full professional nonlinear editor. Timeline editing, sequence playback/rendering, effects, color grading, audio mixing, captions, and sequence export remain planned work.
+**Status: early prototype (0.2.0).** The application provides a native Qt shell, media import, source playback, project save/open, and an interactive timeline foundation. Clips can be moved between tracks, trimmed from either edge, split at the playhead, selected, and deleted. The timeline stores clip timing and track placement in the project. This is not yet a full nonlinear editor: multi-clip sequence playback/rendering, effects, color grading, audio mixing, captions, undo/redo, and sequence export remain planned work.
 
 ## Current functionality
 - Native C++20 / Qt 6 Windows desktop application.
@@ -10,7 +10,12 @@ Independent open-source desktop video-editor project for Windows 11.
 - Dockable Media, Inspector, and Timeline panels.
 - Import local video, audio, and image files.
 - Preview a source file using Qt Multimedia (supported formats depend on the Windows multimedia backend).
-- Add imported media to the initial timeline model.
+- Add imported media to the timeline; supported media duration is read through Qt Multimedia, with a clearly marked five-second estimate when duration metadata is unavailable.
+- Move clips horizontally and between video/audio tracks.
+- Trim clip in/out points by dragging timeline edges.
+- Position the playhead and split a selected clip at that point.
+- Delete selected clips and use the Delete/Backspace keys.
+- Save timeline positions, source in-points, durations, and track assignments in project format version 2 (version 1 projects remain readable).
 - Create, save, and reopen .kadris project files.
 - GitHub Actions Windows build workflow.
 
@@ -31,7 +36,7 @@ Replace the Qt path with your local Qt installation. The Windows GitHub Actions 
 - .github/workflows/ — Windows CI
 
 ## Roadmap and limitations
-See docs/ROADMAP.md. The current timeline is a model/visualization only; it does not yet render a multi-clip sequence or provide frame-accurate editing.
+See docs/ROADMAP.md. Timeline edits are now stored in a time-based clip model, but the timeline does not yet render a multi-clip sequence, provide frame-accurate timebase editing, or include undo/redo.
 
 ## License
 GNU GPL-3.0-or-later. Review THIRD_PARTY_LICENSES.md before adding or redistributing external codecs, plugins, models, or libraries.

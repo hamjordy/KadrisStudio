@@ -21,11 +21,13 @@ This roadmap describes planned work. A feature is complete only after implementa
 - [ ] Serialization tests
 
 ## Milestone 2 — Timeline editing engine
-- [ ] Accurate clip durations and frame-rate-aware time
-- [ ] Multi-track clip model and track assignment
-- [ ] Select, move, trim, split, and delete
+- [x] Read media duration where Qt Multimedia exposes it; mark estimates when unavailable
+- [x] Time-based multi-track clip model and track assignment
+- [x] Select, move, trim, split, and delete
+- [x] Basic timeline snapping (100 ms)
+- [ ] Frame-rate-aware timebase and sub-frame precision
 - [ ] Ripple and roll editing
-- [ ] Snapping, markers, and track controls
+- [ ] Markers and advanced track controls
 - [ ] Undo/redo command stack
 - [ ] Sequence playback across clips
 

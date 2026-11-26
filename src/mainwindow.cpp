@@ -140,13 +140,43 @@ void MainWindow::buildInterface()
 
     auto *timelineDock = new QDockWidget("Timeline", this);
     timelineDock->setObjectName("timelineDock");
-    auto *scroll = new QScrollArea(timelineDock);
+    auto *timelinePanel = new QWidget(timelineDock);
+    auto *timelineLayout = new QVBoxLayout(timelinePanel);
+    timelineLayout->setContentsMargins(8, 6, 8, 8);
+    timelineLayout->setSpacing(6);
+
+    auto *timelineTools = new QHBoxLayout();
+    auto *splitButton = new QPushButton("Split at playhead");
+    auto *deleteButton = new QPushButton("Delete clip");
+    auto *timelineHint = new QLabel("Drag to move  •  Drag clip edges to trim  •  Click to position playhead");
+    timelineHint->setObjectName("mutedLabel");
+    connect(splitButton, &QPushButton::clicked, this, [this]() {
+        if (!m_timeline->splitSelectedClipAtPlayhead())
+            statusBar()->showMessage("Place the playhead inside the selected clip to split it", 4000);
+        else
+            statusBar()->showMessage("Clip split at playhead", 3000);
+    });
+    connect(deleteButton, &QPushButton::clicked, this, [this]() {
+        if (!m_timeline->deleteSelectedClip())
+            statusBar()->showMessage("Select a timeline clip first", 3000);
+        else
+            statusBar()->showMessage("Timeline clip deleted", 3000);
+    });
+    timelineTools->addWidget(splitButton);
+    timelineTools->addWidget(deleteButton);
+    timelineTools->addSpacing(12);
+    timelineTools->addWidget(timelineHint);
+    timelineTools->addStretch();
+    timelineLayout->addLayout(timelineTools);
+
+    auto *scroll = new QScrollArea(timelinePanel);
     scroll->setWidgetResizable(false);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     m_timeline = new TimelineWidget(scroll);
     scroll->setWidget(m_timeline);
-    timelineDock->setWidget(scroll);
+    timelineLayout->addWidget(scroll, 1);
+    timelineDock->setWidget(timelinePanel);
     addDockWidget(Qt::BottomDockWidgetArea, timelineDock);
     resizeDocks({mediaDock, inspectorDock}, {260, 290}, Qt::Horizontal);
 }
@@ -233,7 +263,7 @@ bool MainWindow::writeProject(const QString &path)
     for (const QString &item : m_mediaPaths) media.append(item);
     QJsonObject root;
     root.insert("format", "kadris-project");
-    root.insert("formatVersion", 1);
+    root.insert("formatVersion", 2);
     root.insert("projectName", QFileInfo(path).completeBaseName());
     root.insert("mediaFiles", media);
     root.insert("timelineClips", m_timeline->toJson());
@@ -260,7 +290,8 @@ bool MainWindow::readProject(const QString &path)
     if (error.error != QJsonParseError::NoError || !document.isObject()) return false;
     const QJsonObject root = document.object();
     if (root.value("format").toString() != "kadris-project"
-        || root.value("formatVersion").toInt() != 1) return false;
+        || (root.value("formatVersion").toInt() != 1
+            && root.value("formatVersion").toInt() != 2)) return false;
 
     m_mediaPaths.clear();
     m_mediaList->clear();
