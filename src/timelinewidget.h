@@ -134,6 +134,7 @@ private:
         int blendMode = 0;
         int audioVolume = 100;
         bool audioMuted = false;
+        QVector<float> waveformPeaks;
         int fadeInMs = 0, fadeOutMs = 0;
         QVector<Keyframe> audioVolumeKeyframes;
         QVector<Keyframe> opacityKeyframes;
