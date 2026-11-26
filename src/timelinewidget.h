@@ -32,6 +32,7 @@ public:
         int opacity = 100;
         int blendMode = 0;
         int audioVolume = 100;
+        bool audioMuted = false;
         int fadeInMs = 0, fadeOutMs = 0;
     };
 
@@ -63,6 +64,7 @@ public:
     bool setClipOpacity(int clipId, int opacity);
     bool setClipBlendMode(int clipId, int blendMode);
     bool setClipAudioSettings(int clipId, int volume, int fadeInMs, int fadeOutMs);
+    bool setClipAudioMuted(int clipId, bool muted);
     bool addAudioVolumeKeyframe(int clipId, qint64 timelineTimeMs, int volume);
     bool removeAudioVolumeKeyframeAt(int clipId, qint64 timelineTimeMs);
     int audioVolumeKeyframeCount(int clipId) const;
@@ -130,6 +132,7 @@ private:
         int opacity = 100;
         int blendMode = 0;
         int audioVolume = 100;
+        bool audioMuted = false;
         int fadeInMs = 0, fadeOutMs = 0;
         QVector<Keyframe> audioVolumeKeyframes;
         QVector<Keyframe> opacityKeyframes;
