@@ -1,0 +1,26 @@
+QWidget { background: #11161d; color: #e7edf2; font-family: "Segoe UI"; font-size: 9pt; }
+QMainWindow { background: #0e1319; }
+QMenuBar { background: #151c24; border-bottom: 1px solid #293541; padding: 4px; }
+QMenuBar::item { padding: 6px 10px; background: transparent; }
+QMenuBar::item:selected, QMenu::item:selected { background: #21444a; color: #f4ffff; }
+QMenu { background: #19212a; border: 1px solid #34424f; padding: 5px; }
+QMenu::item { padding: 7px 28px 7px 12px; }
+QToolBar { background: #171f28; border: none; border-bottom: 1px solid #2b3743; spacing: 8px; padding: 6px 10px; }
+QToolButton { background: #202a35; border: 1px solid #34424f; border-radius: 4px; padding: 6px 12px; }
+QDockWidget { color: #e9f0f3; }
+QDockWidget::title { background: #1a232d; border-bottom: 1px solid #303d49; padding: 8px 10px; font-weight: 600; }
+QTreeWidget { background: #111820; alternate-background-color: #151e27; border: 1px solid #293541; outline: none; selection-background-color: #155e63; }
+QTreeWidget::item { padding: 5px 3px; }
+QHeaderView::section { background: #202a34; color: #b7c4ce; border: none; border-right: 1px solid #34414d; padding: 6px; font-weight: 600; }
+QPushButton { background: #202b35; border: 1px solid #3a4855; border-radius: 4px; padding: 7px 12px; }
+QPushButton:hover, QToolButton:hover { background: #2a3a45; border-color: #3caeaa; }
+QPushButton#primaryButton { background: #126a70; border: 1px solid #31b6b0; color: white; font-weight: 600; min-width: 62px; }
+QLabel#sectionTitle { color: #9fb0bc; font-size: 8pt; font-weight: 700; }
+QLabel#mutedLabel { color: #8e9ba8; }
+QLabel#timecodeLabel { color: #e5c27b; font-family: Consolas, monospace; min-width: 104px; }
+QVideoWidget#videoMonitor { background: #05080b; border: 1px solid #293541; }
+QSlider::groove:horizontal { height: 5px; background: #303c47; border-radius: 2px; }
+QSlider::sub-page:horizontal { background: #24a7a4; border-radius: 2px; }
+QSlider::handle:horizontal { background: #e7c47b; border: 1px solid #f4d99e; width: 12px; margin: -5px 0; border-radius: 6px; }
+QStatusBar { background: #151c24; border-top: 1px solid #293541; color: #9eacb8; }
+QScrollArea { border: none; background: #10151b; }
