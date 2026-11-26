@@ -80,6 +80,19 @@ void ProgramMonitorWidget::setColorWheels(int shadows, int midtones, int highlig
     update();
 }
 
+void ProgramMonitorWidget::setRgbCurves(int red, int green, int blue)
+{
+    red = qBound(-100, red, 100);
+    green = qBound(-100, green, 100);
+    blue = qBound(-100, blue, 100);
+    if (m_redCurve == red && m_greenCurve == green && m_blueCurve == blue) return;
+    m_redCurve = red;
+    m_greenCurve = green;
+    m_blueCurve = blue;
+    rebuildCorrectedFrames();
+    update();
+}
+
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
     const double contrastFactor = (259.0 * (m_contrast + 255.0))
@@ -100,6 +113,14 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
                                        + m_brightness, 255);
                 int blue = qBound(0, qRound(contrastFactor * (qBlue(pixel) - 128) + 128)
                                       + m_brightness, 255);
+                const auto applyCurve = [](int channel, int amount) {
+                    const double gamma = std::pow(2.0, -amount / 100.0);
+                    const double normalized = channel / 255.0;
+                    return qBound(0, qRound(std::pow(normalized, gamma) * 255.0), 255);
+                };
+                red = applyCurve(red, m_redCurve);
+                green = applyCurve(green, m_greenCurve);
+                blue = applyCurve(blue, m_blueCurve);
                 const double luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0;
                 const double shadowWeight = qBound(0.0, (0.65 - luminance) / 0.65, 1.0);
                 const double highlightWeight = qBound(0.0, (luminance - 0.35) / 0.65, 1.0);
