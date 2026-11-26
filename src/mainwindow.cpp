@@ -99,7 +99,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_sequencePositionMs = position;
             updateSequenceTimeLabel();
             if (m_sequencePlaying) {
-                m_sequenceClock.invalidate();
+                // A manual timeline seek must reload every active track at its new source in-point.
+                if (m_sequenceClock.isValid()) m_sequenceClock.restart();
+                else m_sequenceClock.start();
+
+                for (int track = 0; track < 3; ++track) {
+                    m_videoTrackPlayers[track]->stop();
+                    m_videoTrackPlayers[track]->setSource(QUrl());
+                    m_activeVideoClipIds[track] = -1;
+                    m_waitingForVideoTrack[track] = false;
+                    m_failedVideoTrack[track] = false;
+                    m_monitor->clearFrame(track);
+                }
                 syncVideoTracks();
             }
         });
@@ -606,11 +617,19 @@ void MainWindow::syncVideoTracks()
 
 void MainWindow::handleVideoTrackStatus(int track)
 {
-    if (track < 0 || track >= 3 || !m_sequencePlaying
-        || !m_waitingForVideoTrack[track]) return;
+    if (track < 0 || track >= 3 || !m_sequencePlaying) return;
 
     QMediaPlayer *player = m_videoTrackPlayers[track];
     const QMediaPlayer::MediaStatus status = player->mediaStatus();
+
+    // Do not restart a source from frame zero if it ends before the timeline clip does.
+    if (status == QMediaPlayer::EndOfMedia && !m_waitingForVideoTrack[track]) {
+        m_failedVideoTrack[track] = true;
+        m_monitor->clearFrame(track);
+        return;
+    }
+
+    if (!m_waitingForVideoTrack[track]) return;
 
     if (status == QMediaPlayer::LoadedMedia
         || status == QMediaPlayer::BufferedMedia) {
