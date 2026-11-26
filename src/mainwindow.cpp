@@ -164,9 +164,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             m_clipColorSliders[6]->setValue(clip.redCurve);
             m_clipColorSliders[7]->setValue(clip.greenCurve);
             m_clipColorSliders[8]->setValue(clip.blueCurve);
-            m_monitor->setColorCorrection(clip.brightness, clip.contrast, clip.saturation);
-            m_monitor->setColorWheels(clip.shadows, clip.midtones, clip.highlights);
-            m_monitor->setRgbCurves(clip.redCurve, clip.greenCurve, clip.blueCurve);
+            if (clip.track < 3) {
+                m_monitor->setTrackColorGrade(clip.track, clip.brightness, clip.contrast,
+                    clip.saturation, clip.shadows, clip.midtones, clip.highlights,
+                    clip.redCurve, clip.greenCurve, clip.blueCurve);
+            }
             m_inspectorLabel->setText(QString("Selected clip: %1\\nClip ID: %2\\nTrack: %3\\n\\nColor settings are saved with this clip.")
                 .arg(QFileInfo(path).fileName()).arg(clipId)
                 .arg(track < 3 ? QString("V%1").arg(track + 1) : QString("A%1").arg(track - 2)));
@@ -400,6 +402,15 @@ void MainWindow::buildInterface()
                 m_clipColorSliders[4]->value(), m_clipColorSliders[5]->value(),
                 m_clipColorSliders[6]->value(), m_clipColorSliders[7]->value(),
                 m_clipColorSliders[8]->value());
+            TimelineWidget::ClipInfo clip;
+            if (m_timeline->selectedClipInfo(&clip) && clip.track < 3) {
+                m_monitor->setTrackColorGrade(clip.track,
+                    m_clipColorSliders[0]->value(), m_clipColorSliders[1]->value(),
+                    m_clipColorSliders[2]->value(), m_clipColorSliders[3]->value(),
+                    m_clipColorSliders[4]->value(), m_clipColorSliders[5]->value(),
+                    m_clipColorSliders[6]->value(), m_clipColorSliders[7]->value(),
+                    m_clipColorSliders[8]->value());
+            }
         });
     }
     auto addCurveSlider = [this, inspectorLayout, redCurve, greenCurve, blueCurve](
@@ -1234,6 +1245,9 @@ void MainWindow::syncVideoTracks()
         m_videoTrackPlayers[track]->stop();
         m_monitor->clearFrame(track);
         m_activeVideoClipIds[track] = clip.id;
+        m_monitor->setTrackColorGrade(track, clip.brightness, clip.contrast,
+            clip.saturation, clip.shadows, clip.midtones, clip.highlights,
+            clip.redCurve, clip.greenCurve, clip.blueCurve);
         m_waitingForVideoTrack[track] = false;
         m_failedVideoTrack[track] = false;
 
