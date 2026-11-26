@@ -6,7 +6,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QRectF>
-#include <QStringList>
+#include <QStringList>\n#include <cmath>
 
 ProgramMonitorWidget::ProgramMonitorWidget(QWidget *parent)
     : QWidget(parent)
@@ -65,6 +65,21 @@ void ProgramMonitorWidget::setColorCorrection(int brightness, int contrast, int 
     update();
 }
 
+
+void ProgramMonitorWidget::setColorWheels(int shadows, int midtones, int highlights)
+{
+    shadows = qBound(-100, shadows, 100);
+    midtones = qBound(-100, midtones, 100);
+    highlights = qBound(-100, highlights, 100);
+    if (m_shadowWarmth == shadows && m_midtoneWarmth == midtones
+        && m_highlightWarmth == highlights) return;
+    m_shadowWarmth = shadows;
+    m_midtoneWarmth = midtones;
+    m_highlightWarmth = highlights;
+    rebuildCorrectedFrames();
+    update();
+}
+
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
     const double contrastFactor = (259.0 * (m_contrast + 255.0))
@@ -85,6 +100,15 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
                                        + m_brightness, 255);
                 int blue = qBound(0, qRound(contrastFactor * (qBlue(pixel) - 128) + 128)
                                       + m_brightness, 255);
+                const double luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255.0;
+                const double shadowWeight = qBound(0.0, (0.65 - luminance) / 0.65, 1.0);
+                const double highlightWeight = qBound(0.0, (luminance - 0.35) / 0.65, 1.0);
+                const double midtoneWeight = qBound(0.0, 1.0 - std::abs(luminance - 0.5) / 0.5, 1.0);
+                const double warmth = (m_shadowWarmth * shadowWeight
+                    + m_midtoneWarmth * midtoneWeight
+                    + m_highlightWarmth * highlightWeight) / 100.0;
+                red = qBound(0, red + qRound(warmth * 42.0), 255);
+                blue = qBound(0, blue - qRound(warmth * 42.0), 255);
                 if (m_saturation != 100) {
                     QColor color(red, green, blue);
                     int hue = 0, sat = 0, value = 0, alpha = 255;
