@@ -31,6 +31,8 @@ public:
         int scale = 100, positionX = 0, positionY = 0;
         int opacity = 100;
         int blendMode = 0;
+        int audioVolume = 100;
+        int fadeInMs = 0, fadeOutMs = 0;
     };
 
     void addClip(const QString &path);
@@ -60,6 +62,7 @@ public:
     bool setClipTransformSettings(int clipId, int scale, int positionX, int positionY);
     bool setClipOpacity(int clipId, int opacity);
     bool setClipBlendMode(int clipId, int blendMode);
+    bool setClipAudioSettings(int clipId, int volume, int fadeInMs, int fadeOutMs);
     bool addOpacityKeyframe(int clipId, qint64 timelineTimeMs, int opacity);
     bool removeOpacityKeyframeAt(int clipId, qint64 timelineTimeMs);
     int opacityKeyframeCount(int clipId) const;
@@ -122,6 +125,8 @@ private:
         QVector<Keyframe> contrastKeyframes;
         int opacity = 100;
         int blendMode = 0;
+        int audioVolume = 100;
+        int fadeInMs = 0, fadeOutMs = 0;
         QVector<Keyframe> opacityKeyframes;
         struct TransformKeyframe { qint64 timeMs = 0; double scale = 100.0; double x = 0.0; double y = 0.0; };
         int scale = 100, positionX = 0, positionY = 0;
