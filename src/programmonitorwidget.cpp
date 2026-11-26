@@ -127,6 +127,18 @@ void ProgramMonitorWidget::setTrackOpacity(int track, int opacity)
     update();
 }
 
+
+void ProgramMonitorWidget::setTrackBlendMode(int track, int blendMode)
+{
+    if (track < 0 || track >= 3) return;
+    TrackTransform &transform = m_transforms[static_cast<size_t>(track)];
+    const int nextMode = qBound(0, blendMode, 3);
+    if (transform.blendMode == nextMode) return;
+    transform.blendMode = nextMode;
+    update();
+}
+
+
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
     for (size_t index = 0; index < m_frames.size(); ++index) {
@@ -205,9 +217,17 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
                              target.center().y() + target.height() * transform.y / 100.0);
         const QRectF destination(center.x() - width / 2.0, center.y() - height / 2.0,
                                  width, height);
+        painter.setCompositionMode(transform.blendMode == 1
+            ? QPainter::CompositionMode_Multiply
+            : transform.blendMode == 2
+                ? QPainter::CompositionMode_Screen
+                : transform.blendMode == 3
+                    ? QPainter::CompositionMode_Overlay
+                    : QPainter::CompositionMode_SourceOver);
         painter.setOpacity(transform.opacity / 100.0);
         painter.drawImage(destination, frame);
         painter.setOpacity(1.0);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
         drewFrame = true;
     }
 
