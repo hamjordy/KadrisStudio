@@ -1,5 +1,6 @@
 #pragma once
 #include <QMainWindow>
+#include <QComboBox>
 #include <QElapsedTimer>
 #include <QStringList>
 #include <QJsonArray>
@@ -96,6 +97,7 @@ private:
     std::array<QSlider *, 9> m_clipColorSliders{};
     std::array<QSlider *, 3> m_clipTransformSliders{};
     QSlider *m_clipOpacitySlider = nullptr;
+    QComboBox *m_clipBlendModeCombo = nullptr;
     int m_selectedTimelineClipId = -1;
     QVector<QJsonArray> m_undoHistory;
     QVector<QJsonArray> m_redoHistory;
