@@ -574,21 +574,73 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         * kSnapIntervalMs;
 
     Clip &clip = m_clips[m_selectedClip];
+    const qint64 snapToleranceMs = qMax<qint64>(
+        kSnapIntervalMs, qRound64(8.0 * 1000.0 / m_pixelsPerSecond));
+
+    // Snap the moving edge to nearby edges of other clips. The selected
+    // clip is excluded so it can never snap to itself.
+    const auto snapToClipEdges = [this, snapToleranceMs](qint64 movingTime,
+                                                         int excludedIndex) {
+        qint64 bestTime = movingTime;
+        qint64 bestDistance = snapToleranceMs + 1;
+        for (int i = 0; i < m_clips.size(); ++i) {
+            if (i == excludedIndex) continue;
+            const Clip &other = m_clips.at(i);
+            const qint64 edges[] = {
+                other.timelineStartMs,
+                other.timelineStartMs + other.durationMs
+            };
+            for (qint64 edge : edges) {
+                const qint64 distance = qAbs(edge - movingTime);
+                if (distance <= snapToleranceMs && distance < bestDistance) {
+                    bestDistance = distance;
+                    bestTime = edge;
+                }
+            }
+        }
+        return bestTime;
+    };
+
     if (m_dragMode == DragMode::Move) {
-        clip.timelineStartMs = qMax<qint64>(
+        qint64 proposedStart = qMax<qint64>(
             0, m_dragSnapshot.timelineStartMs + deltaMs);
+        const qint64 proposedEnd = proposedStart + m_dragSnapshot.durationMs;
+        const qint64 snappedStart = snapToClipEdges(proposedStart, m_selectedClip);
+        const qint64 snappedEnd = snapToClipEdges(proposedEnd, m_selectedClip);
+
+        const qint64 startDistance = qAbs(snappedStart - proposedStart);
+        const qint64 endDistance = qAbs(snappedEnd - proposedEnd);
+        if (startDistance <= endDistance && snappedStart != proposedStart) {
+            proposedStart = snappedStart;
+        } else if (snappedEnd != proposedEnd) {
+            proposedStart = snappedEnd - m_dragSnapshot.durationMs;
+        }
+
+        clip.timelineStartMs = qMax<qint64>(0, proposedStart);
         clip.track = trackAt(pos.y());
     } else if (m_dragMode == DragMode::TrimLeft) {
         const qint64 minimumDelta = -m_dragSnapshot.sourceInMs;
         const qint64 maximumDelta =
             m_dragSnapshot.durationMs - kMinimumClipDurationMs;
         deltaMs = qBound(minimumDelta, deltaMs, maximumDelta);
+        qint64 proposedStart = m_dragSnapshot.timelineStartMs + deltaMs;
+        const qint64 snappedStart = snapToClipEdges(proposedStart, m_selectedClip);
+        if (qAbs(snappedStart - proposedStart) <= snapToleranceMs) {
+            proposedStart = snappedStart;
+        }
+        deltaMs = qBound(minimumDelta,
+            proposedStart - m_dragSnapshot.timelineStartMs, maximumDelta);
         clip.timelineStartMs = m_dragSnapshot.timelineStartMs + deltaMs;
         clip.sourceInMs = m_dragSnapshot.sourceInMs + deltaMs;
         clip.durationMs = m_dragSnapshot.durationMs - deltaMs;
     } else if (m_dragMode == DragMode::TrimRight) {
+        qint64 proposedEnd = m_dragSnapshot.timelineStartMs
+            + m_dragSnapshot.durationMs + deltaMs;
+        const qint64 snappedEnd = snapToClipEdges(proposedEnd, m_selectedClip);
+        if (qAbs(snappedEnd - proposedEnd) <= snapToleranceMs)
+            proposedEnd = snappedEnd;
         clip.durationMs = qMax(kMinimumClipDurationMs,
-                               m_dragSnapshot.durationMs + deltaMs);
+            proposedEnd - m_dragSnapshot.timelineStartMs);
     }
 
     updateCanvasSize();
