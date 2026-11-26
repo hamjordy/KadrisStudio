@@ -26,7 +26,7 @@ jobs:
           target: desktop
           arch: win64_msvc2022_64
           modules: qtmultimedia
-          archives: qtsvg
+          archives: qtbase qtsvg
           cache: true
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
