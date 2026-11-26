@@ -1,7 +1,10 @@
 #include "timelinewidget.h"
 #include "frame_timebase.h"
 
+#include <QFile>
 #include <QFileInfo>
+#include <QtEndian>
+#include <cstring>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QJsonObject>
@@ -32,6 +35,86 @@ constexpr qint64 kSnapIntervalMs = 40; // 25 fps: one frame is 40 ms.
 const FrameTimebase kTimelineTimebase(25, 1);
 constexpr int kTrimHandleWidth = 8;
 constexpr int kTrackCount = 5;
+
+QVector<float> readWaveformPeaks(const QString &path)
+{
+    QVector<float> peaks;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return peaks;
+    const QByteArray bytes = file.readAll();
+    if (bytes.size() < 44 || bytes.left(4) != "RIFF"
+        || bytes.mid(8, 4) != "WAVE") return peaks;
+
+    quint16 format = 0, channels = 0, bitsPerSample = 0, blockAlign = 0;
+    qsizetype dataOffset = -1;
+    qsizetype dataSize = 0;
+    for (qsizetype offset = 12; offset + 8 <= bytes.size();) {
+        const char *chunk = bytes.constData() + offset;
+        const quint32 chunkSize = qFromLittleEndian<quint32>(
+            reinterpret_cast<const uchar *>(chunk + 4));
+        const qsizetype payload = offset + 8;
+        if (QByteArrayView(chunk, 4) == QByteArrayView("fmt ", 4)
+            && chunkSize >= 16 && payload + 16 <= bytes.size()) {
+            const auto *fmt = reinterpret_cast<const uchar *>(bytes.constData() + payload);
+            format = qFromLittleEndian<quint16>(fmt);
+            channels = qFromLittleEndian<quint16>(fmt + 2);
+            blockAlign = qFromLittleEndian<quint16>(fmt + 12);
+            bitsPerSample = qFromLittleEndian<quint16>(fmt + 14);
+        } else if (QByteArrayView(chunk, 4) == QByteArrayView("data", 4)) {
+            dataOffset = payload;
+            dataSize = qMin<qsizetype>(chunkSize, bytes.size() - payload);
+        }
+        const qsizetype advance = 8 + static_cast<qsizetype>(chunkSize)
+            + (chunkSize & 1u);
+        if (advance <= 8 || offset > bytes.size() - advance) break;
+        offset += advance;
+    }
+
+    if (dataOffset < 0 || dataSize <= 0 || channels == 0 || blockAlign == 0
+        || (format != 1 && format != 3)
+        || (bitsPerSample != 8 && bitsPerSample != 16
+            && bitsPerSample != 24 && bitsPerSample != 32)
+        || (format == 3 && bitsPerSample != 32)) return peaks;
+
+    const int bytesPerSample = bitsPerSample / 8;
+    if (blockAlign < channels * bytesPerSample) return peaks;
+    const qsizetype frameCount = dataSize / blockAlign;
+    if (frameCount <= 0) return peaks;
+    const int bucketCount = static_cast<int>(qMin<qsizetype>(1600, frameCount));
+    peaks.fill(0.0f, bucketCount);
+    const auto *data = reinterpret_cast<const uchar *>(bytes.constData() + dataOffset);
+
+    for (qsizetype frame = 0; frame < frameCount; ++frame) {
+        float framePeak = 0.0f;
+        const uchar *frameData = data + frame * blockAlign;
+        for (quint16 channel = 0; channel < channels; ++channel) {
+            const uchar *sample = frameData + channel * bytesPerSample;
+            double value = 0.0;
+            if (format == 3) {
+                float decoded = 0.0f;
+                std::memcpy(&decoded, sample, sizeof(float));
+                value = std::isfinite(decoded) ? decoded : 0.0;
+            } else if (bitsPerSample == 8) {
+                value = (static_cast<int>(sample[0]) - 128) / 128.0;
+            } else if (bitsPerSample == 16) {
+                value = qFromLittleEndian<qint16>(sample) / 32768.0;
+            } else if (bitsPerSample == 24) {
+                qint32 decoded = static_cast<qint32>(sample[0])
+                    | (static_cast<qint32>(sample[1]) << 8)
+                    | (static_cast<qint32>(sample[2]) << 16);
+                if (decoded & 0x800000) decoded |= static_cast<qint32>(0xff000000);
+                value = decoded / 8388608.0;
+            } else {
+                value = qFromLittleEndian<qint32>(sample) / 2147483648.0;
+            }
+            framePeak = qMax(framePeak, static_cast<float>(qBound(0.0, std::abs(value), 1.0)));
+        }
+        const int bucket = static_cast<int>(frame * bucketCount / frameCount);
+        peaks[bucket] = qMax(peaks.at(bucket), framePeak);
+    }
+    return peaks;
+}
+
 }
 
 TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent)
@@ -231,6 +314,8 @@ void TimelineWidget::addClip(const QString &path)
     clip.timelineStartMs = insertionPoint;
     clip.durationMs = kDefaultClipDurationMs;
     clip.durationKnown = false;
+    if (audioExtensions.contains(suffix) && suffix == "wav")
+        clip.waveformPeaks = readWaveformPeaks(path);
 
     m_clips.append(clip);
     m_selectedClip = m_clips.size() - 1;
@@ -1397,11 +1482,28 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
             ? formatTime(clip.durationMs)
             : QString("~%1").arg(formatTime(clip.durationMs));
         p.setPen(QColor("#f2f6f7"));
-        p.drawText(bounds.adjusted(10, 0, -6, 0),
+        p.drawText(QRect(bounds.left() + 10, bounds.top() + 1,
+                         qMax(0, bounds.width() - 18), 16),
             Qt::AlignVCenter | Qt::AlignLeft,
             p.fontMetrics().elidedText(
                 name + "  [" + durationLabel + "]",
                 Qt::ElideRight, qMax(0, bounds.width() - 18)));
+
+        if (audio && !clip.waveformPeaks.isEmpty() && bounds.width() > 8) {
+            const int centerY = bounds.top() + 25;
+            const int amplitude = qMax(2, (bounds.height() - 22) / 2);
+            p.setPen(QPen(selected ? QColor("#ffe0a0") : QColor("#d7ad62"), 1));
+            for (int x = bounds.left() + 4; x < bounds.right() - 3; ++x) {
+                const double relative = static_cast<double>(x - bounds.left() - 4)
+                    / qMax(1, bounds.width() - 8);
+                const int sampleIndex = qBound(0,
+                    static_cast<int>(relative * clip.waveformPeaks.size()),
+                    clip.waveformPeaks.size() - 1);
+                const int peakHeight = qMax(1,
+                    qRound(clip.waveformPeaks.at(sampleIndex) * amplitude));
+                p.drawLine(x, centerY - peakHeight, x, centerY + peakHeight);
+            }
+        }
 
         if (selected) {
             p.setPen(QPen(QColor("#f4d18c"), 2));
