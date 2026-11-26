@@ -35,6 +35,8 @@ private slots:
     void toggleSequencePlayback();
     void stopSequencePlayback(bool resetToStart = true);
     void tickSequencePlayback();
+    void refreshPausedTimelinePreview();
+    void stepSequenceFrame(int direction);
     void syncVideoTracks();
     void handleVideoTrackStatus(int track);
     void syncAudioTracks();
