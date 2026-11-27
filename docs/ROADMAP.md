@@ -16,7 +16,8 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [ ] Media metadata, searchable bins, and thumbnail generation
 - [ ] Drag-and-drop import
 - [ ] Collect/archive project media
-- [ ] Dedicated serialization and recovery regression tests
+- [x] Dedicated timeline serialization regression tests
+- [x] Atomic project-file saving to protect existing work during interrupted saves
 
 ## Milestone 2 — Timeline editing
 - [x] Time-based multi-track clip model and track assignment
@@ -70,7 +71,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 2. Add media relinking and relative project paths so projects survive folder moves.
 3. Add autosave and recovery before expanding the editing feature set.
 4. Establish a real render/export pipeline with output validation.
-5. Expand automated tests beyond compilation, including serialization and timeline behavior.
+5. Expand automated tests beyond compilation, including serialization, timeline behavior, and project recovery.
 
 ## Long-term target
 
