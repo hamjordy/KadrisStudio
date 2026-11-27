@@ -1195,8 +1195,10 @@ bool TimelineWidget::slipClip(int clipId, qint64 deltaMs)
     const qint64 snappedDelta = deltaMs < 0
         ? -m_timebase.snapMilliseconds(-deltaMs)
         : m_timebase.snapMilliseconds(deltaMs);
-    const qint64 maximumSourceIn = qMax<qint64>(0, clip.sourceDurationMs - clip.durationMs);
-    const qint64 nextSourceIn = qBound<qint64>(0, clip.sourceInMs + snappedDelta,
+    const qint64 sourceDelta = qRound64(snappedDelta * clip.playbackRate);
+    const qint64 sourceSpan = qRound64(clip.durationMs * clip.playbackRate);
+    const qint64 maximumSourceIn = qMax<qint64>(0, clip.sourceDurationMs - sourceSpan);
+    const qint64 nextSourceIn = qBound<qint64>(0, clip.sourceInMs + sourceDelta,
                                                maximumSourceIn);
     if (nextSourceIn == clip.sourceInMs) return false;
     clip.sourceInMs = nextSourceIn;
@@ -1228,15 +1230,18 @@ bool TimelineWidget::slideClip(int clipId, qint64 deltaMs)
     const Clip next = m_clips.at(nextIndex);
     if (isTrackLocked(previous.track) || isTrackLocked(next.track)) return false;
 
+    if (!previous.durationKnown || previous.sourceDurationMs <= 0
+        || previous.playbackRate <= 0.0 || next.playbackRate <= 0.0) return false;
     const qint64 minimumDelta = std::max({
         -selected.timelineStartMs,
         kMinimumClipDurationMs - previous.durationMs,
-        -next.sourceInMs
+        -qFloor(static_cast<double>(next.sourceInMs) / next.playbackRate)
     });
     qint64 maximumDelta = next.durationMs - kMinimumClipDurationMs;
-    if (!previous.durationKnown || previous.sourceDurationMs <= 0) return false;
-    maximumDelta = qMin(maximumDelta,
-        previous.sourceDurationMs - previous.sourceInMs - previous.durationMs);
+    const qint64 previousSourceRemaining = previous.sourceDurationMs
+        - previous.sourceInMs - qRound64(previous.durationMs * previous.playbackRate);
+    maximumDelta = qMin(maximumDelta, qFloor(
+        static_cast<double>(previousSourceRemaining) / previous.playbackRate));
     if (minimumDelta > maximumDelta) return false;
 
     const qint64 snappedDelta = deltaMs < 0
@@ -1251,7 +1256,7 @@ bool TimelineWidget::slideClip(int clipId, qint64 deltaMs)
     previousClip.durationMs += safeDelta;
     selectedClip.timelineStartMs += safeDelta;
     nextClip.timelineStartMs += safeDelta;
-    nextClip.sourceInMs += safeDelta;
+    nextClip.sourceInMs += qRound64(safeDelta * nextClip.playbackRate);
     nextClip.durationMs -= safeDelta;
     updateCanvasSize();
     update();
@@ -2191,10 +2196,13 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         m_clips[nextIndex].durationMs = m_slideNextSnapshot.durationMs - safeDelta;
     } else if (m_dragMode == DragMode::Slip) {
         if (!m_dragSnapshot.durationKnown || m_dragSnapshot.sourceDurationMs <= 0) return;
+        const qint64 sourceSpan = qRound64(
+            m_dragSnapshot.durationMs * m_dragSnapshot.playbackRate);
         const qint64 maximumSourceIn = qMax<qint64>(
-            0, m_dragSnapshot.sourceDurationMs - m_dragSnapshot.durationMs);
+            0, m_dragSnapshot.sourceDurationMs - sourceSpan);
+        const qint64 sourceDelta = qRound64(deltaMs * m_dragSnapshot.playbackRate);
         clip.sourceInMs = qBound<qint64>(0,
-            m_dragSnapshot.sourceInMs + deltaMs, maximumSourceIn);
+            m_dragSnapshot.sourceInMs + sourceDelta, maximumSourceIn);
     } else if (m_dragMode == DragMode::RollTrimRight) {
         const int partnerIndex = indexForClipId(m_rollPartnerSnapshot.id);
         if (partnerIndex < 0 || isTrackLocked(m_rollPartnerSnapshot.track)
