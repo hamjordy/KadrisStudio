@@ -955,10 +955,17 @@ void MainWindow::buildInterface()
         connect(clipIndicator, &QPushButton::clicked, this, [this, track]() {
             m_audioClipLatched[track] = false;
             m_audioPeakHold[track] = 0.0f;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+            // Clear buffered samples so the old peak cannot reappear after reset.
+            for (int slot = track * 4; slot < track * 4 + 4; ++slot)
+                m_audioSlotPeaks[slot] = 0.0f;
+#endif
             if (m_audioClipIndicators[track])
                 m_audioClipIndicators[track]->setVisible(false);
             if (m_audioPeakLabels[track])
                 m_audioPeakLabels[track]->setText(QStringLiteral("PEAK -INF dBFS"));
+            if (m_audioPeakMeters[track])
+                m_audioPeakMeters[track]->setValue(0);
         });
         auto *peakMeter = new QProgressBar(strip);
         peakMeter->setRange(0, 1000);
