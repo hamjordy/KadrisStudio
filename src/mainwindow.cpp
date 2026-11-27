@@ -1657,14 +1657,21 @@ bool MainWindow::writeProject(const QString &path)
         timelineMarkers = rootState.value("markers").toArray();
         timelineTrackStates = rootState.value("tracks").toArray();
     }
-    for (int i = 0; i < timelineClips.size(); ++i) {
-        QJsonObject clip = timelineClips.at(i).toObject();
-        const QString sourcePath = clip.value("path").toString();
-        if (!sourcePath.isEmpty() && QFileInfo(sourcePath).isAbsolute()) {
-            clip.insert("path", ProjectMediaPaths::toStoredPath(path, sourcePath));
-            timelineClips.replace(i, clip);
+    auto storeNestedMediaPaths = [&](auto &&self, QJsonArray &clips) -> void {
+        for (int i = 0; i < clips.size(); ++i) {
+            QJsonObject clip = clips.at(i).toObject();
+            const QString sourcePath = clip.value("path").toString();
+            if (!sourcePath.isEmpty() && QFileInfo(sourcePath).isAbsolute())
+                clip.insert("path", ProjectMediaPaths::toStoredPath(path, sourcePath));
+            QJsonArray children = clip.value("nestedClips").toArray();
+            if (!children.isEmpty()) {
+                self(self, children);
+                clip.insert("nestedClips", children);
+            }
+            clips.replace(i, clip);
         }
-    }
+    };
+    storeNestedMediaPaths(storeNestedMediaPaths, timelineClips);
 
     QJsonObject root;
     root.insert("format", "kadris-project");
@@ -1724,14 +1731,21 @@ bool MainWindow::readProject(const QString &path)
     }
 
     QJsonArray timelineClips = root.value("timelineClips").toArray();
-    for (int i = 0; i < timelineClips.size(); ++i) {
-        QJsonObject clip = timelineClips.at(i).toObject();
-        const QString storedPath = clip.value("path").toString();
-        if (!storedPath.isEmpty() && !QFileInfo(storedPath).isAbsolute()) {
-            clip.insert("path", ProjectMediaPaths::resolveStoredPath(path, storedPath));
-            timelineClips.replace(i, clip);
+    auto resolveNestedMediaPaths = [&](auto &&self, QJsonArray &clips) -> void {
+        for (int i = 0; i < clips.size(); ++i) {
+            QJsonObject clip = clips.at(i).toObject();
+            const QString storedPath = clip.value("path").toString();
+            if (!storedPath.isEmpty() && !QFileInfo(storedPath).isAbsolute())
+                clip.insert("path", ProjectMediaPaths::resolveStoredPath(path, storedPath));
+            QJsonArray children = clip.value("nestedClips").toArray();
+            if (!children.isEmpty()) {
+                self(self, children);
+                clip.insert("nestedClips", children);
+            }
+            clips.replace(i, clip);
         }
-    }
+    };
+    resolveNestedMediaPaths(resolveNestedMediaPaths, timelineClips);
     int fpsNumerator = root.value("sequenceFrameRateNumerator").toInt(25);
     int fpsDenominator = root.value("sequenceFrameRateDenominator").toInt(1);
     const bool supportedRate = (fpsDenominator == 1
