@@ -46,5 +46,30 @@ int main(int argc, char **argv)
                                                     rendered.height() / 2);
     assert(gradedPixel.red() < restoredRed.red());
 
+    // Opacity must affect the composited program output, not the cached source frame.
+    monitor.setTrackOpacity(0, 0);
+    rendered.fill(Qt::black);
+    monitor.render(&rendered);
+    const QColor transparentPixel = rendered.pixelColor(rendered.width() / 2,
+                                                         rendered.height() / 2);
+    assert(transparentPixel.red() < 15 && transparentPixel.green() < 15
+           && transparentPixel.blue() < 15);
+
+    monitor.setTrackOpacity(0, 100);
+    monitor.setTrackTransform(0, 100, 100, 0);
+    rendered.fill(Qt::black);
+    monitor.render(&rendered);
+    const QColor movedPixel = rendered.pixelColor(rendered.width() / 2,
+                                                   rendered.height() / 2);
+    assert(movedPixel.red() < 15 && movedPixel.green() < 15
+           && movedPixel.blue() < 15);
+
+    monitor.setTrackTransform(0, 100, 0, 0);
+    rendered.fill(Qt::black);
+    monitor.render(&rendered);
+    const QColor restoredPixel = rendered.pixelColor(rendered.width() / 2,
+                                                      rendered.height() / 2);
+    assert(restoredPixel.red() > 150);
+
     return 0;
 }
