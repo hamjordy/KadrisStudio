@@ -2384,6 +2384,20 @@ void MainWindow::exportVideo()
         encodingPreset = "fast";
     }
 
+    const QStringList audioBitrateOptions = {
+        "96 kbps", "128 kbps", "160 kbps", "192 kbps", "256 kbps", "320 kbps"
+    };
+    const QString audioBitrate = QInputDialog::getItem(
+        this, "Export Audio Settings", "AAC audio bitrate:", audioBitrateOptions, 3, false, &accepted);
+    if (!accepted) return;
+    const int audioBitrateKbps = audioBitrate.section(' ', 0, 0).toInt();
+
+    const QStringList audioSampleRateOptions = {"44.1 kHz", "48 kHz"};
+    const QString audioSampleRate = QInputDialog::getItem(
+        this, "Export Audio Settings", "Audio sample rate:", audioSampleRateOptions, 1, false, &accepted);
+    if (!accepted) return;
+    const int audioSampleRateHz = audioSampleRate.startsWith("44.1") ? 44100 : 48000;
+
     QString outputPath = QFileDialog::getSaveFileName(
         this, "Export Video", "KadrisStudio-Export.mp4",
         "MP4 Video (*.mp4)");
@@ -2396,7 +2410,8 @@ void MainWindow::exportVideo()
     if (!FfmpegExport::buildArguments(
             m_timeline->toJson(), width, height,
             m_sequenceFpsNumerator, m_sequenceFpsDenominator,
-            outputPath, &arguments, &error, qualityCrf, encodingPreset)) {
+            outputPath, &arguments, &error, qualityCrf, encodingPreset,
+            audioBitrateKbps, audioSampleRateHz)) {
         QMessageBox::warning(this, "Export Video",
             "The timeline cannot be exported yet:\n\n" + error);
         return;
