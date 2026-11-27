@@ -31,8 +31,6 @@ constexpr int kTimelineStartX = 142;
 constexpr int kClipMinimumWidth = 18;
 constexpr qint64 kDefaultClipDurationMs = 5000;
 constexpr qint64 kMinimumClipDurationMs = 250;
-constexpr qint64 kSnapIntervalMs = 40; // 25 fps: one frame is 40 ms.
-const FrameTimebase kTimelineTimebase(25, 1);
 constexpr int kTrimHandleWidth = 8;
 constexpr int kTrackCount = 5;
 
@@ -138,6 +136,28 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent)
     setFocusPolicy(Qt::StrongFocus);
 }
 
+void TimelineWidget::setFrameRate(int numerator, int denominator)
+{
+    m_timebase = FrameTimebase(numerator, denominator);
+    m_playheadMs = m_timebase.snapMilliseconds(m_playheadMs);
+    update();
+}
+
+int TimelineWidget::frameRateNumerator() const
+{
+    return static_cast<int>(m_timebase.fpsNumerator());
+}
+
+int TimelineWidget::frameRateDenominator() const
+{
+    return static_cast<int>(m_timebase.fpsDenominator());
+}
+
+qint64 TimelineWidget::frameDurationMs() const
+{
+    return m_timebase.frameToMilliseconds(1);
+}
+
 int TimelineWidget::replaceMediaPath(const QString &oldPath, const QString &newPath)
 {
     if (oldPath.isEmpty() || newPath.isEmpty() || oldPath == newPath
@@ -189,7 +209,7 @@ void TimelineWidget::resetZoom()
 
 void TimelineWidget::addMarker()
 {
-    const qint64 markerTime = kTimelineTimebase.snapMilliseconds(m_playheadMs);
+    const qint64 markerTime = m_timebase.snapMilliseconds(m_playheadMs);
     for (const Marker &marker : m_markers) {
         if (marker.timeMs == markerTime) {
             m_playheadMs = marker.timeMs;
@@ -219,7 +239,7 @@ void TimelineWidget::removeNearestMarker()
         }
     }
     const qint64 tolerance = qMax<qint64>(
-        kSnapIntervalMs, qRound64(12.0 * 1000.0 / m_pixelsPerSecond));
+        frameDurationMs(), qRound64(12.0 * 1000.0 / m_pixelsPerSecond));
     if (nearestIndex >= 0 && nearestDistance <= tolerance) {
         m_markers.removeAt(nearestIndex);
         update();
@@ -317,7 +337,7 @@ void TimelineWidget::markersFromJson(const QJsonArray &markers)
         if (!value.isObject()) continue;
         const QJsonObject item = value.toObject();
         Marker marker;
-        marker.timeMs = kTimelineTimebase.snapMilliseconds(
+        marker.timeMs = m_timebase.snapMilliseconds(
             qMax<qint64>(0, static_cast<qint64>(item.value("timeMs").toDouble())));
         marker.label = item.value("label").toString();
         if (marker.label.isEmpty())
@@ -476,7 +496,7 @@ bool TimelineWidget::addBrightnessKeyframe(int clipId, qint64 timelineTimeMs, in
     Clip &clip = m_clips[index];
     const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
                                             clip.durationMs);
-    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    const qint64 snappedTime = m_timebase.snapMilliseconds(localTime);
     for (Keyframe &keyframe : clip.brightnessKeyframes) {
         if (keyframe.timeMs == snappedTime) {
             keyframe.value = qBound(-100, value, 100);
@@ -505,7 +525,7 @@ bool TimelineWidget::removeBrightnessKeyframeAt(int clipId, qint64 timelineTimeM
         const qint64 candidate = qAbs(clip.brightnessKeyframes.at(i).timeMs - localTime);
         if (candidate < distance) { distance = candidate; nearest = i; }
     }
-    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    if (nearest < 0 || distance > qMax<qint64>(80, frameDurationMs() * 2)) return false;
     clip.brightnessKeyframes.removeAt(nearest);
     update();
     emit timelineEdited();
@@ -549,7 +569,7 @@ bool TimelineWidget::addContrastKeyframe(int clipId, qint64 timelineTimeMs, int 
     Clip &clip = m_clips[index];
     const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
                                             clip.durationMs);
-    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    const qint64 snappedTime = m_timebase.snapMilliseconds(localTime);
     for (Keyframe &keyframe : clip.contrastKeyframes) {
         if (keyframe.timeMs == snappedTime) {
             keyframe.value = qBound(-100, value, 100);
@@ -578,7 +598,7 @@ bool TimelineWidget::removeContrastKeyframeAt(int clipId, qint64 timelineTimeMs)
         const qint64 candidate = qAbs(clip.contrastKeyframes.at(i).timeMs - localTime);
         if (candidate < distance) { distance = candidate; nearest = i; }
     }
-    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    if (nearest < 0 || distance > qMax<qint64>(80, frameDurationMs() * 2)) return false;
     clip.contrastKeyframes.removeAt(nearest);
     update();
     emit timelineEdited();
@@ -666,7 +686,7 @@ bool TimelineWidget::addAudioVolumeKeyframe(int clipId, qint64 timelineTimeMs, i
     const int index = indexForClipId(clipId);
     if (index < 0) return false;
     Clip &clip = m_clips[index];
-    const qint64 localTime = kTimelineTimebase.snapMilliseconds(qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs));
+    const qint64 localTime = m_timebase.snapMilliseconds(qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs));
     const double value = qBound(0, volume, 100);
     for (Keyframe &keyframe : clip.audioVolumeKeyframes) {
         if (keyframe.timeMs == localTime) { keyframe.value = value; update(); emit timelineEdited(); return true; }
@@ -687,7 +707,7 @@ bool TimelineWidget::removeAudioVolumeKeyframeAt(int clipId, qint64 timelineTime
         const qint64 candidate = qAbs(clip.audioVolumeKeyframes.at(i).timeMs - localTime);
         if (candidate < distance) { distance = candidate; nearest = i; }
     }
-    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    if (nearest < 0 || distance > qMax<qint64>(80, frameDurationMs() * 2)) return false;
     clip.audioVolumeKeyframes.removeAt(nearest); update(); emit timelineEdited(); return true;
 }
 
@@ -724,7 +744,7 @@ bool TimelineWidget::addOpacityKeyframe(int clipId, qint64 timelineTimeMs, int o
     if (index < 0) return false;
     Clip &clip = m_clips[index];
     const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs, clip.durationMs);
-    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    const qint64 snappedTime = m_timebase.snapMilliseconds(localTime);
     for (Keyframe &keyframe : clip.opacityKeyframes) {
         if (keyframe.timeMs == snappedTime) { keyframe.value = qBound(0, opacity, 100); update(); emit timelineEdited(); return true; }
     }
@@ -743,7 +763,7 @@ bool TimelineWidget::removeOpacityKeyframeAt(int clipId, qint64 timelineTimeMs)
         const qint64 candidate = qAbs(clip.opacityKeyframes.at(i).timeMs - localTime);
         if (candidate < distance) { distance = candidate; nearest = i; }
     }
-    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    if (nearest < 0 || distance > qMax<qint64>(80, frameDurationMs() * 2)) return false;
     clip.opacityKeyframes.removeAt(nearest); update(); emit timelineEdited(); return true;
 }
 int TimelineWidget::opacityKeyframeCount(int clipId) const
@@ -793,7 +813,7 @@ bool TimelineWidget::addTransformKeyframe(int clipId, qint64 timelineTimeMs,
     Clip &clip = m_clips[index];
     const qint64 localTime = qBound<qint64>(0, timelineTimeMs - clip.timelineStartMs,
                                             clip.durationMs);
-    const qint64 snappedTime = kTimelineTimebase.snapMilliseconds(localTime);
+    const qint64 snappedTime = m_timebase.snapMilliseconds(localTime);
     for (Clip::TransformKeyframe &keyframe : clip.transformKeyframes) {
         if (keyframe.timeMs == snappedTime) {
             keyframe.scale = qBound(10, scale, 300);
@@ -824,7 +844,7 @@ bool TimelineWidget::removeTransformKeyframeAt(int clipId, qint64 timelineTimeMs
         const qint64 candidate = qAbs(clip.transformKeyframes.at(i).timeMs - localTime);
         if (candidate < distance) { distance = candidate; nearest = i; }
     }
-    if (nearest < 0 || distance > qMax<qint64>(80, kSnapIntervalMs * 2)) return false;
+    if (nearest < 0 || distance > qMax<qint64>(80, frameDurationMs() * 2)) return false;
     clip.transformKeyframes.removeAt(nearest);
     update(); emit timelineEdited(); return true;
 }
@@ -989,7 +1009,7 @@ qint64 TimelineWidget::playheadMs() const
 
 void TimelineWidget::setPlayheadMs(qint64 positionMs, bool notify)
 {
-    m_playheadMs = kTimelineTimebase.snapMilliseconds(qMax<qint64>(0, positionMs));
+    m_playheadMs = m_timebase.snapMilliseconds(qMax<qint64>(0, positionMs));
     update();
     if (notify) emit playheadChanged(m_playheadMs);
 }
@@ -1048,7 +1068,7 @@ bool TimelineWidget::splitSelectedClipAtPlayhead()
 
 int TimelineWidget::splitAllClipsAtPlayhead()
 {
-    const qint64 splitTime = kTimelineTimebase.snapMilliseconds(
+    const qint64 splitTime = m_timebase.snapMilliseconds(
         qMax<qint64>(0, m_playheadMs));
     int splitCount = 0;
     int lastRightClipId = -1;
@@ -1149,7 +1169,7 @@ bool TimelineWidget::rippleDeleteSelectedClip()
     for (Clip &clip : m_clips) {
         if (clip.timelineStartMs >= rippleEnd)
             clip.timelineStartMs = qMax<qint64>(0,
-                kTimelineTimebase.snapMilliseconds(clip.timelineStartMs - rippleDuration));
+                m_timebase.snapMilliseconds(clip.timelineStartMs - rippleDuration));
     }
 
     m_selectedClip = -1;
@@ -1176,7 +1196,7 @@ bool TimelineWidget::nudgeSelectedClip(int frameDirection)
             return false;
     }
 
-    qint64 delta = frameDirection < 0 ? -kSnapIntervalMs : kSnapIntervalMs;
+    qint64 delta = frameDirection < 0 ? -frameDurationMs() : frameDurationMs();
     if (delta < 0) {
         qint64 earliestStart = std::numeric_limits<qint64>::max();
         for (const Clip &clip : m_clips) {
@@ -1190,7 +1210,7 @@ bool TimelineWidget::nudgeSelectedClip(int frameDirection)
     if (delta == 0) return false;
     for (Clip &clip : m_clips) {
         if (ids.contains(clip.id))
-            clip.timelineStartMs = kTimelineTimebase.snapMilliseconds(
+            clip.timelineStartMs = m_timebase.snapMilliseconds(
                 qMax<qint64>(0, clip.timelineStartMs + delta));
     }
 
@@ -1219,13 +1239,13 @@ bool TimelineWidget::duplicateSelectedClip()
     }
     if (originals.isEmpty()) return false;
 
-    const qint64 offset = kTimelineTimebase.snapMilliseconds(groupEnd - groupStart);
+    const qint64 offset = m_timebase.snapMilliseconds(groupEnd - groupStart);
     QVector<Clip> duplicates;
     duplicates.reserve(originals.size());
     for (const Clip &original : originals) {
         Clip duplicate = original;
         duplicate.id = m_nextClipId++;
-        duplicate.timelineStartMs = kTimelineTimebase.snapMilliseconds(
+        duplicate.timelineStartMs = m_timebase.snapMilliseconds(
             original.timelineStartMs + offset);
         duplicates.append(duplicate);
     }
@@ -1374,7 +1394,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
             const QJsonObject frame = frameValue.toObject();
             Keyframe keyframe;
             keyframe.timeMs = qBound<qint64>(0,
-                kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
+                m_timebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
                 clip.durationMs);
             keyframe.value = qBound(-100.0, frame.value("value").toDouble(), 100.0);
             clip.brightnessKeyframes.append(keyframe);
@@ -1387,7 +1407,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
             const QJsonObject frame = frameValue.toObject();
             Keyframe keyframe;
             keyframe.timeMs = qBound<qint64>(0,
-                kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
+                m_timebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
                 clip.durationMs);
             keyframe.value = qBound(-100.0, frame.value("value").toDouble(), 100.0);
             clip.contrastKeyframes.append(keyframe);
@@ -1408,7 +1428,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
             if (!frameValue.isObject()) continue;
             const QJsonObject frame = frameValue.toObject();
             Keyframe keyframe;
-            keyframe.timeMs = qBound<qint64>(0, kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())), clip.durationMs);
+            keyframe.timeMs = qBound<qint64>(0, m_timebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())), clip.durationMs);
             keyframe.value = qBound(0.0, frame.value("value").toDouble(100.0), 100.0);
             clip.audioVolumeKeyframes.append(keyframe);
         }
@@ -1418,7 +1438,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
             if (!frameValue.isObject()) continue;
             const QJsonObject frame = frameValue.toObject();
             Keyframe keyframe;
-            keyframe.timeMs = qBound<qint64>(0, kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())), clip.durationMs);
+            keyframe.timeMs = qBound<qint64>(0, m_timebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())), clip.durationMs);
             keyframe.value = qBound(0.0, frame.value("value").toDouble(100.0), 100.0);
             clip.opacityKeyframes.append(keyframe);
         }
@@ -1429,7 +1449,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
             const QJsonObject frame = frameValue.toObject();
             Clip::TransformKeyframe keyframe;
             keyframe.timeMs = qBound<qint64>(0,
-                kTimelineTimebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
+                m_timebase.snapMilliseconds(static_cast<qint64>(frame.value("timeMs").toDouble())),
                 clip.durationMs);
             keyframe.scale = qBound(10.0, frame.value("scale").toDouble(100.0), 300.0);
             keyframe.x = qBound(-100.0, frame.value("x").toDouble(0.0), 100.0);
@@ -1858,13 +1878,13 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
     const int deltaPixels = pos.x() - m_dragOrigin.x();
     qint64 deltaMs = qRound64(
         static_cast<double>(deltaPixels) * 1000.0 / m_pixelsPerSecond);
-    deltaMs = qRound64(static_cast<double>(deltaMs) / kSnapIntervalMs)
-        * kSnapIntervalMs;
+    deltaMs = qRound64(static_cast<double>(deltaMs) / frameDurationMs())
+        * frameDurationMs();
 
     Clip &clip = m_clips[m_selectedClip];
     if (isTrackLocked(clip.track)) return;
     const qint64 snapToleranceMs = qMax<qint64>(
-        kSnapIntervalMs, qRound64(8.0 * 1000.0 / m_pixelsPerSecond));
+        frameDurationMs(), qRound64(8.0 * 1000.0 / m_pixelsPerSecond));
 
     // Move a Ctrl-selected group together while preserving each clip's
     // relative timing and track. Group movement is horizontal for safety.
@@ -2040,7 +2060,7 @@ void TimelineWidget::keyPressEvent(QKeyEvent *event)
     }
 
     const qint64 stepMs = event->modifiers().testFlag(Qt::ShiftModifier)
-        ? 1000 : kSnapIntervalMs;
+        ? 1000 : frameDurationMs();
 
     if (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right) {
         const qint64 direction = event->key() == Qt::Key_Left ? -1 : 1;

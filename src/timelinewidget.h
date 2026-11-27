@@ -1,5 +1,7 @@
 #pragma once
 
+#include "frame_timebase.h"
+
 #include <QJsonArray>
 #include <QPoint>
 #include <QRect>
@@ -39,6 +41,9 @@ public:
     };
 
     void addClip(const QString &path);
+    void setFrameRate(int numerator, int denominator);
+    int frameRateNumerator() const;
+    int frameRateDenominator() const;
     int replaceMediaPath(const QString &oldPath, const QString &newPath);
     void zoomIn();
     void zoomOut();
@@ -155,6 +160,7 @@ private:
     void probeMediaDuration(int clipId, const QString &path);
     int indexForClipId(int clipId) const;
     QString formatTime(qint64 milliseconds) const;
+    qint64 frameDurationMs() const;
 
     struct Marker { qint64 timeMs = 0; QString label; };
     QVector<Clip> m_clips;
@@ -165,6 +171,7 @@ private:
     int m_nextClipId = 1;
     qint64 m_playheadMs = 0;
     int m_pixelsPerSecond = 80;
+    FrameTimebase m_timebase;
 
     DragMode m_dragMode = DragMode::None;
     QPoint m_dragOrigin;

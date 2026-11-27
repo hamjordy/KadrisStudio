@@ -32,7 +32,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [x] Snap clip edges to other clip edges and timeline markers
 - [x] Add, navigate, and remove timeline markers
 - [x] Track lock and mute states
-- [ ] User-selectable sequence frame rate
+- [x] User-selectable sequence frame rate (24/25/30/50/60 and 29.97/59.94 fps), stored per project
 - [ ] Ripple, roll, slip, slide, and rate-stretch editing modes
 - [x] Timeline undo/redo history (up to 100 snapshots; keyboard shortcuts)
 - [ ] Track targeting, sync locks, nesting, and track groups
@@ -71,11 +71,10 @@ This roadmap distinguishes implemented prototype functionality from work still r
 
 ## Immediate priorities
 
-1. Build a reliable undo/redo history for timeline and Inspector edits.
-2. Add relative project paths so projects survive folder moves.
-3. Add automated crash/restart recovery tests and rotating project backups.
-4. Establish a real render/export pipeline with output validation.
-5. Expand automated tests beyond compilation, including serialization, timeline behavior, and project recovery.
+1. Add automated crash/restart recovery tests and rotating project backups.
+2. Establish a real render/export pipeline with output validation.
+3. Expand automated tests beyond compilation, including serialization, timeline behavior, and project recovery.
+4. Add ripple, roll, slip, slide, and rate-stretch editing modes.
 
 ## Long-term target
 

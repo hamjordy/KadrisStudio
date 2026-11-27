@@ -20,6 +20,10 @@ int main()
     assert(ntsc.frameToMilliseconds(30) == 1001);
     assert(ntsc.millisecondsToFrame(1001) == 30);
 
+    const FrameTimebase ntscFilm(60000, 1001);
+    assert(ntscFilm.frameToMilliseconds(60) == 1001);
+    assert(ntscFilm.millisecondsToFrame(1001) == 60);
+
     const FrameTimebase fallback(0, 0);
     assert(fallback.fpsNumerator() == 25);
     assert(fallback.fpsDenominator() == 1);

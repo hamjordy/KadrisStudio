@@ -23,6 +23,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QInputDialog>
 #include <QLabel>
 #include <QListWidget>
 #include <QMediaPlayer>
@@ -1025,6 +1026,9 @@ void MainWindow::buildMenus()
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
     QMenu *sequence = menuBar()->addMenu("&Sequence");
+    auto *settingsAction = sequence->addAction("Sequence Settings...");
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::setSequenceFrameRate);
+    sequence->addSeparator();
     auto *previousFrameAction = sequence->addAction("Previous Frame");
     previousFrameAction->setShortcut(QKeySequence("Left"));
     connect(previousFrameAction, &QAction::triggered, this,
@@ -1129,6 +1133,9 @@ void MainWindow::newProject()
             != QMessageBox::Yes) return;
     QFile::remove(untitledRecoveryPath());
     m_projectPath.clear();
+    m_sequenceFpsNumerator = 25;
+    m_sequenceFpsDenominator = 1;
+    m_timeline->setFrameRate(25, 1);
     m_mediaPaths.clear();
     m_mediaList->clear();
     m_timeline->clearClips();
@@ -1460,7 +1467,9 @@ bool MainWindow::writeProject(const QString &path)
 
     QJsonObject root;
     root.insert("format", "kadris-project");
-    root.insert("formatVersion", 5);
+    root.insert("formatVersion", 6);
+    root.insert("sequenceFrameRateNumerator", m_sequenceFpsNumerator);
+    root.insert("sequenceFrameRateDenominator", m_sequenceFpsDenominator);
     root.insert("projectName", QFileInfo(path).completeBaseName());
     root.insert("mediaFiles", media);
     root.insert("timelineClips", timelineClips);
@@ -1502,7 +1511,8 @@ bool MainWindow::readProject(const QString &path)
             && root.value("formatVersion").toInt() != 2
             && root.value("formatVersion").toInt() != 3
             && root.value("formatVersion").toInt() != 4
-            && root.value("formatVersion").toInt() != 5)) return false;
+            && root.value("formatVersion").toInt() != 5
+            && root.value("formatVersion").toInt() != 6)) return false;
 
     m_mediaPaths.clear();
     m_mediaList->clear();
@@ -1520,6 +1530,17 @@ bool MainWindow::readProject(const QString &path)
             timelineClips.replace(i, clip);
         }
     }
+    int fpsNumerator = root.value("sequenceFrameRateNumerator").toInt(25);
+    int fpsDenominator = root.value("sequenceFrameRateDenominator").toInt(1);
+    const bool supportedRate = (fpsDenominator == 1
+            && (fpsNumerator == 24 || fpsNumerator == 25 || fpsNumerator == 30
+                || fpsNumerator == 50 || fpsNumerator == 60))
+        || (fpsDenominator == 1001
+            && (fpsNumerator == 30000 || fpsNumerator == 60000));
+    if (!supportedRate) { fpsNumerator = 25; fpsDenominator = 1; }
+    m_sequenceFpsNumerator = fpsNumerator;
+    m_sequenceFpsDenominator = fpsDenominator;
+    m_timeline->setFrameRate(fpsNumerator, fpsDenominator);
     m_timeline->fromJson(timelineClips);
     m_timeline->markersFromJson(root.value("timelineMarkers").toArray());
     m_timeline->trackStatesFromJson(root.value("timelineTrackStates").toArray());
@@ -1806,7 +1827,7 @@ void MainWindow::tickSequencePlayback()
 
     // Drive the sequence from one monotonic clock origin, then quantize to
     // the 25 fps sequence timebase. This avoids cumulative timer-rounding drift.
-    const FrameTimebase timebase(25, 1);
+    const FrameTimebase timebase(m_sequenceFpsNumerator, m_sequenceFpsDenominator);
     m_sequencePositionMs = timebase.frameToMilliseconds(
         timebase.millisecondsToFrame(m_sequenceClockOriginMs + elapsed));
     const qint64 sequenceEnd = m_timeline->sequenceDurationMs();
@@ -1906,6 +1927,41 @@ void MainWindow::stepSequenceFrame(int direction)
     m_timeline->setPlayheadMs(m_sequencePositionMs);
     updateSequenceTimeLabel();
     refreshPausedTimelinePreview();
+}
+
+void MainWindow::setSequenceFrameRate()
+{
+    const QStringList rates = {
+        "24 fps", "25 fps", "30 fps", "50 fps", "60 fps",
+        "29.97 fps (30000/1001)", "59.94 fps (60000/1001)"
+    };
+    QString currentRate = m_sequenceFpsDenominator == 1001
+        ? (m_sequenceFpsNumerator == 30000 ? rates.at(5) : rates.at(6))
+        : QString("%1 fps").arg(m_sequenceFpsNumerator);
+    bool accepted = false;
+    const QString selected = QInputDialog::getItem(
+        this, "Sequence Settings", "Project frame rate:",
+        rates, qMax(0, rates.indexOf(currentRate)), false, &accepted);
+    if (!accepted || selected.isEmpty()) return;
+
+    int numerator = 25, denominator = 1;
+    if (selected == "24 fps") numerator = 24;
+    else if (selected == "30 fps") numerator = 30;
+    else if (selected == "50 fps") numerator = 50;
+    else if (selected == "60 fps") numerator = 60;
+    else if (selected == "29.97 fps (30000/1001)") { numerator = 30000; denominator = 1001; }
+    else if (selected == "59.94 fps (60000/1001)") { numerator = 60000; denominator = 1001; }
+    if (numerator == m_sequenceFpsNumerator && denominator == m_sequenceFpsDenominator) return;
+
+    stopSequencePlayback(false);
+    m_sequenceFpsNumerator = numerator;
+    m_sequenceFpsDenominator = denominator;
+    m_timeline->setFrameRate(numerator, denominator);
+    m_sequencePositionMs = m_timeline->playheadMs();
+    m_projectDirty = true;
+    updateSequenceTimeLabel();
+    refreshPausedTimelinePreview();
+    statusBar()->showMessage(QString("Sequence frame rate set to %1").arg(selected), 4000);
 }
 
 void MainWindow::syncVideoTracks()

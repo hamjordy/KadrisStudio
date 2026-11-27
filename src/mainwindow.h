@@ -36,6 +36,7 @@ private slots:
     void importMedia();
     void relinkSelectedMedia();
     void collectProjectMedia();
+    void setSequenceFrameRate();
     void addSelectedMediaToTimeline();
     void playPause();
     void stopPlayback();
@@ -119,6 +120,8 @@ private:
     QJsonObject m_lastTimelineState;
     bool m_restoringTimeline = false;
     bool m_projectDirty = false;
+    int m_sequenceFpsNumerator = 25;
+    int m_sequenceFpsDenominator = 1;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
 };
