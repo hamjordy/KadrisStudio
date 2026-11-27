@@ -137,8 +137,6 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     filters << QString("[%1]trim=duration=%2,fps=%3,format=yuv420p[vout]")
                    .arg(current).arg(number(totalDuration)).arg(fps);
 
-    *arguments << "-filter_complex" << filters.join(';') << "-map" << "[vout]";
-
     if (!audio.isEmpty()) {
         QStringList audioLabels;
         int audioNumber = 0;
@@ -157,13 +155,13 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
             audioLabels << QString("[%1]").arg(label);
             ++audioNumber;
         }
-        // Audio filters are appended after video filters; pass the complete graph once.
         QString graph = filters.join(';');
         graph += ';' + audioLabels.join("") +
                  QString("amix=inputs=%1:duration=longest:dropout_transition=0[aout]")
                      .arg(audioLabels.size());
-        arguments->removeAt(arguments->indexOf("-filter_complex") + 1);
         *arguments << "-filter_complex" << graph << "-map" << "[vout]" << "-map" << "[aout]";
+    } else {
+        *arguments << "-filter_complex" << filters.join(';') << "-map" << "[vout]";
     }
 
     *arguments << "-t" << number(totalDuration)
