@@ -12,5 +12,6 @@ public:
     static bool buildArguments(const QJsonArray &clips, int width, int height,
                                int fpsNumerator, int fpsDenominator,
                                const QString &outputPath, QStringList *arguments,
-                               QString *error = nullptr);
+                               QString *error = nullptr, int qualityCrf = 23,
+                               const QString &encodingPreset = "medium");
 };
