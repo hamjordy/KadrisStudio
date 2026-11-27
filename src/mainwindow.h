@@ -4,6 +4,7 @@
 #include <QElapsedTimer>
 #include <QStringList>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QVector>
 #include <array>
 
@@ -47,6 +48,8 @@ private slots:
     void undoTimelineEdit();
     void redoTimelineEdit();
     void resetTimelineHistory();
+    QJsonObject captureTimelineState() const;
+    void restoreTimelineState(const QJsonObject &state);
 
 private:
     void buildInterface();
@@ -104,9 +107,9 @@ private:
     QSlider *m_clipFadeInSlider = nullptr;
     QSlider *m_clipFadeOutSlider = nullptr;
     int m_selectedTimelineClipId = -1;
-    QVector<QJsonArray> m_undoHistory;
-    QVector<QJsonArray> m_redoHistory;
-    QJsonArray m_lastTimelineState;
+    QVector<QJsonObject> m_undoHistory;
+    QVector<QJsonObject> m_redoHistory;
+    QJsonObject m_lastTimelineState;
     bool m_restoringTimeline = false;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
