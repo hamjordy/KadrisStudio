@@ -32,6 +32,7 @@ public:
         bool durationKnown = false;
         bool nestedSequence = false;
         bool nestedContent = false;
+        int nestedTrack = -1;
         QString nestedName;
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
@@ -103,6 +104,7 @@ public:
     int evaluatedBrightness(int clipId, qint64 timelineTimeMs) const;
     int evaluatedContrast(int clipId, qint64 timelineTimeMs) const;
     bool clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *clip) const;
+    QVector<ClipInfo> clipsAtTimeOnTrack(qint64 positionMs, int track) const;
     bool nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *clip) const;
     qint64 sequenceDurationMs() const;
     qint64 playheadMs() const;
