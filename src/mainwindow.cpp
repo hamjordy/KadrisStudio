@@ -10,6 +10,8 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QAudioOutput>
+#include <QAudioBuffer>
+#include <QAudioBufferOutput>
 #include <QDockWidget>
 #include <QDialog>
 #include <QDateTime>
@@ -37,6 +39,7 @@
 #include <QPushButton>
 #include <QProcess>
 #include <QProgressDialog>
+#include <QProgressBar>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QScrollArea>
@@ -54,6 +57,7 @@
 #include <QUrl>
 
 #include <cmath>
+#include <algorithm>
 
 namespace {
 float faderToLinearGain(int value)
@@ -68,6 +72,67 @@ QString faderToLabel(int value)
     if (value <= 0) return QStringLiteral("-INF dB");
     const double decibels = (static_cast<double>(value) / 100.0 - 1.0) * 60.0;
     return QStringLiteral("%1 dB").arg(decibels, 0, 'f', 1);
+}
+
+float decodedBufferPeak(const QAudioBuffer &buffer)
+{
+    if (!buffer.isValid() || buffer.frameCount() <= 0
+        || buffer.format().channelCount() <= 0)
+        return 0.0f;
+
+    const qsizetype sampleCount = static_cast<qsizetype>(buffer.frameCount())
+        * buffer.format().channelCount();
+    const void *data = buffer.constData();
+    if (!data || sampleCount <= 0) return 0.0f;
+
+    float peak = 0.0f;
+    switch (buffer.format().sampleFormat()) {
+    case QAudioFormat::UInt8: {
+        const auto *samples = static_cast<const quint8 *>(data);
+        for (qsizetype i = 0; i < sampleCount; ++i)
+            peak = qMax(peak, qAbs((static_cast<float>(samples[i]) - 128.0f) / 128.0f));
+        break;
+    }
+    case QAudioFormat::Int16: {
+        const auto *samples = static_cast<const qint16 *>(data);
+        for (qsizetype i = 0; i < sampleCount; ++i)
+            peak = qMax(peak, qAbs(static_cast<float>(samples[i]) / 32768.0f));
+        break;
+    }
+    case QAudioFormat::Int32: {
+        const auto *samples = static_cast<const qint32 *>(data);
+        for (qsizetype i = 0; i < sampleCount; ++i)
+            peak = qMax(peak, qAbs(static_cast<float>(
+                static_cast<double>(samples[i]) / 2147483648.0)));
+        break;
+    }
+    case QAudioFormat::Float: {
+        const auto *samples = static_cast<const float *>(data);
+        for (qsizetype i = 0; i < sampleCount; ++i) {
+            if (std::isfinite(samples[i]))
+                peak = qMax(peak, qAbs(samples[i]));
+        }
+        break;
+    }
+    case QAudioFormat::Unknown:
+    default:
+        break;
+    }
+    return qBound(0.0f, peak, 1.0f);
+}
+
+int peakToMeterValue(float peak)
+{
+    if (peak <= 0.001f) return 0;
+    const double db = 20.0 * std::log10(static_cast<double>(peak));
+    return qBound(0, qRound((db + 60.0) / 60.0 * 1000.0), 1000);
+}
+
+QString peakToLabel(float peak)
+{
+    if (peak <= 0.001f) return QStringLiteral("-INF dBFS");
+    const double db = 20.0 * std::log10(static_cast<double>(peak));
+    return QStringLiteral("%1 dBFS").arg(db, 0, 'f', 1);
 }
 }
 
@@ -115,6 +180,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         m_audioTrackOutputs[track] = new QAudioOutput(this);
         m_audioTrackOutputs[track]->setVolume(1.0f);
         m_audioTrackPlayers[track]->setAudioOutput(m_audioTrackOutputs[track]);
+        m_audioBufferOutputs[track] = new QAudioBufferOutput(this);
+        m_audioTrackPlayers[track]->setAudioBufferOutput(m_audioBufferOutputs[track]);
+        connect(m_audioBufferOutputs[track], &QAudioBufferOutput::audioBufferReceived,
+            this, [this, track](const QAudioBuffer &buffer) {
+                m_audioSlotPeaks[track] = qMax(
+                    m_audioSlotPeaks[track], decodedBufferPeak(buffer));
+            });
 
         connect(m_audioTrackPlayers[track], &QMediaPlayer::mediaStatusChanged, this,
             [this, track](QMediaPlayer::MediaStatus) {
@@ -130,6 +202,27 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     }
 
     buildInterface();
+    m_audioMeterTimer = new QTimer(this);
+    m_audioMeterTimer->setInterval(50);
+    connect(m_audioMeterTimer, &QTimer::timeout, this, [this]() {
+        for (int parentIndex = 0; parentIndex < 2; ++parentIndex) {
+            float outputPeak = 0.0f;
+            for (int slot = parentIndex * 4; slot < parentIndex * 4 + 4; ++slot) {
+                const QAudioOutput *output = m_audioTrackOutputs[slot];
+                if (output && !output->isMuted())
+                    outputPeak = qMax(outputPeak,
+                        m_audioSlotPeaks[slot] * output->volume());
+                m_audioSlotPeaks[slot] *= 0.88f;
+                if (m_audioSlotPeaks[slot] < 0.001f)
+                    m_audioSlotPeaks[slot] = 0.0f;
+            }
+            if (m_audioPeakMeters[parentIndex])
+                m_audioPeakMeters[parentIndex]->setValue(peakToMeterValue(outputPeak));
+            if (m_audioPeakLabels[parentIndex])
+                m_audioPeakLabels[parentIndex]->setText(peakToLabel(outputPeak));
+        }
+    });
+    m_audioMeterTimer->start();
     applyAudioMixerState();
     buildMenus();
 
@@ -824,6 +917,23 @@ void MainWindow::buildInterface()
 
         stripLayout->addWidget(gainLabel);
         stripLayout->addWidget(fader, 1, Qt::AlignHCenter);
+        auto *peakLabel = new QLabel("-INF dBFS", strip);
+        peakLabel->setAlignment(Qt::AlignCenter);
+        peakLabel->setObjectName("timecodeLabel");
+        auto *peakMeter = new QProgressBar(strip);
+        peakMeter->setRange(0, 1000);
+        peakMeter->setValue(0);
+        peakMeter->setTextVisible(false);
+        peakMeter->setFixedHeight(10);
+        peakMeter->setToolTip("Live output peak level in dBFS");
+        peakMeter->setStyleSheet(
+            "QProgressBar { background: #252525; border: 0; border-radius: 3px; }"
+            "QProgressBar::chunk { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, "
+            "stop:0 #25b86a, stop:0.72 #d5bd35, stop:1 #d94b4b); border-radius: 3px; }");
+        m_audioPeakMeters[track] = peakMeter;
+        m_audioPeakLabels[track] = peakLabel;
+        stripLayout->addWidget(peakLabel);
+        stripLayout->addWidget(peakMeter);
         stripLayout->addLayout(switches);
         mixerLayout->addWidget(strip);
 
