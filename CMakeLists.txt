@@ -33,6 +33,16 @@ if(BUILD_TESTING)
     add_executable(frame-timebase-tests tests/frame_timebase_tests.cpp)
     target_include_directories(frame-timebase-tests PRIVATE src)
     add_test(NAME frame-timebase-tests COMMAND frame-timebase-tests)
+
+    add_executable(timeline-serialization-tests
+        tests/timeline_serialization_tests.cpp
+        src/timelinewidget.cpp
+        src/timelinewidget.h
+    )
+    target_include_directories(timeline-serialization-tests PRIVATE src)
+    target_link_libraries(timeline-serialization-tests PRIVATE Qt6::Widgets Qt6::Multimedia)
+    add_test(NAME timeline-serialization-tests COMMAND timeline-serialization-tests)
+    set_tests_properties(timeline-serialization-tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 
 if(MSVC)
