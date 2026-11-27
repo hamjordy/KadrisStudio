@@ -1234,10 +1234,14 @@ bool TimelineWidget::rippleDeleteSelectedClip()
         || rippleEnd <= rippleStart) return false;
 
     const qint64 rippleDuration = rippleEnd - rippleStart;
-    // Ripple is an all-or-nothing edit: never leave locked clips out of sync.
+    const int sourceTrack = m_clips.at(m_selectedClip).track;
+    // The source track always ripples; any additional sync-locked track
+    // follows the edit. Refuse the edit if one of those tracks is locked.
     for (const Clip &clip : m_clips) {
-        if (!ids.contains(clip.id) && clip.timelineStartMs >= rippleEnd
-            && isTrackLocked(clip.track)) return false;
+        const bool followsRipple = clip.track == sourceTrack || isTrackSyncLocked(clip.track);
+        if (!ids.contains(clip.id) && followsRipple
+            && clip.timelineStartMs >= rippleEnd && isTrackLocked(clip.track))
+            return false;
     }
 
     for (int i = m_clips.size() - 1; i >= 0; --i) {
@@ -1245,7 +1249,8 @@ bool TimelineWidget::rippleDeleteSelectedClip()
             m_clips.removeAt(i);
     }
     for (Clip &clip : m_clips) {
-        if (clip.timelineStartMs >= rippleEnd)
+        const bool followsRipple = clip.track == sourceTrack || isTrackSyncLocked(clip.track);
+        if (followsRipple && clip.timelineStartMs >= rippleEnd)
             clip.timelineStartMs = qMax<qint64>(0,
                 m_timebase.snapMilliseconds(clip.timelineStartMs - rippleDuration));
     }
