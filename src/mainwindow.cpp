@@ -1366,7 +1366,6 @@ void MainWindow::autosaveProject()
 
 bool MainWindow::writeProject(const QString &path)
 {
-    const QDir projectDirectory = QFileInfo(path).absoluteDir();
     QJsonArray media;
     for (const QString &item : m_mediaPaths) {
         media.append(ProjectMediaPaths::toStoredPath(path, item));
@@ -1428,7 +1427,6 @@ bool MainWindow::readProject(const QString &path)
             && root.value("formatVersion").toInt() != 4
             && root.value("formatVersion").toInt() != 5)) return false;
 
-    const QDir projectDirectory = QFileInfo(path).absoluteDir();
     m_mediaPaths.clear();
     m_mediaList->clear();
     for (const QJsonValue &value : root.value("mediaFiles").toArray()) {
