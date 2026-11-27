@@ -116,6 +116,7 @@ private:
     QVector<QJsonObject> m_redoHistory;
     QJsonObject m_lastTimelineState;
     bool m_restoringTimeline = false;
+    bool m_projectDirty = false;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
 };
