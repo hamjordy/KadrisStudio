@@ -967,6 +967,7 @@ bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *r
                 resolved->durationMs = duration;
                 resolved->playbackRate = item.value("playbackRate").toDouble(1.0);
                 resolved->nestedSequence = false;
+                resolved->nestedContent = true;
                 const QJsonObject color = item.value("color").toObject();
                 resolved->brightness = color.value("brightness").toInt(0);
                 resolved->contrast = color.value("contrast").toInt(0);
@@ -1007,6 +1008,7 @@ bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *r
             result->durationMs = clip.durationMs;
             result->playbackRate = clip.playbackRate;
             result->nestedSequence = false;
+            result->nestedContent = false;
             result->brightness = clip.brightness; result->contrast = clip.contrast;
             result->saturation = clip.saturation; result->shadows = clip.shadows;
             result->midtones = clip.midtones; result->highlights = clip.highlights;
