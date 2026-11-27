@@ -47,6 +47,11 @@ inline bool copyReferencedMedia(const QStringList &mediaPaths,
         QString candidateName = sourceInfo.fileName();
         int duplicate = 2;
         QString target = QDir(projectFolder).filePath(candidateName);
+        if (QDir::cleanPath(source) == QDir::cleanPath(QFileInfo(target).absoluteFilePath())) {
+            pathMap->insert(source, source);
+            reservedTargets.insert(target);
+            continue;
+        }
 
         while (QFileInfo::exists(target) || reservedTargets.contains(target)) {
             candidateName = suffix.isEmpty()
