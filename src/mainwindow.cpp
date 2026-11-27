@@ -1037,6 +1037,67 @@ void MainWindow::buildMenus()
     zoomResetAction->setShortcut(QKeySequence("Ctrl+0"));
     connect(zoomResetAction, &QAction::triggered, m_timeline, &TimelineWidget::resetZoom);
 
+    view->addSeparator();
+    QMenu *workspace = view->addMenu("Workspaces");
+    auto *editingWorkspace = workspace->addAction("Editing");
+    auto *colorWorkspace = workspace->addAction("Color");
+    auto *audioWorkspace = workspace->addAction("Audio");
+    auto *resetWorkspace = workspace->addAction("Reset Panels");
+
+    auto showDock = [this](const char *name, bool visible) {
+        if (auto *dock = findChild<QDockWidget *>(QString::fromLatin1(name)))
+            dock->setVisible(visible);
+    };
+    connect(editingWorkspace, &QAction::triggered, this, [this, showDock]() {
+        auto *media = findChild<QDockWidget *>("mediaDock");
+        auto *inspector = findChild<QDockWidget *>("inspectorDock");
+        auto *mixer = findChild<QDockWidget *>("audioMixerDock");
+        auto *timeline = findChild<QDockWidget *>("timelineDock");
+        auto *markers = findChild<QDockWidget *>("timelineMarkersDock");
+        for (auto *dock : {media, inspector, mixer, timeline, markers})
+            if (dock) dock->show();
+        if (media && inspector) splitDockWidget(media, inspector, Qt::Horizontal);
+        if (inspector && mixer) splitDockWidget(inspector, mixer, Qt::Vertical);
+        if (timeline && markers) splitDockWidget(timeline, markers, Qt::Horizontal);
+        if (media) media->raise();
+        statusBar()->showMessage("Editing workspace", 2500);
+    });
+    connect(colorWorkspace, &QAction::triggered, this, [this, showDock]() {
+        showDock("mediaDock", true);
+        showDock("inspectorDock", true);
+        showDock("audioMixerDock", false);
+        showDock("timelineDock", true);
+        showDock("timelineMarkersDock", true);
+        if (auto *media = findChild<QDockWidget *>("mediaDock"))
+            media->raise();
+        if (auto *inspector = findChild<QDockWidget *>("inspectorDock"))
+            inspector->raise();
+        statusBar()->showMessage("Color workspace", 2500);
+    });
+    connect(audioWorkspace, &QAction::triggered, this, [this, showDock]() {
+        showDock("mediaDock", true);
+        showDock("inspectorDock", false);
+        showDock("audioMixerDock", true);
+        showDock("timelineDock", true);
+        showDock("timelineMarkersDock", false);
+        if (auto *mixer = findChild<QDockWidget *>("audioMixerDock"))
+            mixer->raise();
+        statusBar()->showMessage("Audio workspace", 2500);
+    });
+    connect(resetWorkspace, &QAction::triggered, this, [this, showDock]() {
+        for (const char *name : {"mediaDock", "inspectorDock", "audioMixerDock",
+                                 "timelineDock", "timelineMarkersDock"})
+            showDock(name, true);
+        statusBar()->showMessage("All editing panels restored", 2500);
+    });
+
+    QMenu *windowMenu = menuBar()->addMenu("&Window");
+    for (const char *name : {"mediaDock", "inspectorDock", "audioMixerDock",
+                             "timelineDock", "timelineMarkersDock"}) {
+        if (auto *dock = findChild<QDockWidget *>(QString::fromLatin1(name)))
+            windowMenu->addAction(dock->toggleViewAction());
+    }
+
     QMenu *sequence = menuBar()->addMenu("&Sequence");
     auto *settingsAction = sequence->addAction("Sequence Settings...");
     connect(settingsAction, &QAction::triggered, this, &MainWindow::setSequenceFrameRate);
