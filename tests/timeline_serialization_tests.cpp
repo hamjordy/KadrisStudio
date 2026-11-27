@@ -202,7 +202,11 @@ int main(int argc, char **argv)
     QJsonObject nestedAudioOne{
         {"id", 421}, {"path", "nested-voice.wav"}, {"track", 3},
         {"timelineStartMs", 0}, {"durationMs", 4000},
-        {"audioVolume", 75}, {"fadeInMs", 600}, {"fadeOutMs", 900}
+        {"audioVolume", 75}, {"fadeInMs", 600}, {"fadeOutMs", 900},
+        {"audioVolumeKeyframes", QJsonArray{
+            QJsonObject{{"timeMs", 0}, {"value", 20}},
+            QJsonObject{{"timeMs", 2000}, {"value", 80}}
+        }}
     };
     QJsonObject nestedAudioTwo{
         {"id", 422}, {"path", "nested-music.wav"}, {"track", 4},
@@ -229,6 +233,9 @@ int main(int argc, char **argv)
     assert(activeNestedAudio.at(0).audioVolume == 75);
     assert(activeNestedAudio.at(0).fadeInMs == 600);
     assert(activeNestedAudio.at(0).fadeOutMs == 900);
+    assert(activeNestedAudio.at(0).audioVolumeKeyframes.size() == 2);
+    assert(activeNestedAudio.at(0).audioVolumeKeyframes.at(0).x() == 1000.0);
+    assert(activeNestedAudio.at(0).audioVolumeKeyframes.at(1).x() == 3000.0);
     assert(activeNestedAudio.at(1).audioVolume == 60);
     assert(activeNestedAudio.at(1).fadeInMs == 400);
     assert(activeNestedAudio.at(1).fadeOutMs == 700);
