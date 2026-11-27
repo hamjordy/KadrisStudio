@@ -251,6 +251,21 @@ int main(int argc, char **argv)
     const QJsonArray fastSplitAllClips = fastSplitAllTimeline.toJson();
     assert(fastSplitAllClips.at(1).toObject().value("sourceInMs").toInt() == 5000);
 
+    // Shift-clicking a track control applies it to every track in its group.
+    TimelineWidget groupedControls;
+    QJsonArray groupedStates = groupedControls.trackStatesToJson();
+    for (int track = 0; track < 2; ++track) {
+        QJsonObject state = groupedStates.at(track).toObject();
+        state.insert("group", "Dialogue");
+        groupedStates[track] = state;
+    }
+    groupedControls.trackStatesFromJson(groupedStates);
+    QMouseEvent groupedSyncClick(QEvent::MouseButtonPress, QPointF(92, 55),
+        Qt::LeftButton, Qt::LeftButton, Qt::ShiftModifier);
+    QApplication::sendEvent(&groupedControls, &groupedSyncClick);
+    assert(groupedControls.isTrackSyncLocked(0));
+    assert(groupedControls.isTrackSyncLocked(1));
+
     // Track targeting limits Add Edit to All Tracks to enabled tracks.
     QJsonArray targetedSplitInput{
         QJsonObject{{"id", 91}, {"path", replacementPath}, {"track", 0},
