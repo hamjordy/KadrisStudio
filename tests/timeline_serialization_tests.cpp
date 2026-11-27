@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QFile>
+#include <QTemporaryDir>
 
 #include <cassert>
 
@@ -36,7 +38,17 @@ int main(int argc, char **argv)
     trackStates.append(QJsonObject{{"locked", false}, {"muted", true}});
     timeline.trackStatesFromJson(trackStates);
 
+    QTemporaryDir temporaryDirectory;
+    assert(temporaryDirectory.isValid());
+    const QString replacementPath = temporaryDirectory.filePath("replacement.mp4");
+    QFile replacementFile(replacementPath);
+    assert(replacementFile.open(QIODevice::WriteOnly));
+    replacementFile.write("test");
+    replacementFile.close();
+
+    assert(timeline.replaceMediaPath("missing-media.mp4", replacementPath) == 1);
     const QJsonArray clipsBefore = timeline.toJson();
+    assert(clipsBefore.first().toObject().value("path").toString() == replacementPath);
     const QJsonArray markersBefore = timeline.markersToJson();
     const QJsonArray tracksBefore = timeline.trackStatesToJson();
 
@@ -49,6 +61,7 @@ int main(int argc, char **argv)
     assert(restored.markersToJson() == markersBefore);
     assert(restored.trackStatesToJson() == tracksBefore);
     assert(restored.selectedClipInfo(&clip));
+    assert(clip.path == replacementPath);
     assert(clip.brightness == 12);
     assert(clip.contrast == -8);
     assert(clip.saturation == 115);
