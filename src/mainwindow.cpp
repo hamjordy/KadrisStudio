@@ -252,6 +252,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         [this]() {
             const QJsonObject currentState = captureTimelineState();
             if (!m_restoringTimeline && currentState != m_lastTimelineState) {
+                m_projectDirty = true;
                 m_undoHistory.append(m_lastTimelineState);
                 if (m_undoHistory.size() > 100) m_undoHistory.removeFirst();
                 m_redoHistory.clear();
@@ -1113,6 +1114,7 @@ void MainWindow::newProject()
         && QMessageBox::question(this, "New Project", "Discard the current project state?")
             != QMessageBox::Yes) return;
     QFile::remove(untitledRecoveryPath());
+    m_projectDirty = false;
     m_projectPath.clear();
     m_mediaPaths.clear();
     m_mediaList->clear();
@@ -1164,6 +1166,7 @@ void MainWindow::saveProject()
     }
     QFile::remove(m_projectPath + ".autosave");
     QFile::remove(untitledRecoveryPath());
+    m_projectDirty = false;
 }
 
 void MainWindow::saveProjectAs()
@@ -1178,6 +1181,7 @@ void MainWindow::saveProjectAs()
     }
     QFile::remove(m_projectPath + ".autosave");
     QFile::remove(untitledRecoveryPath());
+    m_projectDirty = false;
 }
 
 QString MainWindow::untitledRecoveryPath() const
@@ -1213,6 +1217,8 @@ void MainWindow::recoverUntitledProject()
 
 void MainWindow::autosaveProject()
 {
+    if (!m_projectDirty) return;
+
     const QString originalPath = m_projectPath;
     QString recoveryPath;
     if (originalPath.isEmpty()) {
@@ -1235,6 +1241,7 @@ void MainWindow::autosaveProject()
 
     // writeProject updates the active path; restore the real project location.
     m_projectPath = originalPath;
+    m_projectDirty = false;
     updateWindowTitle();
     statusBar()->showMessage("Crash-recovery autosave created", 2500);
 }
@@ -1331,6 +1338,7 @@ bool MainWindow::readProject(const QString &path)
     m_timeline->trackStatesFromJson(root.value("timelineTrackStates").toArray());
     resetTimelineHistory();
     m_projectPath = path;
+    m_projectDirty = false;
     m_player->stop();
     m_player->setSource(QUrl());
     m_sourceLabel->setText("No source loaded");
@@ -1445,6 +1453,7 @@ void MainWindow::addMediaPath(const QString &path)
 {
     if (path.isEmpty() || m_mediaPaths.contains(path)) return;
     m_mediaPaths.append(path);
+    m_projectDirty = true;
     const QFileInfo info(path);
     auto *item = new QTreeWidgetItem(m_mediaList, {info.fileName(), info.suffix().toUpper()});
     item->setData(0, Qt::UserRole, path);
