@@ -80,6 +80,36 @@ int main(int argc, char **argv)
     assert(clip.fadeInMs == 450);
     assert(clip.fadeOutMs == 700);
 
+    // Nesting keeps every selected clip's settings and relative timing in the project.
+    QJsonArray nestInput{
+        QJsonObject{{"id", 201}, {"path", "clip-a.mp4"}, {"track", 0},
+            {"timelineStartMs", 1000}, {"durationMs", 3000}},
+        QJsonObject{{"id", 202}, {"path", "clip-b.mp4"}, {"track", 1},
+            {"timelineStartMs", 2500}, {"durationMs", 2000}}
+    };
+    TimelineWidget nestTimeline;
+    nestTimeline.fromJson(nestInput);
+    assert(nestTimeline.nestSelectedClips("Intro Montage") == false);
+    // Select both clips using the public timeline interaction path.
+    nestTimeline.resize(1600, 300);
+    QMouseEvent selectFirst(QEvent::MouseButtonPress, QPointF(230, 55),
+        Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+    QApplication::sendEvent(&nestTimeline, &selectFirst);
+    QMouseEvent selectSecond(QEvent::MouseButtonPress, QPointF(350, 96),
+        Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+    QApplication::sendEvent(&nestTimeline, &selectSecond);
+    assert(nestTimeline.nestSelectedClips("Intro Montage"));
+    QJsonArray nestedSaved = nestTimeline.toJson();
+    assert(nestedSaved.size() == 1);
+    assert(nestedSaved.first().toObject().value("nestedSequence").toBool());
+    assert(nestedSaved.first().toObject().value("nestedName").toString() == "Intro Montage");
+    assert(nestedSaved.first().toObject().value("nestedClips").toArray().size() == 2);
+    TimelineWidget nestedReloaded;
+    nestedReloaded.fromJson(nestedSaved);
+    assert(nestedReloaded.toJson() == nestedSaved);
+    assert(nestedReloaded.unnestSelectedClip());
+    assert(nestedReloaded.toJson().size() == 2);
+
     // Slip edits shift the source window while preserving timeline placement and duration.
     QJsonObject slipItem;
     slipItem.insert("id", 77);
