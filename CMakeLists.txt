@@ -18,6 +18,7 @@ qt_add_executable(kadris-studio WIN32
     src/timelinewidget.h
     src/frame_timebase.h
     src/project_media_paths.h
+    src/project_media_collection.h
     src/programmonitorwidget.cpp
     src/programmonitorwidget.h
 )
@@ -40,6 +41,11 @@ if(BUILD_TESTING)
     target_link_libraries(project-media-paths-tests PRIVATE Qt6::Widgets)
     add_test(NAME project-media-paths-tests COMMAND project-media-paths-tests)
 
+    add_executable(project-media-collection-tests tests/project_media_collection_tests.cpp)
+    target_include_directories(project-media-collection-tests PRIVATE src)
+    target_link_libraries(project-media-collection-tests PRIVATE Qt6::Widgets)
+    add_test(NAME project-media-collection-tests COMMAND project-media-collection-tests)
+
     add_executable(timeline-serialization-tests
         tests/timeline_serialization_tests.cpp
         src/timelinewidget.cpp
@@ -50,6 +56,7 @@ if(BUILD_TESTING)
     add_test(NAME timeline-serialization-tests COMMAND timeline-serialization-tests)
     set_tests_properties(timeline-serialization-tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     # Keep assert-based regression checks active even in Release CI builds.
+    target_compile_options(project-media-collection-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
     target_compile_options(project-media-paths-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
     target_compile_options(frame-timebase-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
     target_compile_options(timeline-serialization-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
