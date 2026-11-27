@@ -1092,6 +1092,28 @@ void MainWindow::buildMenus()
             statusBar()->showMessage("Clip removed and following unlocked clips rippled left", 3500);
     });
 
+    auto *nestAction = sequence->addAction("Nest Selected Clips...");
+    nestAction->setShortcut(QKeySequence("Ctrl+Shift+N"));
+    connect(nestAction, &QAction::triggered, this, [this]() {
+        bool accepted = false;
+        const QString name = QInputDialog::getText(
+            this, "Nest Clips", "Nested sequence name:", QLineEdit::Normal,
+            "Nested Sequence", &accepted);
+        if (!accepted) return;
+        if (!m_timeline->nestSelectedClips(name))
+            statusBar()->showMessage("Select at least two clips on unlocked tracks to nest", 4000);
+        else
+            statusBar()->showMessage("Nested sequence created. Its contents are preserved in the project.", 5000);
+    });
+    auto *unnestAction = sequence->addAction("Unnest Selected Sequence");
+    unnestAction->setShortcut(QKeySequence("Ctrl+Shift+U"));
+    connect(unnestAction, &QAction::triggered, this, [this]() {
+        if (!m_timeline->unnestSelectedClip())
+            statusBar()->showMessage("Select a nested sequence on an unlocked track to unnest", 4000);
+        else
+            statusBar()->showMessage("Nested sequence unpacked", 3500);
+    });
+
     auto *duplicateClipAction = sequence->addAction("Duplicate Selected Clip");
     duplicateClipAction->setShortcut(QKeySequence("Ctrl+D"));
     connect(duplicateClipAction, &QAction::triggered, this, [this]() {
