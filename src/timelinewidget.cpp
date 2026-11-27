@@ -1737,6 +1737,14 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
                 }
             }
         }
+        // Timeline markers are useful alignment targets when arranging clips.
+        for (const Marker &marker : m_markers) {
+            const qint64 distance = qAbs(marker.timeMs - movingTime);
+            if (distance <= snapToleranceMs && distance < bestDistance) {
+                bestDistance = distance;
+                bestTime = marker.timeMs;
+            }
+        }
         return bestTime;
     };
 
