@@ -69,6 +69,28 @@ int main()
     assert(!FfmpegExport::buildArguments(QJsonArray{effect}, 1280, 720, 25, 1,
                                          "render.mp4", &args, &error));
     assert(error.contains("effects not yet supported"));
+
+    QJsonObject nested{{"id", 10}, {"path", "nest://10"}, {"track", 0},
+        {"timelineStartMs", 3000}, {"durationMs", 3000}, {"durationKnown", true},
+        {"nestedSequence", true}, {"nestedName", "Intro"},
+        {"nestedClips", QJsonArray{
+            QJsonObject(video).insert("timelineStartMs", 250),
+            QJsonObject(audio).insert("timelineStartMs", 500)
+        }}};
+    assert(FfmpegExport::buildArguments(QJsonArray{nested}, 1920, 1080, 25, 1,
+                                        "nested-render.mp4", &args, &error));
+    const QString nestedGraph = args.join(" ");
+    assert(!nestedGraph.contains("nest://"));
+    assert(nestedGraph.contains("between(t,3.250000,5.250000)"));
+    assert(nestedGraph.contains("between(t,3.500000,4.500000)"));
+    assert(nestedGraph.contains("amix=inputs=1"));
+
+    QJsonObject unsupportedNested = nested;
+    unsupportedNested.insert("playbackRate", 2.0);
+    assert(!FfmpegExport::buildArguments(QJsonArray{unsupportedNested}, 1920, 1080, 25, 1,
+                                         "nested-render.mp4", &args, &error));
+    assert(error.contains("Nested sequence"));
+
     fixture.remove();
     return 0;
 }
