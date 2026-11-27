@@ -39,6 +39,47 @@ jobs:
         run: |
           cmake --install build --prefix package --config Release
           & "$env:QT_ROOT_DIR\bin\windeployqt.exe" --release "package\kadris-studio.exe"
+      - name: Capture actual application screenshot
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+          public static class KadrisWindow {
+            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+          }
+          "@
+          $appPath = Join-Path $PWD "package\kadris-studio.exe"
+          $app = Start-Process -FilePath $appPath -PassThru
+          Start-Sleep -Seconds 12
+          $app.Refresh()
+          if ($app.HasExited -or $app.MainWindowHandle -eq [IntPtr]::Zero) {
+            throw "KadrisStudio did not open a visible application window."
+          }
+          [void][KadrisWindow]::ShowWindow($app.MainWindowHandle, 3)
+          [void][KadrisWindow]::SetForegroundWindow($app.MainWindowHandle)
+          Start-Sleep -Seconds 2
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $screenshotPath = Join-Path $PWD "KadrisStudio-Screenshot.png"
+          $bitmap.Save($screenshotPath, [System.Drawing.Imaging.ImageFormat]::Png)
+          $graphics.Dispose()
+          $bitmap.Dispose()
+          Stop-Process -Id $app.Id -Force
+      - name: Upload actual application screenshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KadrisStudio-Actual-Screenshot
+          path: KadrisStudio-Screenshot.png
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
