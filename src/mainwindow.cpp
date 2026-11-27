@@ -1084,6 +1084,9 @@ void MainWindow::buildMenus()
     auto *importAction = media->addAction("&Import Media...");
     importAction->setShortcut(QKeySequence("Ctrl+I"));
     connect(importAction, &QAction::triggered, this, &MainWindow::importMedia);
+    auto *relinkAction = media->addAction("&Relink Selected Media...");
+    relinkAction->setShortcut(QKeySequence("Ctrl+Shift+R"));
+    connect(relinkAction, &QAction::triggered, this, &MainWindow::relinkSelectedMedia);
 
     auto *toolbar = addToolBar("Main");
     toolbar->setObjectName("mainToolbar");
@@ -1268,6 +1271,41 @@ void MainWindow::importMedia()
     for (const QString &path : paths) addMediaPath(path);
     if (!paths.isEmpty())
         statusBar()->showMessage(QString("Imported %1 media item(s)").arg(paths.size()), 5000);
+}
+
+void MainWindow::relinkSelectedMedia()
+{
+    QTreeWidgetItem *item = m_mediaList->currentItem();
+    if (!item) {
+        statusBar()->showMessage("Select a media item to relink first", 3500);
+        return;
+    }
+
+    const QString oldPath = item->data(0, Qt::UserRole).toString();
+    const QString selectedPath = QFileDialog::getOpenFileName(
+        this, "Relink Media", QFileInfo(oldPath).absolutePath(),
+        "Media Files (*.mp4 *.mov *.mkv *.avi *.webm *.m4v *.mp3 *.wav *.aac *.flac *.ogg *.png *.jpg *.jpeg *.tif *.tiff *.bmp);;All Files (*.*)");
+    if (selectedPath.isEmpty()) return;
+    if (!QFileInfo::exists(selectedPath)) {
+        QMessageBox::warning(this, "Relink Media", "The selected file does not exist.");
+        return;
+    }
+
+    if (m_sequencePlaying) stopSequencePlayback(false);
+    const int updatedClips = m_timeline->replaceMediaPath(oldPath, selectedPath);
+    for (int i = 0; i < m_mediaPaths.size(); ++i) {
+        if (m_mediaPaths.at(i) == oldPath) m_mediaPaths[i] = selectedPath;
+    }
+
+    const QFileInfo info(selectedPath);
+    item->setText(0, info.fileName());
+    item->setText(1, info.suffix().toUpper());
+    item->setData(0, Qt::UserRole, selectedPath);
+    item->setToolTip(0, selectedPath);
+
+    statusBar()->showMessage(
+        QString("Media relinked. Updated %1 timeline clip(s). Save the project to keep this change.")
+            .arg(updatedClips), 7000);
 }
 
 void MainWindow::addMediaPath(const QString &path)
