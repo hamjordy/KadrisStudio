@@ -223,13 +223,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                     m_audioSlotPeaks[slot] = 0.0f;
             }
             if (outputPeak >= 0.999f)
-                m_audioClipHoldMs[parentIndex] = 1500;
-            else
-                m_audioClipHoldMs[parentIndex] = qMax(0, m_audioClipHoldMs[parentIndex] - 50);
+                m_audioClipLatched[parentIndex] = true;
 
             if (outputPeak >= m_audioPeakHold[parentIndex])
                 m_audioPeakHold[parentIndex] = outputPeak;
-            else if (m_audioClipHoldMs[parentIndex] == 0)
+            else if (!m_audioClipLatched[parentIndex])
                 m_audioPeakHold[parentIndex] *= 0.94f;
 
             const float displayedPeak = qMax(outputPeak, m_audioPeakHold[parentIndex]);
@@ -240,7 +238,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                     QStringLiteral("PEAK %1").arg(peakToLabel(m_audioPeakHold[parentIndex])));
             if (m_audioClipIndicators[parentIndex])
                 m_audioClipIndicators[parentIndex]->setVisible(
-                    m_audioClipHoldMs[parentIndex] > 0);
+                    m_audioClipLatched[parentIndex]);
         }
     });
     m_audioMeterTimer->start();
@@ -945,13 +943,23 @@ void MainWindow::buildInterface()
 #if QT_VERSION < QT_VERSION_CHECK(6, 8, 0)
         peakLabel->setText("Qt 6.8+ required");
 #endif
-        auto *clipIndicator = new QLabel("CLIP", strip);
-        clipIndicator->setAlignment(Qt::AlignCenter);
+        auto *clipIndicator = new QPushButton("CLIP", strip);
+        clipIndicator->setObjectName("mixerClipResetButton");
+        clipIndicator->setToolTip("Clipping detected. Click to acknowledge and reset peak hold.");
         clipIndicator->setStyleSheet(
-            "QLabel { color: #ffffff; background: #c62828; font-weight: bold; "
-            "border-radius: 3px; padding: 1px 5px; }");
+            "QPushButton { color: #ffffff; background: #c62828; font-weight: bold; "
+            "border: 0; border-radius: 3px; padding: 1px 5px; }"
+            "QPushButton:hover { background: #e53935; }");
         clipIndicator->setVisible(false);
         m_audioClipIndicators[track] = clipIndicator;
+        connect(clipIndicator, &QPushButton::clicked, this, [this, track]() {
+            m_audioClipLatched[track] = false;
+            m_audioPeakHold[track] = 0.0f;
+            if (m_audioClipIndicators[track])
+                m_audioClipIndicators[track]->setVisible(false);
+            if (m_audioPeakLabels[track])
+                m_audioPeakLabels[track]->setText(QStringLiteral("PEAK -INF dBFS"));
+        });
         auto *peakMeter = new QProgressBar(strip);
         peakMeter->setRange(0, 1000);
         peakMeter->setValue(0);
