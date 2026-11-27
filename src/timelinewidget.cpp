@@ -491,6 +491,7 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->nestedSequence = clip.nestedSequence;
         result->nestedName = clip.nestedName;
         result->nestedClips = clip.nestedClips;
+        result->nestedTrackStates = clip.nestedTrackStates;
         result->brightness = clip.brightness; result->contrast = clip.contrast;
         result->saturation = clip.saturation; result->shadows = clip.shadows;
         result->midtones = clip.midtones; result->highlights = clip.highlights;
