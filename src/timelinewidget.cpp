@@ -1060,11 +1060,28 @@ int TimelineWidget::splitAllClipsAtPlayhead()
 bool TimelineWidget::deleteSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
-    if (isTrackLocked(m_clips.at(m_selectedClip).track)) return false;
 
-    m_clips.removeAt(m_selectedClip);
-    if (m_clips.isEmpty()) m_selectedClip = -1;
-    else m_selectedClip = qMin(m_selectedClip, m_clips.size() - 1);
+    if (m_selectedClipIds.size() > 1) {
+        // Treat a multi-delete as one operation: do not partially delete a
+        // selection that includes a clip on a locked track.
+        for (const Clip &clip : m_clips) {
+            if (m_selectedClipIds.contains(clip.id) && isTrackLocked(clip.track))
+                return false;
+        }
+        for (int i = m_clips.size() - 1; i >= 0; --i) {
+            if (m_selectedClipIds.contains(m_clips.at(i).id))
+                m_clips.removeAt(i);
+        }
+        m_selectedClip = -1;
+        m_selectedClipIds.clear();
+        m_dragGroupSnapshot.clear();
+    } else {
+        if (isTrackLocked(m_clips.at(m_selectedClip).track)) return false;
+        m_selectedClipIds.clear();
+        m_clips.removeAt(m_selectedClip);
+        if (m_clips.isEmpty()) m_selectedClip = -1;
+        else m_selectedClip = qMin(m_selectedClip, m_clips.size() - 1);
+    }
 
     updateCanvasSize();
     update();
