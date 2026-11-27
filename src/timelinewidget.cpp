@@ -1004,6 +1004,10 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
         clip.positionY = item.value("positionY").toInt(0);
         clip.opacity = item.value("opacity").toInt(100);
         clip.blendMode = item.value("blendMode").toInt(0);
+        clip.audioVolume = item.value("audioVolume").toInt(100);
+        clip.audioMuted = item.value("audioMuted").toBool(false);
+        clip.fadeInMs = item.value("fadeInMs").toInt(0);
+        clip.fadeOutMs = item.value("fadeOutMs").toInt(0);
         return clip;
     };
 
