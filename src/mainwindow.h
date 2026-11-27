@@ -129,4 +129,5 @@ private:
     QAudioOutput *m_audioOutput = nullptr;
     QProcess *m_exportProcess = nullptr;
     QProgressDialog *m_exportProgress = nullptr;
+    bool m_exportCancelled = false;
 };
