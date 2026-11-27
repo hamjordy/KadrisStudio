@@ -24,7 +24,7 @@ void ProgramMonitorWidget::setFrame(int track, const QImage &frame)
         return;
 
     m_frames[static_cast<size_t>(track)] = frame;
-    rebuildCorrectedFrames();
+    rebuildCorrectedFrame(track);
     update();
 }
 
@@ -99,7 +99,7 @@ void ProgramMonitorWidget::setTrackColorGrade(int track, int brightness, int con
         && grade.red == next.red && grade.green == next.green && grade.blue == next.blue)
         return;
     grade = next;
-    rebuildCorrectedFrames();
+    rebuildCorrectedFrame(track);
     update();
 }
 
@@ -141,15 +141,21 @@ void ProgramMonitorWidget::setTrackBlendMode(int track, int blendMode)
 
 void ProgramMonitorWidget::rebuildCorrectedFrames()
 {
-    for (size_t index = 0; index < m_frames.size(); ++index) {
-        if (m_frames[index].isNull()) {
-            m_correctedFrames[index] = QImage();
+    for (int track = 0; track < static_cast<int>(m_frames.size()); ++track)
+        rebuildCorrectedFrame(track);
+}
+
+void ProgramMonitorWidget::rebuildCorrectedFrame(int frameIndex)
+{
+    if (frameIndex < 0 || frameIndex >= static_cast<int>(m_frames.size())) return;
+        if (m_frames[static_cast<size_t>(frameIndex)].isNull()) {
+            m_correctedFrames[static_cast<size_t>(frameIndex)] = QImage();
             continue;
         }
-        const ColorGrade &grade = m_colorGrades[index];
+        const ColorGrade &grade = m_colorGrades[static_cast<size_t>(frameIndex)];
         const double contrastFactor = (259.0 * (grade.contrast + 255.0))
             / (255.0 * (259.0 - grade.contrast));
-        QImage image = m_frames[index].convertToFormat(QImage::Format_ARGB32);
+        QImage image = m_frames[static_cast<size_t>(frameIndex)].convertToFormat(QImage::Format_ARGB32);
         for (int y = 0; y < image.height(); ++y) {
             QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
             for (int x = 0; x < image.width(); ++x) {
@@ -188,10 +194,8 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
                 line[x] = qRgba(red, green, blue, qAlpha(pixel));
             }
         }
-        m_correctedFrames[index] = image;
-    }
+        m_correctedFrames[static_cast<size_t>(frameIndex)] = image;
 }
-
 void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
