@@ -4,6 +4,7 @@
 
 #include <QJsonArray>
 #include <QPoint>
+#include <QPointF>
 #include <QRect>
 #include <QSet>
 #include <QVector>
