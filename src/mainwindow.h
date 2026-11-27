@@ -100,11 +100,11 @@ private:
     std::array<int, 9> m_activeVideoClipIds{{-1, -1, -1, -1, -1, -1, -1, -1, -1}};
     std::array<bool, 9> m_waitingForVideoTrack{{false, false, false, false, false, false, false, false, false}};
     std::array<bool, 9> m_failedVideoTrack{{false, false, false, false, false, false, false, false, false}};
-    std::array<QMediaPlayer *, 2> m_audioTrackPlayers{};
-    std::array<QAudioOutput *, 2> m_audioTrackOutputs{};
-    std::array<int, 2> m_activeAudioClipIds{{-1, -1}};
-    std::array<bool, 2> m_waitingForAudioTrack{{false, false}};
-    std::array<bool, 2> m_failedAudioTrack{{false, false}};
+    std::array<QMediaPlayer *, 4> m_audioTrackPlayers{};
+    std::array<QAudioOutput *, 4> m_audioTrackOutputs{};
+    std::array<int, 4> m_activeAudioClipIds{{-1, -1, -1, -1}};
+    std::array<bool, 4> m_waitingForAudioTrack{{false, false, false, false}};
+    std::array<bool, 4> m_failedAudioTrack{{false, false, false, false}};
     std::array<QSlider *, 2> m_audioTrackFaders{};
     std::array<float, 2> m_audioTrackGains{{1.0f, 1.0f}};
     std::array<bool, 2> m_audioTrackMuted{{false, false}};
