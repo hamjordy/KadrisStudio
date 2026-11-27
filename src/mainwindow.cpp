@@ -2,6 +2,7 @@
 #include "timelinewidget.h"
 #include "programmonitorwidget.h"
 #include "frame_timebase.h"
+#include "project_media_paths.h"
 
 #include <QAction>
 #include <QCheckBox>
@@ -1368,9 +1369,7 @@ bool MainWindow::writeProject(const QString &path)
     const QDir projectDirectory = QFileInfo(path).absoluteDir();
     QJsonArray media;
     for (const QString &item : m_mediaPaths) {
-        const QString storedPath = QFileInfo(item).isAbsolute()
-            ? projectDirectory.relativeFilePath(item) : item;
-        media.append(QDir::fromNativeSeparators(storedPath));
+        media.append(ProjectMediaPaths::toStoredPath(path, item));
     }
 
     QJsonArray timelineClips = m_timeline->toJson();
@@ -1378,8 +1377,7 @@ bool MainWindow::writeProject(const QString &path)
         QJsonObject clip = timelineClips.at(i).toObject();
         const QString sourcePath = clip.value("path").toString();
         if (!sourcePath.isEmpty() && QFileInfo(sourcePath).isAbsolute()) {
-            clip.insert("path", QDir::fromNativeSeparators(
-                projectDirectory.relativeFilePath(sourcePath)));
+            clip.insert("path", ProjectMediaPaths::toStoredPath(path, sourcePath));
             timelineClips.replace(i, clip);
         }
     }
@@ -1435,9 +1433,7 @@ bool MainWindow::readProject(const QString &path)
     m_mediaList->clear();
     for (const QJsonValue &value : root.value("mediaFiles").toArray()) {
         const QString storedPath = value.toString();
-        const QString resolvedPath = QFileInfo(storedPath).isAbsolute()
-            ? storedPath : projectDirectory.absoluteFilePath(storedPath);
-        addMediaPath(QDir::cleanPath(resolvedPath));
+        addMediaPath(ProjectMediaPaths::resolveStoredPath(path, storedPath));
     }
 
     QJsonArray timelineClips = root.value("timelineClips").toArray();
@@ -1445,8 +1441,7 @@ bool MainWindow::readProject(const QString &path)
         QJsonObject clip = timelineClips.at(i).toObject();
         const QString storedPath = clip.value("path").toString();
         if (!storedPath.isEmpty() && !QFileInfo(storedPath).isAbsolute()) {
-            clip.insert("path", QDir::cleanPath(
-                projectDirectory.absoluteFilePath(storedPath)));
+            clip.insert("path", ProjectMediaPaths::resolveStoredPath(path, storedPath));
             timelineClips.replace(i, clip);
         }
     }
