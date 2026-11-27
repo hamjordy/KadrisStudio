@@ -61,6 +61,8 @@ private:
     bool writeProject(const QString &path);
     bool readProject(const QString &path);
     void updateWindowTitle();
+    QString untitledRecoveryPath() const;
+    void recoverUntitledProject();
     void updatePosition(qint64 position);
     void updateDuration(qint64 duration);
     QString formatTime(qint64 milliseconds) const;
