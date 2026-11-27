@@ -2585,7 +2585,7 @@ void MainWindow::syncAudioTracks()
 
 void MainWindow::handleAudioTrackStatus(int slot)
 {
-    if (slot < 0 || slot >= 4 || !m_sequencePlaying) return;
+    if (slot < 0 || slot >= 8 || !m_sequencePlaying) return;
     QMediaPlayer *player = m_audioTrackPlayers[slot];
     const QMediaPlayer::MediaStatus status = player->mediaStatus();
     if (status == QMediaPlayer::EndOfMedia && !m_waitingForAudioTrack[slot]) {
