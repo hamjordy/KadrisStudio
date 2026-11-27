@@ -39,7 +39,19 @@ int main()
     assert(args.join(" ").contains("amix=inputs=1"));
     assert(args.contains("[vout]"));
     assert(args.contains("[aout]"));
+    assert(args.contains("-crf"));
+    assert(args.contains("23"));
+    assert(args.contains("-preset"));
+    assert(args.contains("medium"));
     assert(args.last() == "render.mp4");
+
+    assert(FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
+                                        "render.mp4", &args, &error, 18, "slow"));
+    assert(args.contains("18"));
+    assert(args.contains("slow"));
+    assert(!FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
+                                         "render.mp4", &args, &error, 60, "slow"));
+    assert(error.contains("quality"));
 
     QJsonObject effect = video;
     effect.insert("opacity", 50);
