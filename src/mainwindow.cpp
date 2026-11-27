@@ -38,6 +38,7 @@
 #include <QPointer>
 #include <QRegularExpression>
 #include <QScrollArea>
+#include <QSettings>
 #include <QSlider>
 #include <QSignalBlocker>
 #include <QStatusBar>
@@ -2349,12 +2350,52 @@ void MainWindow::exportVideo()
         return;
     }
 
+    // Export profiles are stored per user and can be reused in later sessions.
+    QSettings settings;
+    const QString profileRoot = "ExportProfiles";
+    QStringList profileNames = {"Balanced (Full HD)", "Web (HD)", "Archive (4K)"};
+    settings.beginGroup(profileRoot);
+    const QStringList savedProfiles = settings.childGroups();
+    settings.endGroup();
+    for (const QString &name : savedProfiles)
+        if (!profileNames.contains(name)) profileNames << name;
+
+    bool accepted = false;
+    const QString selectedProfile = QInputDialog::getItem(
+        this, "Export Profiles", "Load an export profile:", profileNames, 0, false, &accepted);
+    if (!accepted) return;
+
+    int profileWidth = 1920;
+    int profileHeight = 1080;
+    int profileCrf = 23;
+    QString profilePreset = "medium";
+    int profileAudioBitrate = 192;
+    int profileAudioSampleRate = 48000;
+    if (selectedProfile == "Web (HD)") {
+        profileWidth = 1280; profileHeight = 720;
+        profileCrf = 26; profilePreset = "fast";
+        profileAudioBitrate = 128;
+    } else if (selectedProfile == "Archive (4K)") {
+        profileWidth = 3840; profileHeight = 2160;
+        profileCrf = 18; profilePreset = "slow";
+        profileAudioBitrate = 320;
+    } else if (savedProfiles.contains(selectedProfile)) {
+        settings.beginGroup(profileRoot + "/" + selectedProfile);
+        profileWidth = settings.value("width", 1920).toInt();
+        profileHeight = settings.value("height", 1080).toInt();
+        profileCrf = settings.value("crf", 23).toInt();
+        profilePreset = settings.value("preset", "medium").toString();
+        profileAudioBitrate = settings.value("audioBitrate", 192).toInt();
+        profileAudioSampleRate = settings.value("audioSampleRate", 48000).toInt();
+        settings.endGroup();
+    }
+
     const QStringList resolutions = {
         "1920 × 1080 (Full HD)", "1280 × 720 (HD)", "3840 × 2160 (4K)"
     };
-    bool accepted = false;
+    int resolutionIndex = profileWidth == 1280 ? 1 : (profileWidth == 3840 ? 2 : 0);
     const QString resolution = QInputDialog::getItem(
-        this, "Export Settings", "Resolution:", resolutions, 0, false, &accepted);
+        this, "Export Settings", "Resolution:", resolutions, resolutionIndex, false, &accepted);
     if (!accepted) return;
 
     int width = 1920;
@@ -2371,11 +2412,12 @@ void MainWindow::exportVideo()
         "Best quality (larger file)", "High quality (balanced)",
         "Smaller file (faster export)"
     };
+    const int qualityIndex = profileCrf <= 20 ? 0 : (profileCrf >= 27 ? 2 : 1);
     const QString quality = QInputDialog::getItem(
-        this, "Export Settings", "Encoding quality:", qualityOptions, 1, false, &accepted);
+        this, "Export Settings", "Encoding quality:", qualityOptions, qualityIndex, false, &accepted);
     if (!accepted) return;
-    int qualityCrf = 23;
-    QString encodingPreset = "medium";
+    int qualityCrf = profileCrf;
+    QString encodingPreset = profilePreset;
     if (quality.startsWith("Best")) {
         qualityCrf = 18;
         encodingPreset = "slow";
@@ -2387,16 +2429,37 @@ void MainWindow::exportVideo()
     const QStringList audioBitrateOptions = {
         "96 kbps", "128 kbps", "160 kbps", "192 kbps", "256 kbps", "320 kbps"
     };
+    const int bitrateIndex = audioBitrateOptions.indexOf(QString("%1 kbps").arg(profileAudioBitrate));
     const QString audioBitrate = QInputDialog::getItem(
-        this, "Export Audio Settings", "AAC audio bitrate:", audioBitrateOptions, 3, false, &accepted);
+        this, "Export Audio Settings", "AAC audio bitrate:", audioBitrateOptions,
+        qMax(0, bitrateIndex), false, &accepted);
     if (!accepted) return;
     const int audioBitrateKbps = audioBitrate.section(' ', 0, 0).toInt();
 
     const QStringList audioSampleRateOptions = {"44.1 kHz", "48 kHz"};
     const QString audioSampleRate = QInputDialog::getItem(
-        this, "Export Audio Settings", "Audio sample rate:", audioSampleRateOptions, 1, false, &accepted);
+        this, "Export Audio Settings", "Audio sample rate:", audioSampleRateOptions,
+        profileAudioSampleRate == 44100 ? 0 : 1, false, &accepted);
     if (!accepted) return;
     const int audioSampleRateHz = audioSampleRate.startsWith("44.1") ? 44100 : 48000;
+
+    const QString newProfileName = QInputDialog::getText(
+        this, "Save Export Profile", "Save these settings as a profile? Enter a name (leave blank to skip):");
+    if (!newProfileName.trimmed().isEmpty()) {
+        settings.beginGroup(profileRoot + "/" + newProfileName.trimmed());
+        settings.setValue("width", width);
+        settings.setValue("height", height);
+        settings.setValue("crf", qualityCrf);
+        settings.setValue("preset", encodingPreset);
+        settings.setValue("audioBitrate", audioBitrateKbps);
+        settings.setValue("audioSampleRate", audioSampleRateHz);
+        settings.endGroup();
+        settings.sync();
+        if (settings.status() != QSettings::NoError) {
+            QMessageBox::warning(this, "Export Profiles",
+                "The profile could not be saved to your user settings.");
+        }
+    }
 
     QString outputPath = QFileDialog::getSaveFileName(
         this, "Export Video", "KadrisStudio-Export.mp4",
