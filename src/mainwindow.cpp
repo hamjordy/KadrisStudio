@@ -1898,6 +1898,9 @@ void MainWindow::refreshPausedTimelinePreview()
         m_failedVideoTrack[track] = false;
         if (!QFileInfo::exists(clip.path)) {
             m_failedVideoTrack[track] = true;
+            statusBar()->showMessage(
+                QString("Missing media on VIDEO %1: %2")
+                    .arg(track + 1).arg(QFileInfo(clip.path).fileName()), 6000);
             continue;
         }
         m_waitingForVideoTrack[track] = true;
@@ -2086,6 +2089,14 @@ void MainWindow::handleVideoTrackStatus(int track)
                    || status == QMediaPlayer::EndOfMedia) {
             m_waitingForVideoTrack[track] = false;
             m_failedVideoTrack[track] = true;
+            TimelineWidget::ClipInfo clip;
+            const QString mediaName =
+                m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip)
+                    ? QFileInfo(clip.path).fileName()
+                    : QStringLiteral("unknown media");
+            statusBar()->showMessage(
+                QString("Could not load VIDEO %1: %2")
+                    .arg(track + 1).arg(mediaName), 6000);
         }
         return;
     }
