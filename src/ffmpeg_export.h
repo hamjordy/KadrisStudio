@@ -13,5 +13,6 @@ public:
                                int fpsNumerator, int fpsDenominator,
                                const QString &outputPath, QStringList *arguments,
                                QString *error = nullptr, int qualityCrf = 23,
-                               const QString &encodingPreset = "medium");
+                               const QString &encodingPreset = "medium",
+                               int audioBitrateKbps = 192, int audioSampleRate = 48000);
 };
