@@ -18,7 +18,8 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [ ] Crash/restart recovery regression tests and rotating project backups
 - [ ] Media metadata, searchable bins, and thumbnail generation
 - [ ] Drag-and-drop import
-- [ ] Collect/archive project media
+- [x] Collect referenced project media into a sibling `Media` folder with collision-safe names and missing-file checks
+- [ ] Create portable project archives
 - [x] Dedicated timeline serialization regression tests
 - [x] Atomic project-file saving to protect existing work during interrupted saves
 
