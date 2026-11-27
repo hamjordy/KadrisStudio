@@ -3,6 +3,7 @@
 #include <QJsonArray>
 #include <QPoint>
 #include <QRect>
+#include <QSet>
 #include <QVector>
 #include <QWidget>
 
@@ -167,4 +168,6 @@ private:
     DragMode m_dragMode = DragMode::None;
     QPoint m_dragOrigin;
     Clip m_dragSnapshot;
+    QSet<int> m_selectedClipIds;
+    QVector<Clip> m_dragGroupSnapshot;
 };
