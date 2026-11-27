@@ -236,7 +236,7 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
     }
 
     painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-    painter.setPen(QPen(QColor("#263b48"), 1));
+    painter.setPen(QPen(QColor("#65419b"), 1));
     painter.drawRect(rect().adjusted(0, 0, -1, -1));
 
     if (!drewFrame) {
@@ -244,7 +244,7 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
         heading.setPointSize(10);
         heading.setWeight(QFont::DemiBold);
         painter.setFont(heading);
-        painter.setPen(QColor("#93a4b1"));
+        painter.setPen(QColor("#c6a5f5"));
         painter.drawText(rect().adjusted(20, 20, -20, -20),
                          Qt::AlignCenter,
                          m_caption.isEmpty() ? QStringLiteral("KADRIS STUDIO") : m_caption);
@@ -262,8 +262,8 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
         painter.setFont(labelFont);
         const QString label = QString("VIDEO LAYERS  %1").arg(activeTracks.join("  "));
         const QRect labelRect(rect().left() + 16, rect().bottom() - 34, 210, 22);
-        painter.fillRect(labelRect.adjusted(-6, -2, 6, 2), QColor(4, 12, 18, 175));
-        painter.setPen(QColor(220, 232, 236, 190));
+        painter.fillRect(labelRect.adjusted(-6, -2, 6, 2), QColor(24, 16, 36, 205));
+        painter.setPen(QColor(234, 220, 255, 220));
         painter.drawText(labelRect, Qt::AlignVCenter | Qt::AlignLeft, label);
     }
 }
