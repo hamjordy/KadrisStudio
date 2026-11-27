@@ -1690,6 +1690,7 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
             else m_trackMuted[controlTrack] = !m_trackMuted[controlTrack];
             update();
             emit trackStateChanged(controlTrack);
+            emit timelineEdited();
             event->accept();
             return;
         }
