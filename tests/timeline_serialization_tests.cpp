@@ -1,6 +1,7 @@
 #include "timelinewidget.h"
 
 #include <QApplication>
+#include <QMouseEvent>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QFile>
@@ -192,6 +193,57 @@ int main(int argc, char **argv)
     assert(fastSplitAllTimeline.splitAllClipsAtPlayhead() == 1);
     const QJsonArray fastSplitAllClips = fastSplitAllTimeline.toJson();
     assert(fastSplitAllClips.at(1).toObject().value("sourceInMs").toInt() == 5000);
+
+    // Mouse-driven trim and roll edits must translate timeline movement
+    // into source movement using each clip's playback rate.
+    auto dragTimeline = [](TimelineWidget &widget, const QPoint &from,
+                           const QPoint &to, Qt::KeyboardModifiers modifiers) {
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(from), QPointF(from),
+            Qt::LeftButton, Qt::LeftButton, modifiers);
+        QApplication::sendEvent(&widget, &press);
+        QMouseEvent move(QEvent::MouseMove, QPointF(to), QPointF(to),
+            Qt::NoButton, Qt::LeftButton, modifiers);
+        QApplication::sendEvent(&widget, &move);
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(to), QPointF(to),
+            Qt::LeftButton, Qt::NoButton, modifiers);
+        QApplication::sendEvent(&widget, &release);
+    };
+
+    QJsonObject fastTrimLeftItem{{"id", 86}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 2000}, {"durationMs", 5000},
+        {"durationKnown", true}, {"sourceDurationMs", 16000}, {"playbackRate", 2.0}};
+    TimelineWidget fastTrimLeftTimeline;
+    fastTrimLeftTimeline.fromJson(QJsonArray{fastTrimLeftItem});
+    dragTimeline(fastTrimLeftTimeline, QPoint(144, 50), QPoint(224, 50), Qt::NoModifier);
+    const QJsonObject fastTrimLeft = fastTrimLeftTimeline.toJson().at(0).toObject();
+    assert(fastTrimLeft.value("timelineStartMs").toInt() == 1000);
+    assert(fastTrimLeft.value("sourceInMs").toInt() == 4000);
+    assert(fastTrimLeft.value("durationMs").toInt() == 4000);
+
+    QJsonObject fastTrimRightItem{{"id", 87}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 1000}, {"durationMs", 5000},
+        {"durationKnown", true}, {"sourceDurationMs", 16000}, {"playbackRate", 2.0}};
+    TimelineWidget fastTrimRightTimeline;
+    fastTrimRightTimeline.fromJson(QJsonArray{fastTrimRightItem});
+    dragTimeline(fastTrimRightTimeline, QPoint(540, 50), QPoint(620, 50), Qt::NoModifier);
+    const QJsonObject fastTrimRight = fastTrimRightTimeline.toJson().at(0).toObject();
+    assert(fastTrimRight.value("durationMs").toInt() == 6000);
+    assert(fastTrimRight.value("sourceInMs").toInt() == 1000);
+
+    QJsonObject fastRollOut{{"id", 88}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 0}, {"durationMs", 4000},
+        {"durationKnown", true}, {"sourceDurationMs", 12000}, {"playbackRate", 2.0}};
+    QJsonObject fastRollIn{{"id", 89}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 4000}, {"sourceInMs", 1000}, {"durationMs", 5000},
+        {"durationKnown", true}, {"sourceDurationMs", 12000}, {"playbackRate", 2.0}};
+    TimelineWidget fastRollTimeline;
+    fastRollTimeline.fromJson(QJsonArray{fastRollOut, fastRollIn});
+    dragTimeline(fastRollTimeline, QPoint(461, 50), QPoint(541, 50), Qt::AltModifier);
+    const QJsonArray fastRollClips = fastRollTimeline.toJson();
+    assert(fastRollClips.at(0).toObject().value("durationMs").toInt() == 5000);
+    assert(fastRollClips.at(1).toObject().value("timelineStartMs").toInt() == 5000);
+    assert(fastRollClips.at(1).toObject().value("sourceInMs").toInt() == 3000);
+    assert(fastRollClips.at(1).toObject().value("durationMs").toInt() == 4000);
 
     return 0;
 }
