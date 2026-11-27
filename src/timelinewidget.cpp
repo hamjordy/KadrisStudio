@@ -941,7 +941,10 @@ bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *r
     std::function<bool(const QJsonArray &, qint64, int, int, ClipInfo *)> resolveNested;
     resolveNested = [&](const QJsonArray &children, qint64 localPosition,
                          qint64 absoluteOffset, int parentTrack, ClipInfo *resolved) {
-        for (const QJsonValue &value : children) {
+        // Resolve the topmost/later child first when nested tracks overlap.
+        // This keeps the preview deterministic and lets upper layers cover lower ones.
+        for (int childIndex = children.size() - 1; childIndex >= 0; --childIndex) {
+            const QJsonValue value = children.at(childIndex);
             if (!value.isObject()) continue;
             const QJsonObject item = value.toObject();
             const qint64 start = static_cast<qint64>(item.value("timelineStartMs").toDouble());
