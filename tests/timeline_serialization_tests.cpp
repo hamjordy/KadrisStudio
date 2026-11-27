@@ -114,10 +114,11 @@ int main(int argc, char **argv)
     TimelineWidget previewNested;
     previewNested.fromJson(nestedSaved);
     TimelineWidget::ClipInfo nestedPreviewClip;
-    assert(previewNested.clipAtTimeOnTrack(1200, 0, &nestedPreviewClip));
+    const int nestedParentTrack = nestedSaved.first().toObject().value("track").toInt();
+    assert(previewNested.clipAtTimeOnTrack(1200, nestedParentTrack, &nestedPreviewClip));
     assert(nestedPreviewClip.path == "clip-a.mp4");
     assert(nestedPreviewClip.timelineStartMs == 1000);
-    assert(previewNested.clipAtTimeOnTrack(3000, 0, &nestedPreviewClip));
+    assert(previewNested.clipAtTimeOnTrack(3000, nestedParentTrack, &nestedPreviewClip));
     assert(nestedPreviewClip.path == "clip-b.mp4");
     assert(nestedPreviewClip.timelineStartMs == 2500);
 
