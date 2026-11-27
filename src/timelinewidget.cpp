@@ -1741,7 +1741,7 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                     m_dragGroupSnapshot.append(candidate);
             }
 
-            if (!removingFromSelection || m_selectedClipIds.size() == 1) {
+            if (!removingFromSelection) {
                 const QRect bounds = clipRect(activeIndex);
                 const bool groupMove = m_selectedClipIds.size() > 1
                     && pos.x() - bounds.left() > kTrimHandleWidth
