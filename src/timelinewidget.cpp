@@ -1144,25 +1144,46 @@ bool TimelineWidget::duplicateSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
 
-    const Clip original = m_clips.at(m_selectedClip);
-    if (isTrackLocked(original.track)) return false;
+    QSet<int> ids = m_selectedClipIds;
+    if (ids.isEmpty()) ids.insert(m_clips.at(m_selectedClip).id);
 
-    Clip duplicate = original;
-    duplicate.id = m_nextClipId++;
-    duplicate.timelineStartMs = kTimelineTimebase.snapMilliseconds(
-        original.timelineStartMs + original.durationMs);
-    duplicate.sourceInMs = original.sourceInMs;
-    duplicate.durationKnown = original.durationKnown;
+    QVector<Clip> originals;
+    qint64 groupStart = std::numeric_limits<qint64>::max();
+    qint64 groupEnd = 0;
+    for (const Clip &clip : m_clips) {
+        if (!ids.contains(clip.id)) continue;
+        if (isTrackLocked(clip.track)) return false;
+        originals.append(clip);
+        groupStart = qMin(groupStart, clip.timelineStartMs);
+        groupEnd = qMax(groupEnd, clip.timelineStartMs + clip.durationMs);
+    }
+    if (originals.isEmpty()) return false;
 
-    m_clips.append(duplicate);
+    const qint64 offset = kTimelineTimebase.snapMilliseconds(groupEnd - groupStart);
+    QVector<Clip> duplicates;
+    duplicates.reserve(originals.size());
+    for (const Clip &original : originals) {
+        Clip duplicate = original;
+        duplicate.id = m_nextClipId++;
+        duplicate.timelineStartMs = kTimelineTimebase.snapMilliseconds(
+            original.timelineStartMs + offset);
+        duplicates.append(duplicate);
+    }
+
+    m_selectedClipIds.clear();
+    for (const Clip &duplicate : duplicates) {
+        m_clips.append(duplicate);
+        m_selectedClipIds.insert(duplicate.id);
+    }
     m_selectedClip = m_clips.size() - 1;
-    m_playheadMs = duplicate.timelineStartMs;
+    const Clip &lastDuplicate = m_clips.at(m_selectedClip);
+    m_playheadMs = lastDuplicate.timelineStartMs;
 
     updateCanvasSize();
     update();
     emit playheadChanged(m_playheadMs);
-    emit clipActivated(duplicate.path);
-    emit clipSelectionChanged(duplicate.id, duplicate.path, duplicate.track);
+    emit clipActivated(lastDuplicate.path);
+    emit clipSelectionChanged(lastDuplicate.id, lastDuplicate.path, lastDuplicate.track);
     emit timelineEdited();
     return true;
 }
