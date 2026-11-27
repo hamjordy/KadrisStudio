@@ -1985,8 +1985,8 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
         const QRect lockRect(65, y + 6, 18, 22);
         const QRect syncRect(84, y + 6, 18, 22);
         const QRect muteRect(103, y + 6, 18, 22);
-        p.setPen(QPen(m_trackTargeted[track] ? QColor("#79c8ff") : QColor("#596875"), 1));
-        p.setBrush(m_trackTargeted[track] ? QColor("#24445a") : QColor("#202a34"));
+        p.setPen(QPen(m_trackTargeted[track] ? QColor("#c6a5f5") : QColor("#596875"), 1));
+        p.setBrush(m_trackTargeted[track] ? QColor("#49305f") : QColor("#202a34"));
         p.drawRoundedRect(targetRect, 3, 3);
         p.setPen(m_trackTargeted[track] ? QColor("#ffffff") : QColor("#aab7c2"));
         p.drawText(targetRect, Qt::AlignCenter, m_trackTargeted[track] ? "T" : "t");
@@ -2015,10 +2015,10 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
         const bool audio = clip.track >= 3;
         const QColor fill = audio
             ? (selected ? QColor("#6a512b") : QColor("#47391f"))
-            : (selected ? QColor("#146f76") : QColor("#174b55"));
-        const QColor outline = audio ? QColor("#d7ad62") : QColor("#2c9b9b");
+            : (selected ? QColor("#65419b") : QColor("#35264d"));
+        const QColor outline = audio ? QColor("#d7ad62") : QColor("#a77be8");
 
-        p.setPen(QPen(selected ? QColor("#fff0b5") : outline, selected ? 2 : 1));
+        p.setPen(QPen(selected ? QColor("#eadcff") : outline, selected ? 2 : 1));
         p.setBrush(fill);
         p.drawRoundedRect(bounds, 4, 4);
         p.fillRect(QRect(bounds.left() + 2, bounds.top() + 3, 3,
@@ -2063,7 +2063,7 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
                 qMax(0, bounds.width() - 8));
             const int centerY = bounds.top() + 25;
             const int amplitude = qMax(2, (bounds.height() - 22) / 2);
-            p.setPen(QPen(QColor("#fff0b5"), 2, Qt::DashLine));
+            p.setPen(QPen(QColor("#eadcff"), 2, Qt::DashLine));
             if (fadeInWidth > 0) {
                 p.drawLine(bounds.left() + 4, centerY + amplitude,
                            bounds.left() + 4 + fadeInWidth, centerY);
