@@ -1228,7 +1228,7 @@ bool TimelineWidget::slideClip(int clipId, qint64 deltaMs)
     const Clip next = m_clips.at(nextIndex);
     if (isTrackLocked(previous.track) || isTrackLocked(next.track)) return false;
 
-    const qint64 minimumDelta = qMax({
+    const qint64 minimumDelta = std::max({
         -selected.timelineStartMs,
         kMinimumClipDurationMs - previous.durationMs,
         -next.sourceInMs
