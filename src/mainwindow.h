@@ -113,6 +113,9 @@ private:
 #endif
     std::array<QProgressBar *, 2> m_audioPeakMeters{};
     std::array<QLabel *, 2> m_audioPeakLabels{};
+    std::array<QLabel *, 2> m_audioClipIndicators{};
+    std::array<float, 2> m_audioPeakHold{};
+    std::array<int, 2> m_audioClipHoldMs{};
     QTimer *m_audioMeterTimer = nullptr;
     std::array<int, 8> m_activeAudioClipIds{{-1, -1, -1, -1, -1, -1, -1, -1}};
     std::array<bool, 8> m_waitingForAudioTrack{{false, false, false, false, false, false, false, false}};
