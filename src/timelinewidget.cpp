@@ -2176,23 +2176,30 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         if (previousIndex < 0 || nextIndex < 0
             || isTrackLocked(m_slidePreviousSnapshot.track)
             || isTrackLocked(m_slideNextSnapshot.track)) return;
+        if (!m_slidePreviousSnapshot.durationKnown
+            || m_slidePreviousSnapshot.sourceDurationMs <= 0
+            || m_slidePreviousSnapshot.playbackRate <= 0.0
+            || m_slideNextSnapshot.playbackRate <= 0.0) return;
         const qint64 minimumDelta = std::max({
             -m_dragSnapshot.timelineStartMs,
             kMinimumClipDurationMs - m_slidePreviousSnapshot.durationMs,
-            -m_slideNextSnapshot.sourceInMs
+            -qFloor(static_cast<double>(m_slideNextSnapshot.sourceInMs)
+                    / m_slideNextSnapshot.playbackRate)
         });
         qint64 maximumDelta = m_slideNextSnapshot.durationMs - kMinimumClipDurationMs;
-        if (!m_slidePreviousSnapshot.durationKnown
-            || m_slidePreviousSnapshot.sourceDurationMs <= 0) return;
-        maximumDelta = qMin(maximumDelta,
-            m_slidePreviousSnapshot.sourceDurationMs
-                - m_slidePreviousSnapshot.sourceInMs
-                - m_slidePreviousSnapshot.durationMs);
+        const qint64 previousSourceRemaining = m_slidePreviousSnapshot.sourceDurationMs
+            - m_slidePreviousSnapshot.sourceInMs
+            - qRound64(m_slidePreviousSnapshot.durationMs
+                       * m_slidePreviousSnapshot.playbackRate);
+        maximumDelta = qMin(maximumDelta, qFloor(
+            static_cast<double>(previousSourceRemaining)
+            / m_slidePreviousSnapshot.playbackRate));
         const qint64 safeDelta = qBound(minimumDelta, deltaMs, maximumDelta);
         m_clips[previousIndex].durationMs = m_slidePreviousSnapshot.durationMs + safeDelta;
         clip.timelineStartMs = m_dragSnapshot.timelineStartMs + safeDelta;
         m_clips[nextIndex].timelineStartMs = m_slideNextSnapshot.timelineStartMs + safeDelta;
-        m_clips[nextIndex].sourceInMs = m_slideNextSnapshot.sourceInMs + safeDelta;
+        m_clips[nextIndex].sourceInMs = m_slideNextSnapshot.sourceInMs
+            + qRound64(safeDelta * m_slideNextSnapshot.playbackRate);
         m_clips[nextIndex].durationMs = m_slideNextSnapshot.durationMs - safeDelta;
     } else if (m_dragMode == DragMode::Slip) {
         if (!m_dragSnapshot.durationKnown || m_dragSnapshot.sourceDurationMs <= 0) return;
