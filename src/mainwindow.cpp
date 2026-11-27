@@ -1902,15 +1902,17 @@ void MainWindow::refreshPausedTimelinePreview()
             continue;
         }
 
-        const int animatedBrightness = m_timeline->evaluatedBrightness(
-            clip.id, m_sequencePositionMs);
-        const int animatedContrast = m_timeline->evaluatedContrast(
-            clip.id, m_sequencePositionMs);
-        int animatedScale = 100, animatedX = 0, animatedY = 0;
-        m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
-            &animatedScale, &animatedX, &animatedY);
+        const int animatedBrightness = clip.nestedContent ? clip.brightness
+            : m_timeline->evaluatedBrightness(clip.id, m_sequencePositionMs);
+        const int animatedContrast = clip.nestedContent ? clip.contrast
+            : m_timeline->evaluatedContrast(clip.id, m_sequencePositionMs);
+        int animatedScale = clip.scale, animatedX = clip.positionX, animatedY = clip.positionY;
+        if (!clip.nestedContent)
+            m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
+                &animatedScale, &animatedX, &animatedY);
         m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
-        m_monitor->setTrackOpacity(track, m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+        m_monitor->setTrackOpacity(track, clip.nestedContent ? clip.opacity
+            : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
         m_monitor->setTrackBlendMode(track, clip.blendMode);
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
@@ -2038,15 +2040,17 @@ void MainWindow::syncVideoTracks()
             continue;
         }
 
-        const int animatedBrightness = m_timeline->evaluatedBrightness(
-            clip.id, m_sequencePositionMs);
-        const int animatedContrast = m_timeline->evaluatedContrast(
-            clip.id, m_sequencePositionMs);
-        int animatedScale = 100, animatedX = 0, animatedY = 0;
-        m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
-            &animatedScale, &animatedX, &animatedY);
+        const int animatedBrightness = clip.nestedContent ? clip.brightness
+            : m_timeline->evaluatedBrightness(clip.id, m_sequencePositionMs);
+        const int animatedContrast = clip.nestedContent ? clip.contrast
+            : m_timeline->evaluatedContrast(clip.id, m_sequencePositionMs);
+        int animatedScale = clip.scale, animatedX = clip.positionX, animatedY = clip.positionY;
+        if (!clip.nestedContent)
+            m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
+                &animatedScale, &animatedX, &animatedY);
         m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
-        m_monitor->setTrackOpacity(track, m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+        m_monitor->setTrackOpacity(track, clip.nestedContent ? clip.opacity
+            : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
         m_monitor->setTrackBlendMode(track, clip.blendMode);
         m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
