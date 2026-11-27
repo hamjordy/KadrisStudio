@@ -599,6 +599,48 @@ void MainWindow::buildInterface()
     addCurveSlider("Green", greenCurve);
     addCurveSlider("Blue", blueCurve);
 
+    auto *lookHeading = new QLabel("CREATIVE LOOK PRESETS");
+    lookHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(lookHeading);
+    auto *lookPresetCombo = new QComboBox();
+    lookPresetCombo->setObjectName("creativeLookPreset");
+    lookPresetCombo->addItems({"Custom", "Warm Cinematic", "Cool Cinematic",
+                               "High Contrast", "Monochrome"});
+    lookPresetCombo->setToolTip("Apply a starting color look. Fine-tune any control afterwards.");
+    connect(lookPresetCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+        [brightnessSlider, contrastSlider, saturationSlider, shadowWheel, midtoneWheel,
+         highlightWheel, redCurve, greenCurve, blueCurve](int preset) {
+            switch (preset) {
+            case 1: // Warm cinematic
+                brightnessSlider->setValue(2); contrastSlider->setValue(18);
+                saturationSlider->setValue(112); shadowWheel->setValue(-8);
+                midtoneWheel->setValue(12); highlightWheel->setValue(20);
+                redCurve->setValue(10); greenCurve->setValue(0); blueCurve->setValue(-8);
+                break;
+            case 2: // Cool cinematic
+                brightnessSlider->setValue(0); contrastSlider->setValue(20);
+                saturationSlider->setValue(108); shadowWheel->setValue(-12);
+                midtoneWheel->setValue(-5); highlightWheel->setValue(-18);
+                redCurve->setValue(-8); greenCurve->setValue(0); blueCurve->setValue(12);
+                break;
+            case 3: // High contrast
+                brightnessSlider->setValue(-2); contrastSlider->setValue(38);
+                saturationSlider->setValue(112); shadowWheel->setValue(0);
+                midtoneWheel->setValue(0); highlightWheel->setValue(0);
+                redCurve->setValue(8); greenCurve->setValue(0); blueCurve->setValue(4);
+                break;
+            case 4: // Monochrome
+                brightnessSlider->setValue(0); contrastSlider->setValue(22);
+                saturationSlider->setValue(0); shadowWheel->setValue(0);
+                midtoneWheel->setValue(0); highlightWheel->setValue(0);
+                redCurve->setValue(0); greenCurve->setValue(0); blueCurve->setValue(0);
+                break;
+            default:
+                return;
+            }
+        });
+    inspectorLayout->addWidget(lookPresetCombo);
+
     auto *resetColor = new QPushButton("Reset Color Correction");
     connect(resetColor, &QPushButton::clicked, this,
         [brightnessSlider, contrastSlider, saturationSlider, shadowWheel, midtoneWheel, highlightWheel, redCurve, greenCurve, blueCurve]() {
