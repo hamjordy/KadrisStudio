@@ -4,6 +4,7 @@
 #include "frame_timebase.h"
 #include "project_media_paths.h"
 #include "project_media_collection.h"
+#include "ffmpeg_export.h"
 
 #include <QAction>
 #include <QCheckBox>
@@ -32,6 +33,9 @@
 #include <QKeySequence>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QProcess>
+#include <QProgressDialog>
+#include <QPointer>
 #include <QScrollArea>
 #include <QSlider>
 #include <QSignalBlocker>
@@ -997,6 +1001,11 @@ void MainWindow::buildMenus()
     connect(saveAsAction, &QAction::triggered, this, &MainWindow::saveProjectAs);
     auto *recoveryAction = file->addAction("Recovery Center...");
     connect(recoveryAction, &QAction::triggered, this, &MainWindow::openRecoveryCenter);
+    file->addSeparator();
+    auto *exportAction = file->addAction("Export Video...");
+    exportAction->setShortcut(QKeySequence("Ctrl+Shift+E"));
+    exportAction->setStatusTip("Render the current timeline to an MP4 video");
+    connect(exportAction, &QAction::triggered, this, &MainWindow::exportVideo);
     file->addSeparator();
     auto *exitAction = file->addAction("E&xit");
     exitAction->setShortcut(QKeySequence::Quit);
