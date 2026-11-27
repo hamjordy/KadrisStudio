@@ -2018,8 +2018,8 @@ void MainWindow::toggleSequencePlayback()
         m_sequencePlaying = false;
         m_sequenceTimer->stop();
         m_sequenceClock.invalidate();
-        for (int track = 0; track < 3; ++track)
-            m_videoTrackPlayers[track]->pause();
+        for (int slot = 0; slot < 9; ++slot)
+            m_videoTrackPlayers[slot]->pause();
         for (int track = 0; track < 2; ++track)
             m_audioTrackPlayers[track]->pause();
         m_sequenceButton->setText("Play Timeline");
@@ -2078,12 +2078,12 @@ void MainWindow::stopSequencePlayback(bool resetToStart)
     if (m_sequenceTimer) m_sequenceTimer->stop();
     m_sequenceClock.invalidate();
 
-    for (int track = 0; track < 3; ++track) {
-        m_videoTrackPlayers[track]->stop();
-        m_videoTrackPlayers[track]->setSource(QUrl());
-        m_activeVideoClipIds[track] = -1;
-        m_waitingForVideoTrack[track] = false;
-        m_failedVideoTrack[track] = false;
+    for (int slot = 0; slot < 9; ++slot) {
+        m_videoTrackPlayers[slot]->stop();
+        m_videoTrackPlayers[slot]->setSource(QUrl());
+        m_activeVideoClipIds[slot] = -1;
+        m_waitingForVideoTrack[slot] = false;
+        m_failedVideoTrack[slot] = false;
     }
     for (int track = 0; track < 2; ++track) {
         m_audioTrackPlayers[track]->stop();
