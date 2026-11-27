@@ -109,7 +109,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
             });
     }
 
-    for (int track = 0; track < 2; ++track) {
+    for (int track = 0; track < 4; ++track) {
         m_audioTrackPlayers[track] = new QMediaPlayer(this);
         m_audioTrackOutputs[track] = new QAudioOutput(this);
         m_audioTrackOutputs[track]->setVolume(1.0f);
@@ -243,7 +243,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                     m_failedVideoTrack[slot] = false;
                     m_monitor->clearFrame(slot);
                 }
-                for (int track = 0; track < 2; ++track) {
+                for (int track = 0; track < 4; ++track) {
                     m_audioTrackPlayers[track]->stop();
                     m_audioTrackPlayers[track]->setSource(QUrl());
                     m_activeAudioClipIds[track] = -1;
@@ -2050,7 +2050,7 @@ void MainWindow::toggleSequencePlayback()
         m_waitingForVideoTrack[slot] = false;
         m_failedVideoTrack[slot] = false;
     }
-    for (int track = 0; track < 2; ++track) {
+    for (int track = 0; track < 4; ++track) {
         m_audioTrackPlayers[track]->stop();
         m_audioTrackPlayers[track]->setSource(QUrl());
         m_activeAudioClipIds[track] = -1;
@@ -2208,7 +2208,7 @@ void MainWindow::refreshPausedTimelinePreview()
         }
     }
 
-    for (int track = 0; track < 2; ++track) {
+    for (int track = 0; track < 4; ++track) {
         m_audioTrackPlayers[track]->pause();
         m_activeAudioClipIds[track] = -1;
         m_waitingForAudioTrack[track] = false;
@@ -2393,149 +2393,137 @@ void MainWindow::handleVideoTrackStatus(int slot)
 void MainWindow::applyAudioMixerState()
 {
     const bool anySolo = m_audioTrackSolo[0] || m_audioTrackSolo[1];
-
-    for (int track = 0; track < 2; ++track) {
-        QAudioOutput *output = m_audioTrackOutputs[track];
+    constexpr int firstAudioTrack = 3;
+    for (int slot = 0; slot < 4; ++slot) {
+        const int parentIndex = slot / 2;
+        const int childLayer = slot % 2;
+        QAudioOutput *output = m_audioTrackOutputs[slot];
         if (!output) continue;
-
-        const bool mutedBySolo = anySolo && !m_audioTrackSolo[track];
+        const bool mutedBySolo = anySolo && !m_audioTrackSolo[parentIndex];
         float clipGain = 1.0f;
         bool clipMuted = false;
-        TimelineWidget::ClipInfo clip;
-        if (m_timeline && m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track + 3, &clip)) {
-            clipGain = m_timeline->evaluatedAudioVolume(clip.id, m_sequencePositionMs) / 100.0f;
-            clipMuted = clip.audioMuted;
-            const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs);
-            if (clip.fadeInMs > 0 && localMs < clip.fadeInMs)
-                clipGain *= static_cast<float>(localMs) / clip.fadeInMs;
-            const qint64 remainingMs = qMax<qint64>(0, clip.durationMs - localMs);
-            if (clip.fadeOutMs > 0 && remainingMs < clip.fadeOutMs)
-                clipGain *= static_cast<float>(remainingMs) / clip.fadeOutMs;
+        const auto clips = m_timeline
+            ? m_timeline->clipsAtTimeOnTrack(m_sequencePositionMs, firstAudioTrack + parentIndex)
+            : QVector<TimelineWidget::ClipInfo>();
+        for (const auto &candidate : clips) {
+            const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack - 3;
+            if (candidateLayer != childLayer) continue;
+            clipGain = m_timeline->evaluatedAudioVolume(candidate.id, m_sequencePositionMs) / 100.0f;
+            clipMuted = candidate.audioMuted;
+            const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - candidate.timelineStartMs);
+            if (candidate.fadeInMs > 0 && localMs < candidate.fadeInMs)
+                clipGain *= static_cast<float>(localMs) / candidate.fadeInMs;
+            const qint64 remainingMs = qMax<qint64>(0, candidate.durationMs - localMs);
+            if (candidate.fadeOutMs > 0 && remainingMs < candidate.fadeOutMs)
+                clipGain *= static_cast<float>(remainingMs) / candidate.fadeOutMs;
+            break;
         }
         output->setVolume(qBound(0.0f,
-            m_audioTrackGains[track] * m_masterGain * clipGain, 1.0f));
-        output->setMuted(m_audioTrackMuted[track] || mutedBySolo
-            || clipMuted || (m_timeline && m_timeline->isTrackMuted(track + 3)));
+            m_audioTrackGains[parentIndex] * m_masterGain * clipGain, 1.0f));
+        output->setMuted(m_audioTrackMuted[parentIndex] || mutedBySolo
+            || clipMuted || (m_timeline && m_timeline->isTrackMuted(firstAudioTrack + parentIndex)));
     }
 }
 
 void MainWindow::syncAudioTracks()
 {
     if (!m_sequencePlaying) return;
-
-    constexpr int firstAudioTrack = 3; // Timeline track 4 is AUDIO 1.
-    for (int audioTrack = 0; audioTrack < 2; ++audioTrack) {
-        const int timelineTrack = firstAudioTrack + audioTrack;
-        QMediaPlayer *player = m_audioTrackPlayers[audioTrack];
-
-        TimelineWidget::ClipInfo clip;
-        const bool hasClip = m_timeline->clipAtTimeOnTrack(
-            m_sequencePositionMs, timelineTrack, &clip);
-
-        if (!hasClip) {
-            if (m_activeAudioClipIds[audioTrack] != -1) {
-                player->stop();
-                player->setSource(QUrl());
-                m_activeAudioClipIds[audioTrack] = -1;
-                m_waitingForAudioTrack[audioTrack] = false;
-                m_failedAudioTrack[audioTrack] = false;
+    constexpr int firstAudioTrack = 3;
+    for (int parentIndex = 0; parentIndex < 2; ++parentIndex) {
+        const int timelineTrack = firstAudioTrack + parentIndex;
+        const auto clips = m_timeline->isTrackMuted(timelineTrack)
+            ? QVector<TimelineWidget::ClipInfo>()
+            : m_timeline->clipsAtTimeOnTrack(m_sequencePositionMs, timelineTrack);
+        for (int childLayer = 0; childLayer < 2; ++childLayer) {
+            const int slot = parentIndex * 2 + childLayer;
+            QMediaPlayer *player = m_audioTrackPlayers[slot];
+            TimelineWidget::ClipInfo clip;
+            bool found = false;
+            for (const auto &candidate : clips) {
+                const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack - 3;
+                if (candidateLayer == childLayer) { clip = candidate; found = true; }
             }
-            continue;
-        }
-
-        const qint64 sourcePosition =
-            clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
-
-        if (clip.id == m_activeAudioClipIds[audioTrack]) {
-            player->setPlaybackRate(clip.playbackRate);
-            if (m_waitingForAudioTrack[audioTrack]) {
-                handleAudioTrackStatus(audioTrack);
+            if (!found) {
+                if (m_activeAudioClipIds[slot] != -1) {
+                    player->stop(); player->setSource(QUrl());
+                }
+                m_activeAudioClipIds[slot] = -1;
+                m_waitingForAudioTrack[slot] = false;
+                m_failedAudioTrack[slot] = false;
                 continue;
             }
-            if (m_failedAudioTrack[audioTrack]) continue;
-
-            if (player->duration() > 0 && sourcePosition >= player->duration()) {
-                player->stop();
-                m_failedAudioTrack[audioTrack] = true;
-                continue;
-            }
-
-            if (player->playbackState() == QMediaPlayer::PlayingState) {
-                // Correct noticeable decoder drift without constantly seeking.
-                if (qAbs(player->position() - sourcePosition) > 300)
-                    player->setPosition(sourcePosition);
-            } else {
+            const qint64 sourcePosition = clip.sourceInMs
+                + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
+            if (clip.id == m_activeAudioClipIds[slot]) {
                 player->setPlaybackRate(clip.playbackRate);
-            player->setPosition(qMax<qint64>(0, sourcePosition));
-                player->play();
+                if (m_waitingForAudioTrack[slot]) { handleAudioTrackStatus(slot); continue; }
+                if (m_failedAudioTrack[slot]) continue;
+                if (player->duration() > 0 && sourcePosition >= player->duration()) {
+                    player->stop(); m_failedAudioTrack[slot] = true; continue;
+                }
+                if (player->playbackState() == QMediaPlayer::PlayingState) {
+                    if (qAbs(player->position() - sourcePosition) > 300)
+                        player->setPosition(sourcePosition);
+                } else {
+                    player->setPosition(qMax<qint64>(0, sourcePosition));
+                    player->play();
+                }
+                continue;
             }
-            continue;
+            player->stop();
+            m_activeAudioClipIds[slot] = clip.id;
+            m_waitingForAudioTrack[slot] = false;
+            m_failedAudioTrack[slot] = false;
+            if (!QFileInfo::exists(clip.path)) {
+                m_failedAudioTrack[slot] = true;
+                statusBar()->showMessage(QString("Missing media on AUDIO %1: %2")
+                    .arg(parentIndex + 1).arg(QFileInfo(clip.path).fileName()), 6000);
+                continue;
+            }
+            m_waitingForAudioTrack[slot] = true;
+            player->setSource(QUrl::fromLocalFile(clip.path));
+            handleAudioTrackStatus(slot);
         }
-
-        player->stop();
-        m_activeAudioClipIds[audioTrack] = clip.id;
-        m_waitingForAudioTrack[audioTrack] = false;
-        m_failedAudioTrack[audioTrack] = false;
-
-        if (!QFileInfo::exists(clip.path)) {
-            m_failedAudioTrack[audioTrack] = true;
-            statusBar()->showMessage(
-                QString("Missing media on AUDIO %1: %2")
-                    .arg(audioTrack + 1).arg(QFileInfo(clip.path).fileName()), 6000);
-            continue;
-        }
-
-        m_waitingForAudioTrack[audioTrack] = true;
-        player->setSource(QUrl::fromLocalFile(clip.path));
-        handleAudioTrackStatus(audioTrack);
     }
     applyAudioMixerState();
 }
 
-void MainWindow::handleAudioTrackStatus(int audioTrack)
+void MainWindow::handleAudioTrackStatus(int slot)
 {
-    if (audioTrack < 0 || audioTrack >= 2 || !m_sequencePlaying) return;
-
-    QMediaPlayer *player = m_audioTrackPlayers[audioTrack];
+    if (slot < 0 || slot >= 4 || !m_sequencePlaying) return;
+    QMediaPlayer *player = m_audioTrackPlayers[slot];
     const QMediaPlayer::MediaStatus status = player->mediaStatus();
-
-    if (status == QMediaPlayer::EndOfMedia
-        && !m_waitingForAudioTrack[audioTrack]) {
-        m_failedAudioTrack[audioTrack] = true;
-        return;
+    if (status == QMediaPlayer::EndOfMedia && !m_waitingForAudioTrack[slot]) {
+        m_failedAudioTrack[slot] = true; return;
     }
-
-    if (!m_waitingForAudioTrack[audioTrack]) return;
-
-    if (status == QMediaPlayer::LoadedMedia
-        || status == QMediaPlayer::BufferedMedia) {
+    if (!m_waitingForAudioTrack[slot]) return;
+    if (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia) {
         constexpr int firstAudioTrack = 3;
+        const int parentIndex = slot / 2;
+        const int childLayer = slot % 2;
+        const auto clips = m_timeline->clipsAtTimeOnTrack(
+            m_sequencePositionMs, firstAudioTrack + parentIndex);
         TimelineWidget::ClipInfo clip;
-        if (!m_timeline->clipAtTimeOnTrack(
-                m_sequencePositionMs, firstAudioTrack + audioTrack, &clip)
-            || clip.id != m_activeAudioClipIds[audioTrack]) {
-            m_waitingForAudioTrack[audioTrack] = false;
-            return;
+        bool found = false;
+        for (const auto &candidate : clips) {
+            const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack - 3;
+            if (candidateLayer == childLayer && candidate.id == m_activeAudioClipIds[slot]) {
+                clip = candidate; found = true; break;
+            }
         }
-
-        const qint64 sourcePosition =
-            clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
+        if (!found) { m_waitingForAudioTrack[slot] = false; return; }
+        const qint64 sourcePosition = clip.sourceInMs
+            + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
         if (player->duration() > 0 && sourcePosition >= player->duration()) {
-            m_waitingForAudioTrack[audioTrack] = false;
-            m_failedAudioTrack[audioTrack] = true;
-            return;
+            m_waitingForAudioTrack[slot] = false; m_failedAudioTrack[slot] = true; return;
         }
-
         player->setPlaybackRate(clip.playbackRate);
-            player->setPosition(qMax<qint64>(0, sourcePosition));
-        m_waitingForAudioTrack[audioTrack] = false;
+        player->setPosition(qMax<qint64>(0, sourcePosition));
+        m_waitingForAudioTrack[slot] = false;
         player->play();
-    } else if (status == QMediaPlayer::InvalidMedia
-        || status == QMediaPlayer::EndOfMedia) {
-        m_waitingForAudioTrack[audioTrack] = false;
-        m_failedAudioTrack[audioTrack] = true;
-        statusBar()->showMessage(
-            QString("Could not play media on AUDIO %1").arg(audioTrack + 1), 6000);
+    } else if (status == QMediaPlayer::InvalidMedia || status == QMediaPlayer::EndOfMedia) {
+        m_waitingForAudioTrack[slot] = false; m_failedAudioTrack[slot] = true;
+        statusBar()->showMessage(QString("Could not play nested audio layer %1").arg(slot + 1), 6000);
     }
 }
 
