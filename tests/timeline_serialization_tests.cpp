@@ -42,10 +42,12 @@ int main(int argc, char **argv)
     QJsonObject videoOne = advancedTrackStates.at(0).toObject();
     videoOne.insert("targeted", false);
     videoOne.insert("syncLocked", true);
+    videoOne.insert("group", "Dialogue");
     advancedTrackStates[0] = videoOne;
     timeline.trackStatesFromJson(advancedTrackStates);
     assert(!timeline.isTrackTargeted(0));
     assert(timeline.isTrackSyncLocked(0));
+    assert(timeline.trackGroup(0) == "Dialogue");
 
     QTemporaryDir temporaryDirectory;
     assert(temporaryDirectory.isValid());
@@ -75,6 +77,9 @@ int main(int argc, char **argv)
     assert(restored.trackStatesToJson() == tracksBefore);
     assert(!restored.isTrackTargeted(0));
     assert(restored.isTrackSyncLocked(0));
+    assert(restored.trackGroup(0) == "Dialogue");
+    restored.setTrackGroup(1, "Dialogue");
+    assert(restored.trackGroup(1) == restored.trackGroup(0));
     assert(restored.selectedClipInfo(&clip));
     assert(clip.path == replacementPath);
     assert(clip.brightness == 12);
