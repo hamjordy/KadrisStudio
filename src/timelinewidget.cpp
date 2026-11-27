@@ -452,6 +452,8 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->timelineStartMs = clip.timelineStartMs;
         result->sourceInMs = clip.sourceInMs;
         result->durationMs = clip.durationMs;
+        result->sourceDurationMs = clip.sourceDurationMs;
+        result->durationKnown = clip.durationKnown;
         result->brightness = clip.brightness; result->contrast = clip.contrast;
         result->saturation = clip.saturation; result->shadows = clip.shadows;
         result->midtones = clip.midtones; result->highlights = clip.highlights;
@@ -1203,6 +1205,60 @@ bool TimelineWidget::slipClip(int clipId, qint64 deltaMs)
     return true;
 }
 
+
+bool TimelineWidget::slideClip(int clipId, qint64 deltaMs)
+{
+    const int selectedIndex = indexForClipId(clipId);
+    if (selectedIndex < 0 || deltaMs == 0) return false;
+    const Clip selected = m_clips.at(selectedIndex);
+    const qint64 selectedEnd = selected.timelineStartMs + selected.durationMs;
+    int previousIndex = -1;
+    int nextIndex = -1;
+    for (int i = 0; i < m_clips.size(); ++i) {
+        const Clip &candidate = m_clips.at(i);
+        if (candidate.id == clipId || candidate.track != selected.track) continue;
+        if (candidate.timelineStartMs + candidate.durationMs == selected.timelineStartMs)
+            previousIndex = i;
+        if (candidate.timelineStartMs == selectedEnd)
+            nextIndex = i;
+    }
+    if (previousIndex < 0 || nextIndex < 0
+        || isTrackLocked(selected.track)) return false;
+    const Clip previous = m_clips.at(previousIndex);
+    const Clip next = m_clips.at(nextIndex);
+    if (isTrackLocked(previous.track) || isTrackLocked(next.track)) return false;
+
+    const qint64 minimumDelta = qMax({
+        -selected.timelineStartMs,
+        kMinimumClipDurationMs - previous.durationMs,
+        -next.sourceInMs
+    });
+    qint64 maximumDelta = next.durationMs - kMinimumClipDurationMs;
+    if (!previous.durationKnown || previous.sourceDurationMs <= 0) return false;
+    maximumDelta = qMin(maximumDelta,
+        previous.sourceDurationMs - previous.sourceInMs - previous.durationMs);
+    if (minimumDelta > maximumDelta) return false;
+
+    const qint64 snappedDelta = deltaMs < 0
+        ? -m_timebase.snapMilliseconds(-deltaMs)
+        : m_timebase.snapMilliseconds(deltaMs);
+    const qint64 safeDelta = qBound(minimumDelta, snappedDelta, maximumDelta);
+    if (safeDelta == 0) return false;
+
+    Clip &previousClip = m_clips[previousIndex];
+    Clip &selectedClip = m_clips[selectedIndex];
+    Clip &nextClip = m_clips[nextIndex];
+    previousClip.durationMs += safeDelta;
+    selectedClip.timelineStartMs += safeDelta;
+    nextClip.timelineStartMs += safeDelta;
+    nextClip.sourceInMs += safeDelta;
+    nextClip.durationMs -= safeDelta;
+    updateCanvasSize();
+    update();
+    emit timelineEdited();
+    return true;
+}
+
 bool TimelineWidget::nudgeSelectedClip(int frameDirection)
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()
@@ -1775,6 +1831,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
             const int clickedId = m_clips.at(index).id;
             const bool slipGesture = event->modifiers().testFlag(Qt::ControlModifier)
                 && event->modifiers().testFlag(Qt::AltModifier);
+            const bool slideGesture = event->modifiers().testFlag(Qt::ShiftModifier)
+                && event->modifiers().testFlag(Qt::AltModifier);
             const bool multiSelect = event->modifiers().testFlag(Qt::ControlModifier)
                 && !event->modifiers().testFlag(Qt::AltModifier);
             const bool removingFromSelection =
@@ -1814,6 +1872,10 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
             m_dragSnapshot = m_clips.at(activeIndex);
             m_rollPartnerSnapshot = Clip{};
             m_rollPartnerSnapshot.id = -1;
+            m_slidePreviousSnapshot = Clip{};
+            m_slidePreviousSnapshot.id = -1;
+            m_slideNextSnapshot = Clip{};
+            m_slideNextSnapshot.id = -1;
             m_dragGroupSnapshot.clear();
             for (const Clip &candidate : m_clips) {
                 if (m_selectedClipIds.contains(candidate.id))
@@ -1827,6 +1889,21 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 const bool groupMove = m_selectedClipIds.size() > 1 && insideClipBody;
                 if (slipGesture && insideClipBody) {
                     m_dragMode = DragMode::Slip;
+                } else if (slideGesture && insideClipBody) {
+                    const qint64 clipStart = m_dragSnapshot.timelineStartMs;
+                    const qint64 clipEnd = clipStart + m_dragSnapshot.durationMs;
+                    for (const Clip &candidate : m_clips) {
+                        if (candidate.id == m_dragSnapshot.id
+                            || candidate.track != m_dragSnapshot.track) continue;
+                        if (candidate.timelineStartMs + candidate.durationMs == clipStart)
+                            m_slidePreviousSnapshot = candidate;
+                        if (candidate.timelineStartMs == clipEnd)
+                            m_slideNextSnapshot = candidate;
+                    }
+                    if (m_slidePreviousSnapshot.id >= 0 && m_slideNextSnapshot.id >= 0)
+                        m_dragMode = DragMode::Slide;
+                    else
+                        m_dragMode = DragMode::None;
                 } else if (groupMove) {
                     m_dragMode = DragMode::Move;
                 } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
@@ -2060,6 +2137,30 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         clip.timelineStartMs = m_dragSnapshot.timelineStartMs + deltaMs;
         clip.sourceInMs = m_dragSnapshot.sourceInMs + deltaMs;
         clip.durationMs = m_dragSnapshot.durationMs - deltaMs;
+    } else if (m_dragMode == DragMode::Slide) {
+        const int previousIndex = indexForClipId(m_slidePreviousSnapshot.id);
+        const int nextIndex = indexForClipId(m_slideNextSnapshot.id);
+        if (previousIndex < 0 || nextIndex < 0
+            || isTrackLocked(m_slidePreviousSnapshot.track)
+            || isTrackLocked(m_slideNextSnapshot.track)) return;
+        const qint64 minimumDelta = qMax({
+            -m_dragSnapshot.timelineStartMs,
+            kMinimumClipDurationMs - m_slidePreviousSnapshot.durationMs,
+            -m_slideNextSnapshot.sourceInMs
+        });
+        qint64 maximumDelta = m_slideNextSnapshot.durationMs - kMinimumClipDurationMs;
+        if (!m_slidePreviousSnapshot.durationKnown
+            || m_slidePreviousSnapshot.sourceDurationMs <= 0) return;
+        maximumDelta = qMin(maximumDelta,
+            m_slidePreviousSnapshot.sourceDurationMs
+                - m_slidePreviousSnapshot.sourceInMs
+                - m_slidePreviousSnapshot.durationMs);
+        const qint64 safeDelta = qBound(minimumDelta, deltaMs, maximumDelta);
+        m_clips[previousIndex].durationMs = m_slidePreviousSnapshot.durationMs + safeDelta;
+        clip.timelineStartMs = m_dragSnapshot.timelineStartMs + safeDelta;
+        m_clips[nextIndex].timelineStartMs = m_slideNextSnapshot.timelineStartMs + safeDelta;
+        m_clips[nextIndex].sourceInMs = m_slideNextSnapshot.sourceInMs + safeDelta;
+        m_clips[nextIndex].durationMs = m_slideNextSnapshot.durationMs - safeDelta;
     } else if (m_dragMode == DragMode::Slip) {
         if (!m_dragSnapshot.durationKnown || m_dragSnapshot.sourceDurationMs <= 0) return;
         const qint64 maximumSourceIn = qMax<qint64>(

@@ -105,5 +105,29 @@ int main(int argc, char **argv)
     assert(slipTimeline.slipClip(77, -100000));
     assert(slipTimeline.selectedClipInfo(&slipAfter));
     assert(slipAfter.sourceInMs == 0);
+
+    // Slide edits move the selected clip while trimming the two adjacent clips.
+    QJsonObject previousItem{{"id", 81}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 0}, {"durationMs", 4000},
+        {"durationKnown", true}, {"sourceDurationMs", 10000}};
+    QJsonObject selectedItem{{"id", 82}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 4000}, {"sourceInMs", 1000}, {"durationMs", 3000},
+        {"durationKnown", true}, {"sourceDurationMs", 10000}};
+    QJsonObject nextItem{{"id", 83}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 7000}, {"sourceInMs", 2000}, {"durationMs", 5000},
+        {"durationKnown", true}, {"sourceDurationMs", 10000}};
+    TimelineWidget slideTimeline;
+    slideTimeline.fromJson(QJsonArray{previousItem, selectedItem, nextItem});
+    assert(slideTimeline.slideClip(82, 1000));
+    const QJsonArray slideClips = slideTimeline.toJson();
+    const QJsonObject slidPrevious = slideClips.at(0).toObject();
+    const QJsonObject slidSelected = slideClips.at(1).toObject();
+    const QJsonObject slidNext = slideClips.at(2).toObject();
+    assert(slidPrevious.value("durationMs").toInt() == 5000);
+    assert(slidSelected.value("timelineStartMs").toInt() == 5000);
+    assert(slidSelected.value("durationMs").toInt() == 3000);
+    assert(slidNext.value("timelineStartMs").toInt() == 8000);
+    assert(slidNext.value("sourceInMs").toInt() == 3000);
+    assert(slidNext.value("durationMs").toInt() == 4000);
     return 0;
 }

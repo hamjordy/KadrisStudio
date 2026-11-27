@@ -27,6 +27,8 @@ public:
         qint64 timelineStartMs = 0;
         qint64 sourceInMs = 0;
         qint64 durationMs = 0;
+        qint64 sourceDurationMs = 0;
+        bool durationKnown = false;
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
@@ -103,6 +105,7 @@ public:
     bool rippleDeleteSelectedClip();
     bool nudgeSelectedClip(int frameDirection);
     bool slipClip(int clipId, qint64 deltaMs);
+    bool slideClip(int clipId, qint64 deltaMs);
     QJsonArray toJson() const;
     void fromJson(const QJsonArray &clips);
 
@@ -152,7 +155,7 @@ private:
         QVector<TransformKeyframe> transformKeyframes;
     };
 
-    enum class DragMode { None, Move, TrimLeft, TrimRight, RippleTrimRight, RollTrimRight, Slip };
+    enum class DragMode { None, Move, TrimLeft, TrimRight, RippleTrimRight, RollTrimRight, Slip, Slide };
 
     QRect clipRect(int index) const;
     int clipIndexAt(const QPoint &position) const;
@@ -179,6 +182,8 @@ private:
     QPoint m_dragOrigin;
     Clip m_dragSnapshot;
     Clip m_rollPartnerSnapshot;
+    Clip m_slidePreviousSnapshot;
+    Clip m_slideNextSnapshot;
     QSet<int> m_selectedClipIds;
     QVector<Clip> m_dragGroupSnapshot;
 };
