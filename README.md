@@ -28,6 +28,7 @@ KadrisStudio is an independent, open-source Windows desktop video-editor project
 - Per-clip transform (scale and X/Y position), opacity, and blend modes.
 - Brightness, contrast, transform, and opacity keyframes with interpolation.
 - Persist clip adjustments and keyframes in project files.
+- Autosave dirty projects and recover unsaved sessions; browse, restore, or discard available recovery snapshots in the Recovery Center.
 
 ### Audio
 - Per-clip volume, mute, fade-in, and fade-out.
@@ -41,7 +42,7 @@ KadrisStudio is an independent, open-source Windows desktop video-editor project
 - Sequence export, an export queue, and verified output rendering are not yet implemented.
 - WAV waveform visualization is currently limited to supported WAV PCM/float formats.
 - Multiple overlapping audio clips per track, advanced routing, sample-accurate mixing, audio meters, and professional audio effects remain future work.
-- Proxy media, relinking, project media collection, autosave/recovery, and a full undo/redo history remain future work.
+- Proxy media, project media collection, and a full undo/redo history remain future work. Autosave and a recovery center are implemented, but still need broader crash/recovery testing.
 - Supported media formats depend on the installed Qt/Windows multimedia backend.
 
 ## Build on Windows 11
