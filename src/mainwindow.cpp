@@ -10,8 +10,10 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QAudioOutput>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 #include <QAudioBuffer>
 #include <QAudioBufferOutput>
+#endif
 #include <QDockWidget>
 #include <QDialog>
 #include <QDateTime>
@@ -74,6 +76,7 @@ QString faderToLabel(int value)
     return QStringLiteral("%1 dB").arg(decibels, 0, 'f', 1);
 }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
 float decodedBufferPeak(const QAudioBuffer &buffer)
 {
     if (!buffer.isValid() || buffer.frameCount() <= 0
@@ -134,6 +137,7 @@ QString peakToLabel(float peak)
     const double db = 20.0 * std::log10(static_cast<double>(peak));
     return QStringLiteral("%1 dBFS").arg(db, 0, 'f', 1);
 }
+#endif
 }
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
@@ -180,6 +184,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         m_audioTrackOutputs[track] = new QAudioOutput(this);
         m_audioTrackOutputs[track]->setVolume(1.0f);
         m_audioTrackPlayers[track]->setAudioOutput(m_audioTrackOutputs[track]);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
         m_audioBufferOutputs[track] = new QAudioBufferOutput(this);
         m_audioTrackPlayers[track]->setAudioBufferOutput(m_audioBufferOutputs[track]);
         connect(m_audioBufferOutputs[track], &QAudioBufferOutput::audioBufferReceived,
@@ -187,6 +192,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 m_audioSlotPeaks[track] = qMax(
                     m_audioSlotPeaks[track], decodedBufferPeak(buffer));
             });
+#endif
 
         connect(m_audioTrackPlayers[track], &QMediaPlayer::mediaStatusChanged, this,
             [this, track](QMediaPlayer::MediaStatus) {
@@ -202,6 +208,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     }
 
     buildInterface();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     m_audioMeterTimer = new QTimer(this);
     m_audioMeterTimer->setInterval(50);
     connect(m_audioMeterTimer, &QTimer::timeout, this, [this]() {
@@ -223,6 +230,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
         }
     });
     m_audioMeterTimer->start();
+#endif
     applyAudioMixerState();
     buildMenus();
 
@@ -920,6 +928,9 @@ void MainWindow::buildInterface()
         auto *peakLabel = new QLabel("-INF dBFS", strip);
         peakLabel->setAlignment(Qt::AlignCenter);
         peakLabel->setObjectName("timecodeLabel");
+#if QT_VERSION < QT_VERSION_CHECK(6, 8, 0)
+        peakLabel->setText("Qt 6.8+ required");
+#endif
         auto *peakMeter = new QProgressBar(strip);
         peakMeter->setRange(0, 1000);
         peakMeter->setValue(0);
