@@ -134,6 +134,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     m_sequenceTimer->setInterval(16);
     connect(m_sequenceTimer, &QTimer::timeout, this, &MainWindow::tickSequencePlayback);
 
+    // Keep a crash-recovery snapshot beside the saved project once per minute.
+    m_autosaveTimer = new QTimer(this);
+    m_autosaveTimer->setInterval(60000);
+    connect(m_autosaveTimer, &QTimer::timeout, this, &MainWindow::autosaveProject);
+    m_autosaveTimer->start();
+
     connect(m_timeline, &TimelineWidget::clipActivated, this,
         [this](const QString &path) {
             m_inspectorLabel->setText(QString("Timeline clip: %1\n\n"
@@ -1120,6 +1126,26 @@ void MainWindow::openProject()
     const QString path = QFileDialog::getOpenFileName(
         this, "Open Kadris Project", {}, "Kadris Projects (*.kadris);;JSON Files (*.json)");
     if (path.isEmpty()) return;
+    const QString recoveryPath = path + ".autosave";
+    const QFileInfo originalInfo(path);
+    const QFileInfo recoveryInfo(recoveryPath);
+    const bool recoveryAvailable = recoveryInfo.exists()
+        && recoveryInfo.lastModified() > originalInfo.lastModified();
+    if (recoveryAvailable) {
+        const auto choice = QMessageBox::question(this, "Recover Project",
+            "A newer autosave was found for this project. Recover it?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (choice == QMessageBox::Yes) {
+            if (readProject(recoveryPath)) {
+                m_projectPath = path;
+                updateWindowTitle();
+                statusBar()->showMessage("Recovered the latest autosaved project", 6000);
+                return;
+            }
+            QMessageBox::warning(this, "Recover Project",
+                "The autosave could not be opened. The original project will be opened instead.");
+        }
+    }
     if (!readProject(path))
         QMessageBox::warning(this, "Open Project", "This file is not a valid Kadris project.");
 }
@@ -1127,8 +1153,11 @@ void MainWindow::openProject()
 void MainWindow::saveProject()
 {
     if (m_projectPath.isEmpty()) { saveProjectAs(); return; }
-    if (!writeProject(m_projectPath))
+    if (!writeProject(m_projectPath)) {
         QMessageBox::warning(this, "Save Project", "The project could not be saved.");
+        return;
+    }
+    QFile::remove(m_projectPath + ".autosave");
 }
 
 void MainWindow::saveProjectAs()
@@ -1137,8 +1166,30 @@ void MainWindow::saveProjectAs()
         this, "Save Kadris Project", "Untitled.kadris", "Kadris Projects (*.kadris)");
     if (path.isEmpty()) return;
     if (!path.endsWith(".kadris", Qt::CaseInsensitive)) path += ".kadris";
-    if (!writeProject(path))
+    if (!writeProject(path)) {
         QMessageBox::warning(this, "Save Project", "The project could not be saved.");
+        return;
+    }
+    QFile::remove(m_projectPath + ".autosave");
+}
+
+void MainWindow::autosaveProject()
+{
+    if (m_projectPath.isEmpty()) return;
+
+    const QString originalPath = m_projectPath;
+    const QString recoveryPath = originalPath + ".autosave";
+    if (!writeProject(recoveryPath)) {
+        m_projectPath = originalPath;
+        updateWindowTitle();
+        statusBar()->showMessage("Autosave failed — the original project is unchanged", 6000);
+        return;
+    }
+
+    // writeProject updates the active path; restore the real project location.
+    m_projectPath = originalPath;
+    updateWindowTitle();
+    statusBar()->showMessage("Crash-recovery autosave created", 2500);
 }
 
 bool MainWindow::writeProject(const QString &path)
