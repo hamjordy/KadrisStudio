@@ -2414,7 +2414,30 @@ void MainWindow::applyAudioMixerState()
         for (const auto &candidate : clips) {
             const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack - 3;
             if (candidateLayer != childLayer) continue;
-            clipGain = m_timeline->evaluatedAudioVolume(candidate.id, m_sequencePositionMs) / 100.0f;
+            int evaluatedVolume = candidate.audioVolume;
+            const auto &volumeFrames = candidate.audioVolumeKeyframes;
+            if (!volumeFrames.isEmpty()) {
+                const double position = static_cast<double>(m_sequencePositionMs);
+                if (position <= volumeFrames.first().x()) {
+                    evaluatedVolume = qRound(volumeFrames.first().y());
+                } else if (position >= volumeFrames.last().x()) {
+                    evaluatedVolume = qRound(volumeFrames.last().y());
+                } else {
+                    for (int frameIndex = 1; frameIndex < volumeFrames.size(); ++frameIndex) {
+                        const QPointF &left = volumeFrames.at(frameIndex - 1);
+                        const QPointF &right = volumeFrames.at(frameIndex);
+                        if (position <= right.x()) {
+                            const double span = right.x() - left.x();
+                            const double amount = span <= 0.0
+                                ? 0.0 : (position - left.x()) / span;
+                            evaluatedVolume = qRound(left.y()
+                                + (right.y() - left.y()) * amount);
+                            break;
+                        }
+                    }
+                }
+            }
+            clipGain = qBound(0, evaluatedVolume, 100) / 100.0f;
             clipMuted = candidate.audioMuted || candidate.nestedTrackMuted;
             const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - candidate.timelineStartMs);
             if (candidate.fadeInMs > 0 && localMs < candidate.fadeInMs)
