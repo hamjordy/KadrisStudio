@@ -85,32 +85,31 @@ float decodedBufferPeak(const QAudioBuffer &buffer)
 
     const qsizetype sampleCount = static_cast<qsizetype>(buffer.frameCount())
         * buffer.format().channelCount();
-    const void *data = buffer.constData();
-    if (!data || sampleCount <= 0) return 0.0f;
+    if (sampleCount <= 0) return 0.0f;
 
     float peak = 0.0f;
     switch (buffer.format().sampleFormat()) {
     case QAudioFormat::UInt8: {
-        const auto *samples = static_cast<const quint8 *>(data);
+        const auto *samples = buffer.constData<quint8>();
         for (qsizetype i = 0; i < sampleCount; ++i)
             peak = qMax(peak, qAbs((static_cast<float>(samples[i]) - 128.0f) / 128.0f));
         break;
     }
     case QAudioFormat::Int16: {
-        const auto *samples = static_cast<const qint16 *>(data);
+        const auto *samples = buffer.constData<qint16>();
         for (qsizetype i = 0; i < sampleCount; ++i)
             peak = qMax(peak, qAbs(static_cast<float>(samples[i]) / 32768.0f));
         break;
     }
     case QAudioFormat::Int32: {
-        const auto *samples = static_cast<const qint32 *>(data);
+        const auto *samples = buffer.constData<qint32>();
         for (qsizetype i = 0; i < sampleCount; ++i)
             peak = qMax(peak, qAbs(static_cast<float>(
                 static_cast<double>(samples[i]) / 2147483648.0)));
         break;
     }
     case QAudioFormat::Float: {
-        const auto *samples = static_cast<const float *>(data);
+        const auto *samples = buffer.constData<float>();
         for (qsizetype i = 0; i < sampleCount; ++i) {
             if (std::isfinite(samples[i]))
                 peak = qMax(peak, qAbs(samples[i]));
