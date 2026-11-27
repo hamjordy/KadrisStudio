@@ -1007,6 +1007,14 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
         clip.blendMode = item.value("blendMode").toInt(0);
         clip.audioVolume = item.value("audioVolume").toInt(100);
         clip.audioMuted = item.value("audioMuted").toBool(false);
+        const QJsonArray volumeFrames = item.value("audioVolumeKeyframes").toArray();
+        for (const QJsonValue &frameValue : volumeFrames) {
+            const QJsonObject frame = frameValue.toObject();
+            const double localTime = frame.value("timeMs").toDouble();
+            const double absoluteTime = absoluteStart + localTime / accumulatedRate;
+            clip.audioVolumeKeyframes.append(QPointF(
+                absoluteTime, frame.value("value").toDouble(100.0)));
+        }
         clip.fadeInMs = item.value("fadeInMs").toInt(0);
         clip.fadeOutMs = item.value("fadeOutMs").toInt(0);
         return clip;
@@ -1088,6 +1096,18 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             item.insert("positionY", clip.positionY);
             item.insert("opacity", clip.opacity);
             item.insert("blendMode", clip.blendMode);
+            item.insert("audioVolume", clip.audioVolume);
+            item.insert("audioMuted", clip.audioMuted);
+            item.insert("fadeInMs", clip.fadeInMs);
+            item.insert("fadeOutMs", clip.fadeOutMs);
+            QJsonArray volumeFrames;
+            for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
+                QJsonObject frame;
+                frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
+                frame.insert("value", keyframe.value);
+                volumeFrames.append(frame);
+            }
+            item.insert("audioVolumeKeyframes", volumeFrames);
             result.append(readClip(item, track, -1, clip.timelineStartMs, 1.0));
         }
     }
