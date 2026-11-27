@@ -32,6 +32,7 @@ private slots:
     void saveProject();
     void saveProjectAs();
     void autosaveProject();
+    void openRecoveryCenter();
     void importMedia();
     void relinkSelectedMedia();
     void addSelectedMediaToTimeline();
