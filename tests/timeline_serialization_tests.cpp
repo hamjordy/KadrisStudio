@@ -225,6 +225,20 @@ int main(int argc, char **argv)
     assert(activeNestedAudio.at(0).track == 3);
     assert(activeNestedAudio.at(1).track == 3);
 
+    // Track mute state is retained inside a nested sequence and exposed to the mixer.
+    QJsonArray nestedAudioTrackStates;
+    for (int track = 0; track < 5; ++track) {
+        nestedAudioTrackStates.append(QJsonObject{{"muted", track == 4}});
+    }
+    QJsonObject mutedAudioContainer = nestedAudioContainer;
+    mutedAudioContainer.insert("nestedTrackStates", nestedAudioTrackStates);
+    TimelineWidget mutedNestedAudioPreview;
+    mutedNestedAudioPreview.fromJson(QJsonArray{mutedAudioContainer});
+    const auto mutedNestedAudio = mutedNestedAudioPreview.clipsAtTimeOnTrack(2000, 3);
+    assert(mutedNestedAudio.size() == 2);
+    assert(!mutedNestedAudio.at(0).nestedTrackMuted);
+    assert(mutedNestedAudio.at(1).nestedTrackMuted);
+
     // Nested sequence speed changes both the child timeline mapping and source rate.
     QJsonObject rateAdjustedChild{
         {"id", 411}, {"path", "rate-adjusted-child.mp4"}, {"track", 1},
