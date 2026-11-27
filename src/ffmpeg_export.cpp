@@ -1,6 +1,7 @@
 #include "ffmpeg_export.h"
 
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QJsonObject>
 #include <QtMath>
 
