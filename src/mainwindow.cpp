@@ -1114,12 +1114,12 @@ void MainWindow::newProject()
         && QMessageBox::question(this, "New Project", "Discard the current project state?")
             != QMessageBox::Yes) return;
     QFile::remove(untitledRecoveryPath());
-    m_projectDirty = false;
     m_projectPath.clear();
     m_mediaPaths.clear();
     m_mediaList->clear();
     m_timeline->clearClips();
     resetTimelineHistory();
+    m_projectDirty = false;
     m_player->stop();
     m_player->setSource(QUrl());
     m_sourceLabel->setText("No source loaded");
