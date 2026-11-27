@@ -11,7 +11,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [x] Windows CI build workflow
 
 ## Milestone 1 — Media and project reliability
-- [ ] Relative media paths
+- [x] Relative media paths for media-bin items and timeline clips, with legacy absolute-path compatibility
 - [x] Relink a missing media-bin item and update every matching timeline clip without losing edit settings
 - [x] Timed autosave of dirty projects and recovery of unsaved sessions
 - [x] Recovery Center to inspect, restore, and discard available autosave snapshots
@@ -33,7 +33,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [x] Track lock and mute states
 - [ ] User-selectable sequence frame rate
 - [ ] Ripple, roll, slip, slide, and rate-stretch editing modes
-- [ ] Full undo/redo command history
+- [x] Timeline undo/redo history (up to 100 snapshots; keyboard shortcuts)
 - [ ] Track targeting, sync locks, nesting, and track groups
 
 ## Milestone 3 — Preview, compositing, and rendering
