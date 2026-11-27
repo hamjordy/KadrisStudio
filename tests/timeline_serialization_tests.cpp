@@ -239,6 +239,20 @@ int main(int argc, char **argv)
     assert(!mutedNestedAudio.at(0).nestedTrackMuted);
     assert(mutedNestedAudio.at(1).nestedTrackMuted);
 
+    // Nested track mute settings survive saving and reopening the parent project.
+    const QJsonArray savedMutedNestedAudio = mutedNestedAudioPreview.toJson();
+    TimelineWidget reopenedMutedNestedAudio;
+    reopenedMutedNestedAudio.fromJson(savedMutedNestedAudio);
+    TimelineWidget::ClipInfo reopenedNestedAudioClip;
+    assert(reopenedMutedNestedAudio.clipAtTimeOnTrack(
+        1000, 3, &reopenedNestedAudioClip));
+    assert(reopenedNestedAudioClip.nestedTrackStates.size() == 5);
+    const auto reopenedMutedLayers =
+        reopenedMutedNestedAudio.clipsAtTimeOnTrack(2000, 3);
+    assert(reopenedMutedLayers.size() == 2);
+    assert(!reopenedMutedLayers.at(0).nestedTrackMuted);
+    assert(reopenedMutedLayers.at(1).nestedTrackMuted);
+
     // Nested sequence speed changes both the child timeline mapping and source rate.
     QJsonObject rateAdjustedChild{
         {"id", 411}, {"path", "rate-adjusted-child.mp4"}, {"track", 1},
