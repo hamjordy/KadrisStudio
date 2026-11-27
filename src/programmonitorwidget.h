@@ -34,6 +34,7 @@ protected:
 
 private:
     void rebuildCorrectedFrames();
+    void rebuildCorrectedFrame(int track);
 
     std::array<QImage, 3> m_frames;
     std::array<QImage, 3> m_correctedFrames;
