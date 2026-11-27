@@ -82,8 +82,8 @@ int main()
                                         "nested-render.mp4", &args, &error));
     const QString nestedGraph = args.join(" ");
     assert(!nestedGraph.contains("nest://"));
-    assert(nestedGraph.contains("between(t,3.250000,5.250000)"));
-    assert(nestedGraph.contains("between(t,3.500000,4.500000)"));
+    assert(nestedGraph.contains("between(t,3.25,5.25)"));
+    assert(nestedGraph.contains("between(t,3.5,4.5)"));
     assert(nestedGraph.contains("amix=inputs=1"));
 
     QJsonObject unsupportedNested = nested;
