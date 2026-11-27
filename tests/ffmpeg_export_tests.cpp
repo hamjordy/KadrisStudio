@@ -43,12 +43,23 @@ int main()
     assert(args.contains("23"));
     assert(args.contains("-preset"));
     assert(args.contains("medium"));
+    assert(args.contains("-b:a"));
+    assert(args.contains("192k"));
+    assert(args.contains("-ar"));
+    assert(args.contains("48000"));
     assert(args.last() == "render.mp4");
 
     assert(FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
                                         "render.mp4", &args, &error, 18, "slow"));
     assert(args.contains("18"));
     assert(args.contains("slow"));
+    assert(FfmpegExport::buildArguments(QJsonArray{video, audio}, 1280, 720, 25, 1,
+                                        "render.mp4", &args, &error, 23, "medium", 320, 44100));
+    assert(args.contains("320k"));
+    assert(args.contains("44100"));
+    assert(!FfmpegExport::buildArguments(QJsonArray{video, audio}, 1280, 720, 25, 1,
+                                         "render.mp4", &args, &error, 23, "medium", 500, 48000));
+    assert(error.contains("audio"));
     assert(!FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
                                          "render.mp4", &args, &error, 60, "slow"));
     assert(error.contains("quality"));
