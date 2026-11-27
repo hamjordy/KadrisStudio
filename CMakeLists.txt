@@ -17,6 +17,7 @@ qt_add_executable(kadris-studio WIN32
     src/timelinewidget.cpp
     src/timelinewidget.h
     src/frame_timebase.h
+    src/audio_crossfade.h
     src/project_media_paths.h
     src/project_media_collection.h
     src/programmonitorwidget.cpp
