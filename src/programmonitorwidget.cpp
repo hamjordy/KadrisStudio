@@ -148,10 +148,10 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
 void ProgramMonitorWidget::rebuildCorrectedFrame(int frameIndex)
 {
     if (frameIndex < 0 || frameIndex >= static_cast<int>(m_frames.size())) return;
-        if (m_frames[static_cast<size_t>(frameIndex)].isNull()) {
-            m_correctedFrames[static_cast<size_t>(frameIndex)] = QImage();
-            continue;
-        }
+    if (m_frames[static_cast<size_t>(frameIndex)].isNull()) {
+        m_correctedFrames[static_cast<size_t>(frameIndex)] = QImage();
+        return;
+    }
         const ColorGrade &grade = m_colorGrades[static_cast<size_t>(frameIndex)];
         const double contrastFactor = (259.0 * (grade.contrast + 255.0))
             / (255.0 * (259.0 - grade.contrast));
