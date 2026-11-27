@@ -38,6 +38,14 @@ int main(int argc, char **argv)
     trackStates.append(QJsonObject{{"locked", true}, {"muted", false}});
     trackStates.append(QJsonObject{{"locked", false}, {"muted", true}});
     timeline.trackStatesFromJson(trackStates);
+    QJsonArray advancedTrackStates = timeline.trackStatesToJson();
+    QJsonObject videoOne = advancedTrackStates.at(0).toObject();
+    videoOne.insert("targeted", false);
+    videoOne.insert("syncLocked", true);
+    advancedTrackStates[0] = videoOne;
+    timeline.trackStatesFromJson(advancedTrackStates);
+    assert(!timeline.isTrackTargeted(0));
+    assert(timeline.isTrackSyncLocked(0));
 
     QTemporaryDir temporaryDirectory;
     assert(temporaryDirectory.isValid());
@@ -65,6 +73,8 @@ int main(int argc, char **argv)
     assert(restored.toJson() == clipsBefore);
     assert(restored.markersToJson() == markersBefore);
     assert(restored.trackStatesToJson() == tracksBefore);
+    assert(!restored.isTrackTargeted(0));
+    assert(restored.isTrackSyncLocked(0));
     assert(restored.selectedClipInfo(&clip));
     assert(clip.path == replacementPath);
     assert(clip.brightness == 12);
