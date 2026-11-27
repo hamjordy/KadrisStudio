@@ -1015,8 +1015,12 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             clip.audioVolumeKeyframes.append(QPointF(
                 absoluteTime, frame.value("value").toDouble(100.0)));
         }
-        clip.fadeInMs = item.value("fadeInMs").toInt(0);
-        clip.fadeOutMs = item.value("fadeOutMs").toInt(0);
+        // Fade durations live in the child sequence's clock. Convert them
+        // to parent timeline time just like clip duration and keyframes.
+        clip.fadeInMs = qMax(0, qRound(item.value("fadeInMs").toDouble()
+                                      / accumulatedRate));
+        clip.fadeOutMs = qMax(0, qRound(item.value("fadeOutMs").toDouble()
+                                       / accumulatedRate));
         return clip;
     };
 
