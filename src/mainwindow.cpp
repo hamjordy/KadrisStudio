@@ -1621,6 +1621,7 @@ bool MainWindow::writeProject(const QString &path)
     QJsonArray timelineTrackStates = m_timeline->trackStatesToJson();
     if (!m_nestedEditStack.isEmpty()) {
         QJsonArray editedClips = m_timeline->toJson();
+        QJsonArray editedTrackStates = m_timeline->trackStatesToJson();
         QJsonObject rootState;
         for (int depth = m_nestedEditStack.size() - 1; depth >= 0; --depth) {
             const NestedEditContext &context = m_nestedEditStack.at(depth);
@@ -1631,6 +1632,7 @@ bool MainWindow::writeProject(const QString &path)
                 QJsonObject parentClip = parentClips.at(i).toObject();
                 if (parentClip.value("id").toInt() != context.clipId) continue;
                 parentClip.insert("nestedClips", editedClips);
+                parentClip.insert("nestedTrackStates", editedTrackStates);
                 qint64 nestedEnd = 0;
                 for (const QJsonValue &childValue : editedClips) {
                     const QJsonObject child = childValue.toObject();
@@ -1651,6 +1653,7 @@ bool MainWindow::writeProject(const QString &path)
             }
             parentState.insert("clips", parentClips);
             editedClips = parentClips;
+            editedTrackStates = parentState.value("tracks").toArray();
             if (depth == 0) rootState = parentState;
         }
         timelineClips = editedClips;
@@ -1805,6 +1808,7 @@ bool MainWindow::openSelectedNestedSequence()
     context.name = clip.nestedName;
     m_nestedEditStack.append(context);
     m_timeline->fromJson(clip.nestedClips);
+    m_timeline->trackStatesFromJson(clip.nestedTrackStates);
     resetTimelineHistory();
     m_projectDirty = true;
     QStringList breadcrumbs;
@@ -1823,6 +1827,7 @@ bool MainWindow::returnToParentSequence()
     if (m_nestedEditStack.isEmpty()) return false;
     stopSequencePlayback(true);
     const QJsonArray childClips = m_timeline->toJson();
+    const QJsonArray childTrackStates = m_timeline->trackStatesToJson();
     const NestedEditContext context = m_nestedEditStack.constLast();
     QJsonObject parentState = context.parentState;
     QJsonArray parentClips = parentState.value("clips").toArray();
@@ -1831,6 +1836,7 @@ bool MainWindow::returnToParentSequence()
         QJsonObject parentClip = parentClips.at(i).toObject();
         if (parentClip.value("id").toInt() != context.clipId) continue;
         parentClip.insert("nestedClips", childClips);
+        parentClip.insert("nestedTrackStates", childTrackStates);
         qint64 nestedEnd = 0;
         for (const QJsonValue &childValue : childClips) {
             const QJsonObject child = childValue.toObject();
