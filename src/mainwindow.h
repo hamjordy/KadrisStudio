@@ -32,6 +32,7 @@ private slots:
     void saveProject();
     void saveProjectAs();
     void importMedia();
+    void relinkSelectedMedia();
     void addSelectedMediaToTimeline();
     void playPause();
     void stopPlayback();
