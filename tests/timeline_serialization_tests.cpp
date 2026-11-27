@@ -42,11 +42,15 @@ int main(int argc, char **argv)
     assert(temporaryDirectory.isValid());
     const QString replacementPath = temporaryDirectory.filePath("replacement.mp4");
     QFile replacementFile(replacementPath);
-    assert(replacementFile.open(QIODevice::WriteOnly));
+    const bool replacementOpened = replacementFile.open(QIODevice::WriteOnly);
+    assert(replacementOpened);
+    if (!replacementOpened) return 1;
     replacementFile.write("test");
     replacementFile.close();
 
-    assert(timeline.replaceMediaPath("missing-media.mp4", replacementPath) == 1);
+    const int replacedCount = timeline.replaceMediaPath("missing-media.mp4", replacementPath);
+    assert(replacedCount == 1);
+    if (replacedCount != 1) return 1;
     const QJsonArray clipsBefore = timeline.toJson();
     assert(clipsBefore.first().toObject().value("path").toString() == replacementPath);
     const QJsonArray markersBefore = timeline.markersToJson();
