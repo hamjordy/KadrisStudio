@@ -128,6 +128,7 @@ signals:
     void timelineEdited();
     void markersChanged();
     void trackStateChanged(int track);
+    void nestedSequenceDoubleClicked(int clipId);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
