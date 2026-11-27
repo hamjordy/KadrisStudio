@@ -21,6 +21,8 @@ qt_add_executable(kadris-studio WIN32
     src/project_media_collection.h
     src/programmonitorwidget.cpp
     src/programmonitorwidget.h
+    src/ffmpeg_export.cpp
+    src/ffmpeg_export.h
 )
 qt_add_resources(kadris-studio kadris_resources
     PREFIX "/"
@@ -32,6 +34,11 @@ target_link_libraries(kadris-studio PRIVATE
 target_include_directories(kadris-studio PRIVATE src)
 
 if(BUILD_TESTING)
+    add_executable(ffmpeg-export-tests tests/ffmpeg_export_tests.cpp src/ffmpeg_export.cpp src/ffmpeg_export.h)
+    target_include_directories(ffmpeg-export-tests PRIVATE src)
+    target_link_libraries(ffmpeg-export-tests PRIVATE Qt6::Widgets)
+    add_test(NAME ffmpeg-export-tests COMMAND ffmpeg-export-tests)
+
     add_executable(frame-timebase-tests tests/frame_timebase_tests.cpp)
     target_include_directories(frame-timebase-tests PRIVATE src)
     add_test(NAME frame-timebase-tests COMMAND frame-timebase-tests)
