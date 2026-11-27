@@ -70,13 +70,14 @@ int main()
                                          "render.mp4", &args, &error));
     assert(error.contains("effects not yet supported"));
 
+    QJsonObject nestedVideo = video;
+    nestedVideo.insert("timelineStartMs", 250);
+    QJsonObject nestedAudio = audio;
+    nestedAudio.insert("timelineStartMs", 500);
     QJsonObject nested{{"id", 10}, {"path", "nest://10"}, {"track", 0},
         {"timelineStartMs", 3000}, {"durationMs", 3000}, {"durationKnown", true},
         {"nestedSequence", true}, {"nestedName", "Intro"},
-        {"nestedClips", QJsonArray{
-            QJsonObject(video).insert("timelineStartMs", 250),
-            QJsonObject(audio).insert("timelineStartMs", 500)
-        }}};
+        {"nestedClips", QJsonArray{nestedVideo, nestedAudio}}};
     assert(FfmpegExport::buildArguments(QJsonArray{nested}, 1920, 1080, 25, 1,
                                         "nested-render.mp4", &args, &error));
     const QString nestedGraph = args.join(" ");
