@@ -36,15 +36,16 @@ private:
     void rebuildCorrectedFrames();
     void rebuildCorrectedFrame(int track);
 
-    std::array<QImage, 3> m_frames;
-    std::array<QImage, 3> m_correctedFrames;
+    static constexpr int kLayerCount = 9;
+    std::array<QImage, kLayerCount> m_frames;
+    std::array<QImage, kLayerCount> m_correctedFrames;
     struct ColorGrade {
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
         int red = 0, green = 0, blue = 0;
     };
-    std::array<ColorGrade, 3> m_colorGrades;
+    std::array<ColorGrade, kLayerCount> m_colorGrades;
     struct TrackTransform { int scale = 100; int x = 0; int y = 0; int opacity = 100; int blendMode = 0; };
-    std::array<TrackTransform, 3> m_transforms;
+    std::array<TrackTransform, kLayerCount> m_transforms;
     QString m_caption;
 };
