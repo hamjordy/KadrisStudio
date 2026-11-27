@@ -1035,7 +1035,12 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             }
 
             const int childTrack = item.value("track").toInt(-1);
-            if (childTrack < 0 || childTrack >= 3) continue;
+            // Nested video layers map only to video tracks; nested audio layers
+            // map only to audio tracks. Preserve the child track index so the
+            // playback mixer can route each layer independently.
+            if (childTrack < 0 || childTrack >= kTrackCount
+                || (parentTrack < 3 && childTrack >= 3)
+                || (parentTrack >= 3 && childTrack < 3)) continue;
             result.append(readClip(item, parentTrack, childTrack,
                                    absoluteStart, accumulatedRate));
         }
