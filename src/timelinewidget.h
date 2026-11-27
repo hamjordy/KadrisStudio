@@ -39,6 +39,7 @@ public:
     };
 
     void addClip(const QString &path);
+    int replaceMediaPath(const QString &oldPath, const QString &newPath);
     void zoomIn();
     void zoomOut();
     void resetZoom();
