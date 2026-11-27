@@ -36,6 +36,7 @@
 #include <QProcess>
 #include <QProgressDialog>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QScrollArea>
 #include <QSlider>
 #include <QSignalBlocker>
@@ -2384,10 +2385,25 @@ void MainWindow::exportVideo()
         return;
     }
 
+    qint64 totalDurationMs = 0;
+    for (const QJsonValue &value : m_timeline->toJson()) {
+        if (!value.isObject()) continue;
+        const QJsonObject clip = value.toObject();
+        totalDurationMs = qMax(totalDurationMs,
+            static_cast<qint64>(clip.value("timelineStartMs").toDouble())
+            + static_cast<qint64>(clip.value("durationMs").toDouble()));
+    }
+    if (totalDurationMs <= 0) totalDurationMs = 1;
+
+    // FFmpeg reports machine-readable progress on stdout; keep diagnostics on stderr.
+    arguments.insert(0, "-progress");
+    arguments.insert(1, "pipe:1");
+    arguments.insert(2, "-nostats");
+
     auto *process = new QProcess(this);
     m_exportProcess = process;
     auto *progress = new QProgressDialog(
-        "Rendering your timeline to MP4…", "Cancel Export", 0, 0, this);
+        "Rendering your timeline to MP4… 0%", "Cancel Export", 0, 1000, this);
     m_exportProgress = progress;
     progress->setWindowTitle("KadrisStudio Export");
     progress->setWindowModality(Qt::WindowModal);
@@ -2395,6 +2411,49 @@ void MainWindow::exportVideo()
     progress->setAutoClose(false);
     progress->setAutoReset(false);
     connect(progress, &QProgressDialog::canceled, process, &QProcess::kill);
+
+    connect(process, &QProcess::readyReadStandardOutput, this,
+        [process, progress, totalDurationMs, pending = QString()]() mutable {
+            pending += QString::fromLocal8Bit(process->readAllStandardOutput());
+            while (true) {
+                const int newline = pending.indexOf('\n');
+                if (newline < 0) break;
+                const QString line = pending.left(newline).trimmed();
+                pending.remove(0, newline + 1);
+
+                qint64 renderedUs = -1;
+                if (line.startsWith("out_time_us=")) {
+                    bool ok = false;
+                    renderedUs = line.mid(QStringLiteral("out_time_us=").size()).toLongLong(&ok);
+                    if (!ok) renderedUs = -1;
+                } else if (line.startsWith("out_time=")) {
+                    const QRegularExpression timePattern(
+                        R"(^out_time=(\\d+):(\\d{2}):(\\d{2})\\.(\\d+)$)");
+                    const auto match = timePattern.match(line);
+                    if (match.hasMatch()) {
+                        const qint64 hours = match.captured(1).toLongLong();
+                        const qint64 minutes = match.captured(2).toLongLong();
+                        const qint64 seconds = match.captured(3).toLongLong();
+                        QString fraction = match.captured(4).left(6);
+                        while (fraction.size() < 6) fraction += QLatin1Char('0');
+                        renderedUs = ((hours * 60 + minutes) * 60 + seconds) * 1000000
+                            + fraction.toLongLong();
+                    }
+                } else if (line == "progress=end") {
+                    progress->setValue(1000);
+                    progress->setLabelText("Rendering your timeline to MP4… 100%");
+                }
+
+                if (renderedUs >= 0) {
+                    const qint64 totalUs = totalDurationMs * 1000;
+                    const int value = qBound(0, static_cast<int>(
+                        (renderedUs * 1000) / qMax<qint64>(1, totalUs)), 999);
+                    progress->setValue(value);
+                    progress->setLabelText(
+                        QString("Rendering your timeline to MP4… %1%").arg(value / 10.0, 0, 'f', 1));
+                }
+            }
+        });
 
     connect(process,
         qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
