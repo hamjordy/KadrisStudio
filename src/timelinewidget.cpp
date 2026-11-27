@@ -1784,6 +1784,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
             m_selectedClip = activeIndex;
             m_dragOrigin = pos;
             m_dragSnapshot = m_clips.at(activeIndex);
+            m_rollPartnerSnapshot = Clip{};
+            m_rollPartnerSnapshot.id = -1;
             m_dragGroupSnapshot.clear();
             for (const Clip &candidate : m_clips) {
                 if (m_selectedClipIds.contains(candidate.id))
@@ -1800,8 +1802,22 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
                     m_dragMode = DragMode::TrimLeft;
                 } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
-                    m_dragMode = event->modifiers().testFlag(Qt::ShiftModifier)
-                        ? DragMode::RippleTrimRight : DragMode::TrimRight;
+                    if (event->modifiers().testFlag(Qt::AltModifier)) {
+                        const qint64 editPoint = m_dragSnapshot.timelineStartMs
+                            + m_dragSnapshot.durationMs;
+                        for (const Clip &candidate : m_clips) {
+                            if (candidate.id != m_dragSnapshot.id
+                                && candidate.track == m_dragSnapshot.track
+                                && candidate.timelineStartMs == editPoint) {
+                                m_rollPartnerSnapshot = candidate;
+                                break;
+                            }
+                        }
+                    }
+                    m_dragMode = m_rollPartnerSnapshot.id >= 0
+                        ? DragMode::RollTrimRight
+                        : (event->modifiers().testFlag(Qt::ShiftModifier)
+                            ? DragMode::RippleTrimRight : DragMode::TrimRight);
                 } else {
                     m_dragMode = DragMode::Move;
                 }
@@ -2014,6 +2030,25 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         clip.timelineStartMs = m_dragSnapshot.timelineStartMs + deltaMs;
         clip.sourceInMs = m_dragSnapshot.sourceInMs + deltaMs;
         clip.durationMs = m_dragSnapshot.durationMs - deltaMs;
+    } else if (m_dragMode == DragMode::RollTrimRight) {
+        const int partnerIndex = indexForClipId(m_rollPartnerSnapshot.id);
+        if (partnerIndex < 0 || isTrackLocked(m_rollPartnerSnapshot.track)
+            || m_rollPartnerSnapshot.track != m_dragSnapshot.track) return;
+        // A roll edit moves one shared cut: the outgoing clip gains exactly
+        // the duration that the incoming clip loses, preserving the sequence end.
+        const qint64 minimumDelta = qMax(
+            kMinimumClipDurationMs - m_dragSnapshot.durationMs,
+            -m_rollPartnerSnapshot.sourceInMs);
+        const qint64 maximumDelta =
+            m_rollPartnerSnapshot.durationMs - kMinimumClipDurationMs;
+        deltaMs = qBound(minimumDelta, deltaMs, maximumDelta);
+        const qint64 rolledDelta = m_timebase.snapMilliseconds(deltaMs);
+        const qint64 safeDelta = qBound(minimumDelta, rolledDelta, maximumDelta);
+        clip.durationMs = m_dragSnapshot.durationMs + safeDelta;
+        Clip &partner = m_clips[partnerIndex];
+        partner.timelineStartMs = m_rollPartnerSnapshot.timelineStartMs + safeDelta;
+        partner.sourceInMs = m_rollPartnerSnapshot.sourceInMs + safeDelta;
+        partner.durationMs = m_rollPartnerSnapshot.durationMs - safeDelta;
     } else if (m_dragMode == DragMode::TrimRight
                || m_dragMode == DragMode::RippleTrimRight) {
         qint64 proposedEnd = m_dragSnapshot.timelineStartMs

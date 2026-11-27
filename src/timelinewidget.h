@@ -150,7 +150,7 @@ private:
         QVector<TransformKeyframe> transformKeyframes;
     };
 
-    enum class DragMode { None, Move, TrimLeft, TrimRight, RippleTrimRight };
+    enum class DragMode { None, Move, TrimLeft, TrimRight, RippleTrimRight, RollTrimRight };
 
     QRect clipRect(int index) const;
     int clipIndexAt(const QPoint &position) const;
@@ -176,6 +176,7 @@ private:
     DragMode m_dragMode = DragMode::None;
     QPoint m_dragOrigin;
     Clip m_dragSnapshot;
+    Clip m_rollPartnerSnapshot;
     QSet<int> m_selectedClipIds;
     QVector<Clip> m_dragGroupSnapshot;
 };
