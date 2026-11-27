@@ -125,6 +125,22 @@ int main(int argc, char **argv)
     assert(nestedReloaded.unnestSelectedClip());
     assert(nestedReloaded.toJson().size() == 2);
 
+    // Double-clicking a nested clip selects it and requests opening its sequence.
+    TimelineWidget nestedOpenGesture;
+    nestedOpenGesture.resize(1600, 300);
+    nestedOpenGesture.fromJson(nestedSaved);
+    int openedNestedClipId = -1;
+    QObject::connect(&nestedOpenGesture, &TimelineWidget::nestedSequenceDoubleClicked,
+                     [&openedNestedClipId](int id) { openedNestedClipId = id; });
+    QMouseEvent openNestedEvent(QEvent::MouseButtonDblClick, QPointF(230, 55),
+        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(&nestedOpenGesture, &openNestedEvent);
+    assert(openedNestedClipId > 0);
+    TimelineWidget::ClipInfo openedNestedInfo;
+    assert(nestedOpenGesture.selectedClipInfo(&openedNestedInfo));
+    assert(openedNestedInfo.id == openedNestedClipId);
+    assert(openedNestedInfo.nestedSequence);
+
     // Preview lookup resolves child media at the nested sequence's absolute timeline time.
     TimelineWidget previewNested;
     previewNested.fromJson(nestedSaved);
