@@ -1543,8 +1543,43 @@ void MainWindow::autosaveProject()
     statusBar()->showMessage("Crash-recovery autosave created", 2500);
 }
 
+bool MainWindow::createProjectBackup(const QString &path)
+{
+    const QFileInfo projectInfo(path);
+    if (!projectInfo.exists() || !projectInfo.isFile()
+        || projectInfo.suffix().compare("kadris", Qt::CaseInsensitive) != 0)
+        return true;
+
+    const QString backupDirectory = path + ".backups";
+    if (!QDir().mkpath(backupDirectory)) {
+        statusBar()->showMessage("Could not create project backup folder — save cancelled", 8000);
+        return false;
+    }
+
+    const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss-zzz");
+    const QString backupPath = QDir(backupDirectory).filePath(
+        projectInfo.completeBaseName() + "-" + timestamp + ".kadris");
+    if (!QFile::copy(path, backupPath)) {
+        statusBar()->showMessage("Could not create a backup of the existing project — save cancelled", 8000);
+        return false;
+    }
+
+    QDir backups(backupDirectory);
+    QFileInfoList files = backups.entryInfoList(
+        QStringList{QStringLiteral("*.kadris")}, QDir::Files, QDir::Name);
+    while (files.size() > 10) {
+        const QFileInfo oldest = files.takeFirst();
+        if (!QFile::remove(oldest.absoluteFilePath())) {
+            statusBar()->showMessage("Project backup created, but an old backup could not be pruned", 6000);
+            break;
+        }
+    }
+    return true;
+}
+
 bool MainWindow::writeProject(const QString &path)
 {
+    if (!createProjectBackup(path)) return false;
     QJsonArray media;
     for (const QString &item : m_mediaPaths) {
         media.append(ProjectMediaPaths::toStoredPath(path, item));
