@@ -84,28 +84,28 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 m_monitor->setFrame(0, frame.toImage());
         });
 
-    for (int track = 0; track < 3; ++track) {
-        m_videoTrackPlayers[track] = new QMediaPlayer(this);
-        m_videoTrackSinks[track] = new QVideoSink(this);
-        m_videoTrackPlayers[track]->setVideoSink(m_videoTrackSinks[track]);
+    for (int slot = 0; slot < 9; ++slot) {
+        m_videoTrackPlayers[slot] = new QMediaPlayer(this);
+        m_videoTrackSinks[slot] = new QVideoSink(this);
+        m_videoTrackPlayers[slot]->setVideoSink(m_videoTrackSinks[slot]);
 
-        connect(m_videoTrackSinks[track], &QVideoSink::videoFrameChanged, this,
-            [this, track](const QVideoFrame &frame) {
+        connect(m_videoTrackSinks[slot], &QVideoSink::videoFrameChanged, this,
+            [this, slot](const QVideoFrame &frame) {
                 if (m_monitor && frame.isValid()
-                    && (m_sequencePlaying || m_activeVideoClipIds[track] >= 0))
-                    m_monitor->setFrame(track, frame.toImage());
+                    && (m_sequencePlaying || m_activeVideoClipIds[slot] >= 0))
+                    m_monitor->setFrame(slot, frame.toImage());
             });
-        connect(m_videoTrackPlayers[track], &QMediaPlayer::mediaStatusChanged, this,
-            [this, track](QMediaPlayer::MediaStatus) {
-                handleVideoTrackStatus(track);
+        connect(m_videoTrackPlayers[slot], &QMediaPlayer::mediaStatusChanged, this,
+            [this, slot](QMediaPlayer::MediaStatus) {
+                handleVideoTrackStatus(slot);
             });
-        connect(m_videoTrackPlayers[track], &QMediaPlayer::errorOccurred, this,
-            [this, track](QMediaPlayer::Error, const QString &message) {
-                m_waitingForVideoTrack[track] = false;
-                m_failedVideoTrack[track] = true;
-                if (m_monitor) m_monitor->clearFrame(track);
+        connect(m_videoTrackPlayers[slot], &QMediaPlayer::errorOccurred, this,
+            [this, slot](QMediaPlayer::Error, const QString &message) {
+                m_waitingForVideoTrack[slot] = false;
+                m_failedVideoTrack[slot] = true;
+                if (m_monitor) m_monitor->clearFrame(slot);
                 statusBar()->showMessage(
-                    QString("Video track %1: %2").arg(track + 1).arg(message), 6000);
+                    QString("Video layer %1: %2").arg(slot + 1).arg(message), 6000);
             });
     }
 
@@ -235,13 +235,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 if (m_sequenceClock.isValid()) m_sequenceClock.restart();
                 else m_sequenceClock.start();
 
-                for (int track = 0; track < 3; ++track) {
-                    m_videoTrackPlayers[track]->stop();
-                    m_videoTrackPlayers[track]->setSource(QUrl());
-                    m_activeVideoClipIds[track] = -1;
-                    m_waitingForVideoTrack[track] = false;
-                    m_failedVideoTrack[track] = false;
-                    m_monitor->clearFrame(track);
+                for (int slot = 0; slot < 9; ++slot) {
+                    m_videoTrackPlayers[slot]->stop();
+                    m_videoTrackPlayers[slot]->setSource(QUrl());
+                    m_activeVideoClipIds[slot] = -1;
+                    m_waitingForVideoTrack[slot] = false;
+                    m_failedVideoTrack[slot] = false;
+                    m_monitor->clearFrame(slot);
                 }
                 for (int track = 0; track < 2; ++track) {
                     m_audioTrackPlayers[track]->stop();
@@ -2043,12 +2043,12 @@ void MainWindow::toggleSequencePlayback()
 
     // Rebuild every active source from the current playhead. This also makes
     // pause -> seek -> resume start at the correct source positions.
-    for (int track = 0; track < 3; ++track) {
-        m_videoTrackPlayers[track]->stop();
-        m_videoTrackPlayers[track]->setSource(QUrl());
-        m_activeVideoClipIds[track] = -1;
-        m_waitingForVideoTrack[track] = false;
-        m_failedVideoTrack[track] = false;
+    for (int slot = 0; slot < 9; ++slot) {
+        m_videoTrackPlayers[slot]->stop();
+        m_videoTrackPlayers[slot]->setSource(QUrl());
+        m_activeVideoClipIds[slot] = -1;
+        m_waitingForVideoTrack[slot] = false;
+        m_failedVideoTrack[slot] = false;
     }
     for (int track = 0; track < 2; ++track) {
         m_audioTrackPlayers[track]->stop();
@@ -2139,67 +2139,73 @@ void MainWindow::tickSequencePlayback()
 void MainWindow::refreshPausedTimelinePreview()
 {
     if (m_sequencePlaying || !m_timeline || !m_monitor) return;
-
     m_player->stop();
     m_monitor->setCaption("Timeline preview");
-    for (int track = 0; track < 3; ++track) {
-        auto *player = m_videoTrackPlayers[track];
-        TimelineWidget::ClipInfo clip;
-        const bool hasClip = !m_timeline->isTrackMuted(track)
-            && m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip);
-        if (!hasClip) {
+
+    for (int parentTrack = 0; parentTrack < 3; ++parentTrack) {
+        const QVector<TimelineWidget::ClipInfo> clips =
+            m_timeline->isTrackMuted(parentTrack) ? QVector<TimelineWidget::ClipInfo>()
+                : m_timeline->clipsAtTimeOnTrack(m_sequencePositionMs, parentTrack);
+        for (int childLayer = 0; childLayer < 3; ++childLayer) {
+            const int slot = parentTrack * 3 + childLayer;
+            auto *player = m_videoTrackPlayers[slot];
+            TimelineWidget::ClipInfo clip;
+            bool found = false;
+            for (const auto &candidate : clips) {
+                const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack;
+                if (candidateLayer == childLayer) { clip = candidate; found = true; }
+            }
+            if (!found) {
+                if (m_activeVideoClipIds[slot] != -1 || player->source().isValid()) {
+                    player->stop(); player->setSource(QUrl());
+                }
+                m_activeVideoClipIds[slot] = -1;
+                m_waitingForVideoTrack[slot] = false;
+                m_failedVideoTrack[slot] = false;
+                m_monitor->clearFrame(slot);
+                continue;
+            }
+
+            const int brightness = clip.nestedContent ? clip.brightness
+                : m_timeline->evaluatedBrightness(clip.id, m_sequencePositionMs);
+            const int contrast = clip.nestedContent ? clip.contrast
+                : m_timeline->evaluatedContrast(clip.id, m_sequencePositionMs);
+            int scale = clip.scale, x = clip.positionX, y = clip.positionY;
+            if (!clip.nestedContent)
+                m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs, &scale, &x, &y);
+            m_monitor->setTrackTransform(slot, scale, x, y);
+            m_monitor->setTrackOpacity(slot, clip.nestedContent ? clip.opacity
+                : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+            m_monitor->setTrackBlendMode(slot, clip.blendMode);
+            m_monitor->setTrackColorGrade(slot, brightness, contrast, clip.saturation,
+                clip.shadows, clip.midtones, clip.highlights, clip.redCurve,
+                clip.greenCurve, clip.blueCurve);
+
+            if (m_activeVideoClipIds[slot] == clip.id
+                && !m_waitingForVideoTrack[slot] && !m_failedVideoTrack[slot]) {
+                player->setPlaybackRate(clip.playbackRate);
+                const qint64 source = qMax<qint64>(0, clip.sourceInMs
+                    + qRound64(qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs)
+                        * clip.playbackRate));
+                player->setPosition(source);
+                player->pause();
+                continue;
+            }
             player->stop();
-            player->setSource(QUrl());
-            m_activeVideoClipIds[track] = -1;
-            m_waitingForVideoTrack[track] = false;
-            m_failedVideoTrack[track] = false;
-            m_monitor->clearFrame(track);
-            continue;
+            m_monitor->clearFrame(slot);
+            m_activeVideoClipIds[slot] = clip.id;
+            m_waitingForVideoTrack[slot] = false;
+            m_failedVideoTrack[slot] = false;
+            if (!QFileInfo::exists(clip.path)) {
+                m_failedVideoTrack[slot] = true;
+                statusBar()->showMessage(QString("Missing media on VIDEO %1: %2")
+                    .arg(parentTrack + 1).arg(QFileInfo(clip.path).fileName()), 6000);
+                continue;
+            }
+            m_waitingForVideoTrack[slot] = true;
+            player->setSource(QUrl::fromLocalFile(clip.path));
+            handleVideoTrackStatus(slot);
         }
-
-        const int animatedBrightness = clip.nestedContent ? clip.brightness
-            : m_timeline->evaluatedBrightness(clip.id, m_sequencePositionMs);
-        const int animatedContrast = clip.nestedContent ? clip.contrast
-            : m_timeline->evaluatedContrast(clip.id, m_sequencePositionMs);
-        int animatedScale = clip.scale, animatedX = clip.positionX, animatedY = clip.positionY;
-        if (!clip.nestedContent)
-            m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
-                &animatedScale, &animatedX, &animatedY);
-        m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
-        m_monitor->setTrackOpacity(track, clip.nestedContent ? clip.opacity
-            : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
-        m_monitor->setTrackBlendMode(track, clip.blendMode);
-        m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
-            clip.saturation, clip.shadows, clip.midtones, clip.highlights,
-            clip.redCurve, clip.greenCurve, clip.blueCurve);
-        if (m_activeVideoClipIds[track] == clip.id
-            && !m_waitingForVideoTrack[track]
-            && !m_failedVideoTrack[track]) {
-            player->setPlaybackRate(clip.playbackRate);
-            const qint64 timelineOffset = qMax<qint64>(
-                0, m_sequencePositionMs - clip.timelineStartMs);
-            const qint64 sourcePosition = qMax<qint64>(0,
-                clip.sourceInMs + qRound64(timelineOffset * clip.playbackRate));
-            player->setPosition(sourcePosition);
-            player->pause();
-            continue;
-        }
-
-        player->stop();
-        m_monitor->clearFrame(track);
-        m_activeVideoClipIds[track] = clip.id;
-        m_waitingForVideoTrack[track] = false;
-        m_failedVideoTrack[track] = false;
-        if (!QFileInfo::exists(clip.path)) {
-            m_failedVideoTrack[track] = true;
-            statusBar()->showMessage(
-                QString("Missing media on VIDEO %1: %2")
-                    .arg(track + 1).arg(QFileInfo(clip.path).fileName()), 6000);
-            continue;
-        }
-        m_waitingForVideoTrack[track] = true;
-        player->setSource(QUrl::fromLocalFile(clip.path));
-        handleVideoTrackStatus(track);
     }
 
     for (int track = 0; track < 2; ++track) {
@@ -2266,169 +2272,121 @@ void MainWindow::setSequenceFrameRate()
 void MainWindow::syncVideoTracks()
 {
     if (!m_sequencePlaying) return;
-
-    for (int track = 0; track < 3; ++track) {
-        if (m_timeline->isTrackMuted(track)) {
-            if (m_activeVideoClipIds[track] != -1) {
-                m_videoTrackPlayers[track]->stop();
-                m_videoTrackPlayers[track]->setSource(QUrl());
-                m_activeVideoClipIds[track] = -1;
-                m_waitingForVideoTrack[track] = false;
-                m_failedVideoTrack[track] = false;
-                m_monitor->clearFrame(track);
+    for (int parentTrack = 0; parentTrack < 3; ++parentTrack) {
+        const QVector<TimelineWidget::ClipInfo> clips =
+            m_timeline->isTrackMuted(parentTrack) ? QVector<TimelineWidget::ClipInfo>()
+                : m_timeline->clipsAtTimeOnTrack(m_sequencePositionMs, parentTrack);
+        for (int childLayer = 0; childLayer < 3; ++childLayer) {
+            const int slot = parentTrack * 3 + childLayer;
+            auto *player = m_videoTrackPlayers[slot];
+            TimelineWidget::ClipInfo clip;
+            bool found = false;
+            for (const auto &candidate : clips) {
+                const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack;
+                if (candidateLayer == childLayer) { clip = candidate; found = true; }
             }
-            continue;
-        }
-        TimelineWidget::ClipInfo clip;
-        const bool hasClip = m_timeline->clipAtTimeOnTrack(
-            m_sequencePositionMs, track, &clip);
-
-        if (!hasClip) {
-            if (m_activeVideoClipIds[track] != -1) {
-                m_videoTrackPlayers[track]->stop();
-                m_videoTrackPlayers[track]->setSource(QUrl());
-                m_activeVideoClipIds[track] = -1;
-                m_waitingForVideoTrack[track] = false;
-                m_failedVideoTrack[track] = false;
-                m_monitor->clearFrame(track);
-            }
-            continue;
-        }
-
-        const int animatedBrightness = clip.nestedContent ? clip.brightness
-            : m_timeline->evaluatedBrightness(clip.id, m_sequencePositionMs);
-        const int animatedContrast = clip.nestedContent ? clip.contrast
-            : m_timeline->evaluatedContrast(clip.id, m_sequencePositionMs);
-        int animatedScale = clip.scale, animatedX = clip.positionX, animatedY = clip.positionY;
-        if (!clip.nestedContent)
-            m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs,
-                &animatedScale, &animatedX, &animatedY);
-        m_monitor->setTrackTransform(track, animatedScale, animatedX, animatedY);
-        m_monitor->setTrackOpacity(track, clip.nestedContent ? clip.opacity
-            : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
-        m_monitor->setTrackBlendMode(track, clip.blendMode);
-        m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
-            clip.saturation, clip.shadows, clip.midtones, clip.highlights,
-            clip.redCurve, clip.greenCurve, clip.blueCurve);
-        if (clip.id == m_activeVideoClipIds[track]) {
-            QMediaPlayer *player = m_videoTrackPlayers[track];
-            player->setPlaybackRate(clip.playbackRate);
-            if (m_waitingForVideoTrack[track]) {
-                handleVideoTrackStatus(track);
-            } else if (!m_failedVideoTrack[track]) {
-                const qint64 timelineOffset = qMax<qint64>(
-                    0, m_sequencePositionMs - clip.timelineStartMs);
-                const qint64 sourcePosition = qMax<qint64>(0,
-                    clip.sourceInMs + qRound64(timelineOffset * clip.playbackRate));
-                if (player->playbackState() == QMediaPlayer::PlayingState) {
-                    // Keep the decoded video aligned to the sequence clock without
-                    // seeking every frame; large corrections recover from decoder drift.
-                    constexpr qint64 videoDriftToleranceMs = 500;
-                    if (qAbs(player->position() - sourcePosition)
-                        > videoDriftToleranceMs) {
-                        player->setPosition(sourcePosition);
-                    }
-                } else {
-                    player->setPosition(sourcePosition);
-                    player->play();
+            if (!found) {
+                if (m_activeVideoClipIds[slot] != -1) {
+                    player->stop(); player->setSource(QUrl());
+                    m_activeVideoClipIds[slot] = -1;
+                    m_waitingForVideoTrack[slot] = false;
+                    m_failedVideoTrack[slot] = false;
+                    m_monitor->clearFrame(slot);
                 }
+                continue;
             }
-            continue;
+
+            const int brightness = clip.nestedContent ? clip.brightness
+                : m_timeline->evaluatedBrightness(clip.id, m_sequencePositionMs);
+            const int contrast = clip.nestedContent ? clip.contrast
+                : m_timeline->evaluatedContrast(clip.id, m_sequencePositionMs);
+            int scale = clip.scale, x = clip.positionX, y = clip.positionY;
+            if (!clip.nestedContent)
+                m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs, &scale, &x, &y);
+            m_monitor->setTrackTransform(slot, scale, x, y);
+            m_monitor->setTrackOpacity(slot, clip.nestedContent ? clip.opacity
+                : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+            m_monitor->setTrackBlendMode(slot, clip.blendMode);
+            m_monitor->setTrackColorGrade(slot, brightness, contrast, clip.saturation,
+                clip.shadows, clip.midtones, clip.highlights, clip.redCurve,
+                clip.greenCurve, clip.blueCurve);
+
+            if (m_activeVideoClipIds[slot] == clip.id) {
+                player->setPlaybackRate(clip.playbackRate);
+                if (m_waitingForVideoTrack[slot]) {
+                    handleVideoTrackStatus(slot);
+                } else if (!m_failedVideoTrack[slot]) {
+                    const qint64 source = qMax<qint64>(0, clip.sourceInMs
+                        + qRound64(qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs)
+                            * clip.playbackRate));
+                    if (player->playbackState() == QMediaPlayer::PlayingState) {
+                        if (qAbs(player->position() - source) > 500) player->setPosition(source);
+                    } else {
+                        player->setPosition(source);
+                        player->play();
+                    }
+                }
+                continue;
+            }
+
+            player->stop();
+            m_monitor->clearFrame(slot);
+            m_activeVideoClipIds[slot] = clip.id;
+            m_waitingForVideoTrack[slot] = false;
+            m_failedVideoTrack[slot] = false;
+            if (!QFileInfo::exists(clip.path)) {
+                m_failedVideoTrack[slot] = true;
+                statusBar()->showMessage(QString("Missing media on VIDEO %1: %2")
+                    .arg(parentTrack + 1).arg(QFileInfo(clip.path).fileName()), 6000);
+                continue;
+            }
+            m_waitingForVideoTrack[slot] = true;
+            player->setSource(QUrl::fromLocalFile(clip.path));
+            handleVideoTrackStatus(slot);
         }
-
-        m_videoTrackPlayers[track]->stop();
-        m_monitor->clearFrame(track);
-        m_activeVideoClipIds[track] = clip.id;
-        m_monitor->setTrackColorGrade(track, animatedBrightness, animatedContrast,
-            clip.saturation, clip.shadows, clip.midtones, clip.highlights,
-            clip.redCurve, clip.greenCurve, clip.blueCurve);
-        m_waitingForVideoTrack[track] = false;
-        m_failedVideoTrack[track] = false;
-
-        if (!QFileInfo::exists(clip.path)) {
-            m_failedVideoTrack[track] = true;
-            statusBar()->showMessage(
-                QString("Missing media on VIDEO %1: %2")
-                    .arg(track + 1).arg(QFileInfo(clip.path).fileName()), 6000);
-            continue;
-        }
-
-        m_waitingForVideoTrack[track] = true;
-        m_videoTrackPlayers[track]->setSource(QUrl::fromLocalFile(clip.path));
-        handleVideoTrackStatus(track);
     }
 }
 
-void MainWindow::handleVideoTrackStatus(int track)
+void MainWindow::handleVideoTrackStatus(int slot)
 {
-    if (track < 0 || track >= 3) return;
-
-    QMediaPlayer *player = m_videoTrackPlayers[track];
-    if (!m_sequencePlaying) {
-        if (!m_waitingForVideoTrack[track]) return;
-        const auto status = player->mediaStatus();
-        if (status == QMediaPlayer::LoadedMedia
-            || status == QMediaPlayer::BufferedMedia) {
-            TimelineWidget::ClipInfo clip;
-            if (!m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip)
-                || clip.id != m_activeVideoClipIds[track]) {
-                m_waitingForVideoTrack[track] = false;
-                return;
-            }
-            const qint64 sourcePosition =
-                clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
-            player->setPlaybackRate(clip.playbackRate);
-            player->setPosition(qMax<qint64>(0, sourcePosition));
-            m_waitingForVideoTrack[track] = false;
-            player->pause();
-        } else if (status == QMediaPlayer::InvalidMedia
-                   || status == QMediaPlayer::EndOfMedia) {
-            m_waitingForVideoTrack[track] = false;
-            m_failedVideoTrack[track] = true;
-            TimelineWidget::ClipInfo clip;
-            const QString mediaName =
-                m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip)
-                    ? QFileInfo(clip.path).fileName()
-                    : QStringLiteral("unknown media");
-            statusBar()->showMessage(
-                QString("Could not load VIDEO %1: %2")
-                    .arg(track + 1).arg(mediaName), 6000);
+    if (slot < 0 || slot >= 9) return;
+    QMediaPlayer *player = m_videoTrackPlayers[slot];
+    const int parentTrack = slot / 3;
+    const int childLayer = slot % 3;
+    const auto findClip = [this, parentTrack, childLayer](TimelineWidget::ClipInfo *out) {
+        const auto clips = m_timeline->clipsAtTimeOnTrack(m_sequencePositionMs, parentTrack);
+        for (const auto &candidate : clips) {
+            const int layer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack;
+            if (layer == childLayer) { if (out) *out = candidate; return true; }
         }
+        return false;
+    };
+    const auto status = player->mediaStatus();
+    if (status == QMediaPlayer::EndOfMedia && !m_waitingForVideoTrack[slot]) {
+        m_failedVideoTrack[slot] = true;
+        m_monitor->clearFrame(slot);
         return;
     }
-    const QMediaPlayer::MediaStatus status = player->mediaStatus();
-
-    // Do not restart a source from frame zero if it ends before the timeline clip does.
-    if (status == QMediaPlayer::EndOfMedia && !m_waitingForVideoTrack[track]) {
-        m_failedVideoTrack[track] = true;
-        m_monitor->clearFrame(track);
-        return;
-    }
-
-    if (!m_waitingForVideoTrack[track]) return;
-
-    if (status == QMediaPlayer::LoadedMedia
-        || status == QMediaPlayer::BufferedMedia) {
+    if (!m_waitingForVideoTrack[slot]) return;
+    if (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia) {
         TimelineWidget::ClipInfo clip;
-        if (!m_timeline->clipAtTimeOnTrack(m_sequencePositionMs, track, &clip)
-            || clip.id != m_activeVideoClipIds[track]) {
-            m_waitingForVideoTrack[track] = false;
+        if (!findClip(&clip) || clip.id != m_activeVideoClipIds[slot]) {
+            m_waitingForVideoTrack[slot] = false;
             return;
         }
-
-        const qint64 sourcePosition =
-            clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
+        const qint64 source = qMax<qint64>(0, clip.sourceInMs
+            + qRound64(qMax<qint64>(0, m_sequencePositionMs - clip.timelineStartMs)
+                * clip.playbackRate));
         player->setPlaybackRate(clip.playbackRate);
-            player->setPosition(qMax<qint64>(0, sourcePosition));
-        m_waitingForVideoTrack[track] = false;
-        player->play();
-    } else if (status == QMediaPlayer::InvalidMedia
-        || status == QMediaPlayer::EndOfMedia) {
-        m_waitingForVideoTrack[track] = false;
-        m_failedVideoTrack[track] = true;
-        m_monitor->clearFrame(track);
-        statusBar()->showMessage(
-            QString("Could not play media on VIDEO %1").arg(track + 1), 6000);
+        player->setPosition(source);
+        m_waitingForVideoTrack[slot] = false;
+        if (m_sequencePlaying) player->play(); else player->pause();
+    } else if (status == QMediaPlayer::InvalidMedia || status == QMediaPlayer::EndOfMedia) {
+        m_waitingForVideoTrack[slot] = false;
+        m_failedVideoTrack[slot] = true;
+        m_monitor->clearFrame(slot);
+        statusBar()->showMessage(QString("Could not load VIDEO %1 layer %2")
+            .arg(parentTrack + 1).arg(childLayer + 1), 6000);
     }
 }
 
