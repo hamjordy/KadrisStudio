@@ -283,6 +283,22 @@ bool TimelineWidget::isTrackSyncLocked(int track) const
     return track >= 0 && track < kTrackCount && m_trackSyncLocked[track];
 }
 
+QString TimelineWidget::trackGroup(int track) const
+{
+    return track >= 0 && track < kTrackCount ? m_trackGroups[track] : QString();
+}
+
+void TimelineWidget::setTrackGroup(int track, const QString &groupName)
+{
+    if (track < 0 || track >= kTrackCount) return;
+    const QString normalized = groupName.trimmed().left(32);
+    if (m_trackGroups[track] == normalized) return;
+    m_trackGroups[track] = normalized;
+    update();
+    emit trackStateChanged(track);
+    emit timelineEdited();
+}
+
 QJsonArray TimelineWidget::trackStatesToJson() const
 {
     QJsonArray states;
@@ -292,6 +308,7 @@ QJsonArray TimelineWidget::trackStatesToJson() const
         state.insert("muted", m_trackMuted[track]);
         state.insert("targeted", m_trackTargeted[track]);
         state.insert("syncLocked", m_trackSyncLocked[track]);
+        state.insert("group", m_trackGroups[track]);
         states.append(state);
     }
     return states;
@@ -305,6 +322,7 @@ void TimelineWidget::trackStatesFromJson(const QJsonArray &states)
         m_trackMuted[track] = state.value("muted").toBool(false);
         m_trackTargeted[track] = state.value("targeted").toBool(true);
         m_trackSyncLocked[track] = state.value("syncLocked").toBool(false);
+        m_trackGroups[track] = state.value("group").toString();
     }
     update();
     for (int track = 0; track < kTrackCount; ++track)
@@ -1872,8 +1890,15 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
         p.setPen(track < 3 ? QColor("#c1ccd5") : QColor("#a2b3bf"));
         const QString shortName = track < 3
             ? QString("V%1").arg(track + 1) : QString("A%1").arg(track - 2);
-        p.drawText(QRect(13, y, 32, kTrackHeight),
+        p.drawText(QRect(11, y, 34, kTrackHeight),
                    Qt::AlignVCenter | Qt::AlignLeft, shortName);
+        if (!m_trackGroups[track].isEmpty()) {
+            p.setPen(QColor("#d4b5ef"));
+            p.setFont(QFont(p.font().family(), 7));
+            p.drawText(QRect(10, y + 22, 36, 12), Qt::AlignLeft | Qt::AlignVCenter,
+                       m_trackGroups[track].left(5));
+            p.setFont(QFont(p.font().family(), 8));
+        }
         const QRect targetRect(46, y + 6, 18, 22);
         const QRect lockRect(65, y + 6, 18, 22);
         const QRect syncRect(84, y + 6, 18, 22);
@@ -2189,6 +2214,19 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         const QPoint pos = event->position().toPoint();
+        const int groupTrack = (pos.y() - kTrackTop) / (kTrackHeight + kTrackGap);
+        if (pos.x() < 45 && pos.y() >= kTrackTop
+            && groupTrack >= 0 && groupTrack < kTrackCount
+            && (pos.y() - kTrackTop) % (kTrackHeight + kTrackGap) < kTrackHeight) {
+            bool accepted = false;
+            const QString name = QInputDialog::getText(
+                this, "Track Group", "Group name (same name joins tracks):",
+                QLineEdit::Normal, m_trackGroups[groupTrack], &accepted);
+            if (accepted)
+                setTrackGroup(groupTrack, name);
+            event->accept();
+            return;
+        }
         if (pos.y() >= kHeaderHeight && pos.y() <= kHeaderHeight + 34) {
             int nearestIndex = -1;
             int nearestDistance = 13;
