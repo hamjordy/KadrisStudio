@@ -133,7 +133,7 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent)
     setMinimumSize(1100, 270);
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     setMouseTracking(true);
-    setToolTip("Track controls: click L to lock/unlock and M to mute/unmute a track");
+    setToolTip("Track controls: T = target, L = lock, S = sync lock, M = mute");
     setFocusPolicy(Qt::StrongFocus);
 }
 
@@ -2487,17 +2487,19 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         if (m_dragMode == DragMode::RippleTrimRight && durationDelta != 0) {
             const qint64 oldEnd = m_dragSnapshot.timelineStartMs
                 + m_dragSnapshot.durationMs;
-            // Validate every downstream edit before moving anything: ripple
-            // trimming must never partially modify a locked track.
+            // The edited track always ripples. Additional sync-locked tracks
+            // follow the same delta; validate all of them before changing any clip.
             for (const Clip &other : m_clips) {
-                if (other.id == m_dragSnapshot.id
-                    || other.track != m_dragSnapshot.track
+                const bool followsRipple = other.track == m_dragSnapshot.track
+                    || isTrackSyncLocked(other.track);
+                if (other.id == m_dragSnapshot.id || !followsRipple
                     || other.timelineStartMs < oldEnd) continue;
                 if (isTrackLocked(other.track)) return;
             }
             for (Clip &other : m_clips) {
-                if (other.id == m_dragSnapshot.id
-                    || other.track != m_dragSnapshot.track
+                const bool followsRipple = other.track == m_dragSnapshot.track
+                    || isTrackSyncLocked(other.track);
+                if (other.id == m_dragSnapshot.id || !followsRipple
                     || other.timelineStartMs < oldEnd) continue;
                 other.timelineStartMs = m_timebase.snapMilliseconds(
                     qMax<qint64>(0, other.timelineStartMs + durationDelta));
