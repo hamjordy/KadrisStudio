@@ -161,6 +161,14 @@ int main(int argc, char **argv)
     const QJsonObject restoredInner = recursiveSaved.first().toObject();
     assert(restoredInner.value("nestedSequence").toBool());
     assert(restoredInner.value("nestedClips").toArray() == nestedSaved);
+    TimelineWidget recursivePreview;
+    recursivePreview.fromJson(recursiveSaved);
+    TimelineWidget::ClipInfo recursiveResolved;
+    assert(recursivePreview.clipAtTimeOnTrack(1200, 0, &recursiveResolved));
+    assert(recursiveResolved.path == "clip-a.mp4");
+    assert(recursiveResolved.nestedContent);
+    assert(recursivePreview.clipAtTimeOnTrack(3000, 0, &recursiveResolved));
+    assert(recursiveResolved.path == "clip-b.mp4");
 
     // Preview lookup resolves child media at the nested sequence's absolute timeline time.
     TimelineWidget previewNested;
