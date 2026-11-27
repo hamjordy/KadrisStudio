@@ -330,6 +330,8 @@ void TimelineWidget::addClip(const QString &path)
 
     m_clips.append(clip);
     m_selectedClip = m_clips.size() - 1;
+    m_selectedClipIds.clear();
+    m_selectedClipIds.insert(clip.id);
     m_playheadMs = clip.timelineStartMs;
     updateCanvasSize();
     update();
@@ -1479,7 +1481,8 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
     for (int i = 0; i < m_clips.size(); ++i) {
         const QRect bounds = clipRect(i);
         const Clip &clip = m_clips.at(i);
-        const bool selected = (i == m_selectedClip);
+        const bool selected = m_selectedClipIds.contains(clip.id)
+            || (m_selectedClipIds.isEmpty() && i == m_selectedClip);
         const bool audio = clip.track >= 3;
         const QColor fill = audio
             ? (selected ? QColor("#6a512b") : QColor("#47391f"))
@@ -1625,12 +1628,36 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
         emit playheadChanged(m_playheadMs);
 
         if (index >= 0) {
+            const int clickedId = m_clips.at(index).id;
+            const bool multiSelect = event->modifiers().testFlag(Qt::ControlModifier);
+            if (multiSelect) {
+                if (m_selectedClipIds.contains(clickedId))
+                    m_selectedClipIds.remove(clickedId);
+                else
+                    m_selectedClipIds.insert(clickedId);
+                if (m_selectedClipIds.isEmpty())
+                    m_selectedClipIds.insert(clickedId);
+            } else if (!m_selectedClipIds.contains(clickedId)) {
+                m_selectedClipIds.clear();
+                m_selectedClipIds.insert(clickedId);
+            }
             m_selectedClip = index;
             m_dragOrigin = pos;
             m_dragSnapshot = m_clips.at(index);
+            m_dragGroupSnapshot.clear();
+            if (m_selectedClipIds.contains(clickedId)) {
+                for (const Clip &candidate : m_clips) {
+                    if (m_selectedClipIds.contains(candidate.id))
+                        m_dragGroupSnapshot.append(candidate);
+                }
+            }
             const QRect bounds = clipRect(index);
-
-            if (pos.x() - bounds.left() <= kTrimHandleWidth) {
+            const bool groupMove = m_selectedClipIds.size() > 1
+                && pos.x() - bounds.left() > kTrimHandleWidth
+                && bounds.right() - pos.x() > kTrimHandleWidth;
+            if (groupMove) {
+                m_dragMode = DragMode::Move;
+            } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
                 m_dragMode = DragMode::TrimLeft;
             } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
                 m_dragMode = DragMode::TrimRight;
@@ -1643,6 +1670,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 m_clips.at(index).path, m_clips.at(index).track);
         } else {
             m_selectedClip = -1;
+            m_selectedClipIds.clear();
+            m_dragGroupSnapshot.clear();
             m_dragMode = DragMode::None;
             emit clipSelectionChanged(-1, QString(), -1);
         }
@@ -1715,6 +1744,50 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
     if (isTrackLocked(clip.track)) return;
     const qint64 snapToleranceMs = qMax<qint64>(
         kSnapIntervalMs, qRound64(8.0 * 1000.0 / m_pixelsPerSecond));
+
+    // Move a Ctrl-selected group together while preserving each clip's
+    // relative timing and track. Group movement is horizontal for safety.
+    if (m_dragMode == DragMode::Move && m_dragGroupSnapshot.size() > 1) {
+        qint64 groupStart = std::numeric_limits<qint64>::max();
+        qint64 groupEnd = 0;
+        for (const Clip &item : m_dragGroupSnapshot) {
+            if (isTrackLocked(item.track)) return;
+            groupStart = qMin(groupStart, item.timelineStartMs);
+            groupEnd = qMax(groupEnd, item.timelineStartMs + item.durationMs);
+        }
+        qint64 proposedStart = qMax<qint64>(0, groupStart + deltaMs);
+        qint64 proposedEnd = groupEnd + (proposedStart - groupStart);
+        qint64 bestDelta = proposedStart - groupStart;
+        qint64 bestDistance = snapToleranceMs + 1;
+        auto considerSnap = [&](qint64 edge) {
+            const qint64 distance = qAbs(edge - proposedStart);
+            if (distance <= snapToleranceMs && distance < bestDistance) {
+                bestDistance = distance;
+                bestDelta = edge - groupStart;
+            }
+            const qint64 endDistance = qAbs(edge - proposedEnd);
+            if (endDistance <= snapToleranceMs && endDistance < bestDistance) {
+                bestDistance = endDistance;
+                bestDelta = edge - groupEnd;
+            }
+        };
+        for (const Clip &other : m_clips) {
+            if (m_selectedClipIds.contains(other.id)) continue;
+            considerSnap(other.timelineStartMs);
+            considerSnap(other.timelineStartMs + other.durationMs);
+        }
+        for (const Marker &marker : m_markers)
+            considerSnap(marker.timeMs);
+        bestDelta = qMax<qint64>(-groupStart, bestDelta);
+        for (const Clip &snapshot : m_dragGroupSnapshot) {
+            const int targetIndex = indexForClipId(snapshot.id);
+            if (targetIndex >= 0)
+                m_clips[targetIndex].timelineStartMs = snapshot.timelineStartMs + bestDelta;
+        }
+        updateCanvasSize();
+        update();
+        return;
+    }
 
     // Snap the moving edge to nearby edges of other clips. The selected
     // clip is excluded so it can never snap to itself.
