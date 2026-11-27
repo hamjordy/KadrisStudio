@@ -18,8 +18,43 @@ QString atempoFilters(double rate)
     QStringList filters;
     while (rate > 2.0) { filters << "atempo=2.0"; rate /= 2.0; }
     while (rate < 0.5) { filters << "atempo=0.5"; rate /= 0.5; }
+
     filters << "atempo=" + number(rate);
     return filters.join(',');
+}
+
+bool expandNestedClips(const QJsonArray &source, double offsetMs,
+                       QJsonArray *expanded, QString *error, int depth = 0)
+{
+    if (depth > 8) {
+        if (error) *error = "Nested sequences exceed the maximum supported depth (8).";
+        return false;
+    }
+    for (const QJsonValue &value : source) {
+        if (!value.isObject()) continue;
+        QJsonObject clip = value.toObject();
+        const double start = clip.value("timelineStartMs").toDouble(0.0);
+        if (clip.value("nestedSequence").toBool(false)) {
+            if (clip.value("sourceInMs").toDouble(0.0) != 0.0
+                || clip.value("playbackRate").toDouble(1.0) != 1.0) {
+                if (error) *error = QString("Nested sequence %1 uses source trimming or speed changes that the export renderer does not support yet.")
+                    .arg(clip.value("nestedName").toString("Untitled"));
+                return false;
+            }
+            const QJsonArray children = clip.value("nestedClips").toArray();
+            if (children.isEmpty()) {
+                if (error) *error = QString("Nested sequence %1 is empty.")
+                    .arg(clip.value("nestedName").toString("Untitled"));
+                return false;
+            }
+            if (!expandNestedClips(children, offsetMs + start, expanded, error, depth + 1))
+                return false;
+            continue;
+        }
+        clip.insert("timelineStartMs", start + offsetMs);
+        expanded->append(clip);
+    }
+    return true;
 }
 }
 
@@ -51,6 +86,9 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         || !allowedAudioSampleRates.contains(audioSampleRate))
         return fail("The audio bitrate or sample rate is invalid.");
 
+    QJsonArray renderClips;
+    if (!expandNestedClips(clips, 0.0, &renderClips, error)) return false;
+
     struct Segment {
         int input = -1;
         int track = 0;
@@ -66,7 +104,7 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     double totalDuration = 0.0;
     int inputIndex = 0;
 
-    for (const QJsonValue &value : clips) {
+    for (const QJsonValue &value : renderClips) {
         if (!value.isObject()) continue;
         const QJsonObject clip = value.toObject();
         const QString path = clip.value("path").toString();
