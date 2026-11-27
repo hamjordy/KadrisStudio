@@ -110,6 +110,17 @@ int main(int argc, char **argv)
     assert(nestedReloaded.unnestSelectedClip());
     assert(nestedReloaded.toJson().size() == 2);
 
+    // Preview lookup resolves child media at the nested sequence's absolute timeline time.
+    TimelineWidget previewNested;
+    previewNested.fromJson(nestedSaved);
+    TimelineWidget::ClipInfo nestedPreviewClip;
+    assert(previewNested.clipAtTimeOnTrack(1200, 0, &nestedPreviewClip));
+    assert(nestedPreviewClip.path == "clip-a.mp4");
+    assert(nestedPreviewClip.timelineStartMs == 1000);
+    assert(previewNested.clipAtTimeOnTrack(3000, 0, &nestedPreviewClip));
+    assert(nestedPreviewClip.path == "clip-b.mp4");
+    assert(nestedPreviewClip.timelineStartMs == 2500);
+
     // Slip edits shift the source window while preserving timeline placement and duration.
     QJsonObject slipItem;
     slipItem.insert("id", 77);
