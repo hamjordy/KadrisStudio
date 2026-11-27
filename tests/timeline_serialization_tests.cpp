@@ -1,4 +1,5 @@
 #include "timelinewidget.h"
+#include "audio_crossfade.h"
 
 #include <QApplication>
 #include <QMouseEvent>
@@ -12,6 +13,27 @@
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
+    // Equal-power crossfade starts/ends cleanly and preserves combined power.
+    constexpr qint64 overlapStart = 1000;
+    constexpr qint64 overlapEnd = 3000;
+    assert(qAbs(KadrisAudio::equalPowerCrossfadeGain(
+        overlapStart, overlapStart, overlapEnd, false) - 1.0) < 0.000001);
+    assert(qAbs(KadrisAudio::equalPowerCrossfadeGain(
+        overlapStart, overlapStart, overlapEnd, true)) < 0.000001);
+    for (qint64 position : {1500, 2000, 2500}) {
+        const double outgoing = KadrisAudio::equalPowerCrossfadeGain(
+            position, overlapStart, overlapEnd, false);
+        const double incoming = KadrisAudio::equalPowerCrossfadeGain(
+            position, overlapStart, overlapEnd, true);
+        assert(qAbs(outgoing * outgoing + incoming * incoming - 1.0) < 0.000001);
+    }
+    assert(qAbs(KadrisAudio::equalPowerCrossfadeGain(
+        overlapEnd, overlapStart, overlapEnd, false)) < 0.000001);
+    assert(qAbs(KadrisAudio::equalPowerCrossfadeGain(
+        overlapEnd, overlapStart, overlapEnd, true) - 1.0) < 0.000001);
+    assert(KadrisAudio::equalPowerCrossfadeGain(
+        1500, 2000, 1000, false) == 1.0);
+
     TimelineWidget timeline;
 
     timeline.addClip("missing-media.mp4");
