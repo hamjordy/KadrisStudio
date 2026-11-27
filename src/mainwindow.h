@@ -35,6 +35,7 @@ private slots:
     void openRecoveryCenter();
     void importMedia();
     void relinkSelectedMedia();
+    void collectProjectMedia();
     void addSelectedMediaToTimeline();
     void playPause();
     void stopPlayback();
