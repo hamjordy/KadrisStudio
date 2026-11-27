@@ -1370,6 +1370,97 @@ bool TimelineWidget::duplicateSelectedClip()
     return true;
 }
 
+bool TimelineWidget::nestSelectedClips(const QString &name)
+{
+    QSet<int> selectedIds = m_selectedClipIds;
+    if (selectedIds.isEmpty() && selectedClipId() >= 0)
+        selectedIds.insert(selectedClipId());
+    if (selectedIds.size() < 2) return false;
+
+    QVector<Clip> selected;
+    qint64 groupStart = std::numeric_limits<qint64>::max();
+    qint64 groupEnd = 0;
+    int parentTrack = -1;
+    for (const Clip &clip : m_clips) {
+        if (!selectedIds.contains(clip.id)) continue;
+        if (isTrackLocked(clip.track)) return false;
+        selected.append(clip);
+        groupStart = qMin(groupStart, clip.timelineStartMs);
+        groupEnd = qMax(groupEnd, clip.timelineStartMs + clip.durationMs);
+        if (clip.id == selectedClipId()) parentTrack = clip.track;
+    }
+    if (selected.size() < 2 || parentTrack < 0) return false;
+
+    const QJsonArray serialized = toJson();
+    QJsonArray children;
+    for (const QJsonValue &value : serialized) {
+        const QJsonObject item = value.toObject();
+        if (!selectedIds.contains(item.value("id").toInt())) continue;
+        QJsonObject child = item;
+        child.insert("timelineStartMs",
+            item.value("timelineStartMs").toDouble() - static_cast<double>(groupStart));
+        children.append(child);
+    }
+
+    Clip nested;
+    nested.id = m_nextClipId++;
+    nested.path = QStringLiteral("nest://%1").arg(nested.id);
+    nested.track = parentTrack;
+    nested.timelineStartMs = groupStart;
+    nested.durationMs = qMax<qint64>(kMinimumClipDurationMs, groupEnd - groupStart);
+    nested.durationKnown = true;
+    nested.nestedSequence = true;
+    nested.nestedName = name.trimmed().isEmpty()
+        ? QString("Nested Sequence %1").arg(nested.id) : name.trimmed();
+    nested.nestedClips = children;
+
+    for (int i = m_clips.size() - 1; i >= 0; --i) {
+        if (selectedIds.contains(m_clips.at(i).id))
+            m_clips.removeAt(i);
+    }
+    m_clips.append(nested);
+    m_selectedClip = m_clips.size() - 1;
+    m_selectedClipIds.clear();
+    m_selectedClipIds.insert(nested.id);
+    m_playheadMs = nested.timelineStartMs;
+    updateCanvasSize();
+    update();
+    emit playheadChanged(m_playheadMs);
+    emit clipSelectionChanged(nested.id, nested.path, nested.track);
+    emit timelineEdited();
+    return true;
+}
+
+bool TimelineWidget::unnestSelectedClip()
+{
+    const int index = indexForClipId(selectedClipId());
+    if (index < 0 || !m_clips.at(index).nestedSequence) return false;
+    const Clip nested = m_clips.at(index);
+    if (isTrackLocked(nested.track)) return false;
+
+    QJsonArray restored = toJson();
+    restored.removeAt(index);
+    for (const QJsonValue &value : nested.nestedClips) {
+        if (!value.isObject()) continue;
+        QJsonObject child = value.toObject();
+        child.insert("id", m_nextClipId++);
+        child.insert("timelineStartMs",
+            child.value("timelineStartMs").toDouble()
+            + static_cast<double>(nested.timelineStartMs));
+        restored.append(child);
+    }
+    fromJson(restored);
+    m_selectedClipIds.clear();
+    if (!m_clips.isEmpty()) {
+        m_selectedClip = m_clips.size() - 1;
+        m_selectedClipIds.insert(m_clips.last().id);
+    }
+    updateCanvasSize();
+    update();
+    emit timelineEdited();
+    return true;
+}
+
 QJsonArray TimelineWidget::toJson() const
 {
     QJsonArray result;
@@ -1384,6 +1475,11 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("durationKnown", clip.durationKnown);
         item.insert("sourceDurationMs", static_cast<double>(clip.sourceDurationMs));
         item.insert("playbackRate", clip.playbackRate);
+        if (clip.nestedSequence) {
+            item.insert("nestedSequence", true);
+            item.insert("nestedName", clip.nestedName);
+            item.insert("nestedClips", clip.nestedClips);
+        }
         QJsonObject color;
         color.insert("brightness", clip.brightness);
         color.insert("contrast", clip.contrast);
@@ -1460,8 +1556,9 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         if (!value.isObject()) continue;
         const QJsonObject item = value.toObject();
         const QString path = item.value("path").toString();
+        const bool isNested = item.value("nestedSequence").toBool(false);
         const int track = item.value("track").toInt(0);
-        if (path.isEmpty() || track < 0 || track >= kTrackCount) continue;
+        if ((path.isEmpty() && !isNested) || track < 0 || track >= kTrackCount) continue;
 
         Clip clip;
         clip.id = item.value("id").toInt(m_nextClipId);
@@ -1469,6 +1566,9 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         m_nextClipId = qMax(m_nextClipId, clip.id + 1);
         clip.path = path;
         clip.track = track;
+        clip.nestedSequence = isNested;
+        clip.nestedName = item.value("nestedName").toString("Nested Sequence");
+        clip.nestedClips = item.value("nestedClips").toArray();
         if (track >= 3 && QFileInfo(path).suffix().compare(
                 "wav", Qt::CaseInsensitive) == 0 && QFileInfo::exists(path)) {
             clip.waveformPeaks = readWaveformPeaks(path);
@@ -1722,7 +1822,9 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
         p.fillRect(QRect(bounds.left() + 2, bounds.top() + 3, 3,
                          bounds.height() - 6), outline);
 
-        const QString name = QFileInfo(clip.path).fileName();
+        const QString name = clip.nestedSequence
+            ? QString("[NEST] %1 (%2 clips)").arg(clip.nestedName).arg(clip.nestedClips.size())
+            : QFileInfo(clip.path).fileName();
         const QString durationLabel = clip.durationKnown
             ? formatTime(clip.durationMs)
             : QString("~%1").arg(formatTime(clip.durationMs));
