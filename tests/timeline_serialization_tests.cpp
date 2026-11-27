@@ -106,6 +106,24 @@ int main(int argc, char **argv)
     assert(slipTimeline.selectedClipInfo(&slipAfter));
     assert(slipAfter.sourceInMs == 0);
 
+    // Rate Stretch keeps the source span fixed and stores the playback speed.
+    QJsonObject rateItem{{"id", 79}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 1000}, {"durationMs", 4000},
+        {"durationKnown", true}, {"sourceDurationMs", 12000}};
+    TimelineWidget rateTimeline;
+    rateTimeline.fromJson(QJsonArray{rateItem});
+    assert(rateTimeline.rateStretchClip(79, 2000));
+    QJsonObject rateSaved = rateTimeline.toJson().at(0).toObject();
+    assert(rateSaved.value("durationMs").toInt() == 2000);
+    assert(qAbs(rateSaved.value("playbackRate").toDouble() - 2.0) < 0.001);
+    TimelineWidget rateRestored;
+    rateRestored.fromJson(QJsonArray{rateSaved});
+    TimelineWidget::ClipInfo rateInfo;
+    assert(rateRestored.selectedClipInfo(&rateInfo));
+    assert(qAbs(rateInfo.playbackRate - 2.0) < 0.001);
+    assert(!rateRestored.rateStretchClip(79, 100));
+    assert(!rateRestored.rateStretchClip(79, 20000));
+
     // Slide edits move the selected clip while trimming the two adjacent clips.
     QJsonObject previousItem{{"id", 81}, {"path", replacementPath}, {"track", 0},
         {"timelineStartMs", 0}, {"sourceInMs", 0}, {"durationMs", 4000},

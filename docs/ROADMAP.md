@@ -33,7 +33,8 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [x] Add, navigate, and remove timeline markers
 - [x] Track lock and mute states
 - [x] User-selectable sequence frame rate (24/25/30/50/60 and 29.97/59.94 fps), stored per project
-- [x] Shift-drag a clip's right edge for ripple trim on its track (locked downstream tracks are protected)\n- [ ] Roll, slip, slide, and rate-stretch editing modes
+- [x] Shift-drag a clip's right edge for ripple trim on its track (locked downstream tracks are protected)\n- [x] Roll, slip, and slide editing modes
+- [ ] Rate Stretch (Ctrl+Shift + drag rechter cliprand; 0,25x–4x, per clip opgeslagen)
 - [x] Timeline undo/redo history (up to 100 snapshots; keyboard shortcuts)
 - [ ] Track targeting, sync locks, nesting, and track groups
 

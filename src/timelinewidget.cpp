@@ -453,6 +453,7 @@ bool TimelineWidget::selectedClipInfo(ClipInfo *result) const
         result->sourceInMs = clip.sourceInMs;
         result->durationMs = clip.durationMs;
         result->sourceDurationMs = clip.sourceDurationMs;
+        result->playbackRate = clip.playbackRate;
         result->durationKnown = clip.durationKnown;
         result->brightness = clip.brightness; result->contrast = clip.contrast;
         result->saturation = clip.saturation; result->shadows = clip.shadows;
@@ -1259,6 +1260,27 @@ bool TimelineWidget::slideClip(int clipId, qint64 deltaMs)
     return true;
 }
 
+bool TimelineWidget::rateStretchClip(int clipId, qint64 newDurationMs)
+{
+    const int index = indexForClipId(clipId);
+    if (index < 0 || isTrackLocked(m_clips.at(index).track)) return false;
+    Clip &clip = m_clips[index];
+    if (newDurationMs < kMinimumClipDurationMs || newDurationMs == clip.durationMs)
+        return false;
+    const double sourceSpanMs = clip.durationMs * clip.playbackRate;
+    if (clip.durationKnown && clip.sourceDurationMs > 0
+        && clip.sourceInMs + sourceSpanMs > clip.sourceDurationMs + 0.5)
+        return false;
+    const double nextRate = sourceSpanMs / static_cast<double>(newDurationMs);
+    if (nextRate < 0.25 || nextRate > 4.0) return false;
+    clip.durationMs = newDurationMs;
+    clip.playbackRate = nextRate;
+    updateCanvasSize();
+    update();
+    emit timelineEdited();
+    return true;
+}
+
 bool TimelineWidget::nudgeSelectedClip(int frameDirection)
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()
@@ -1357,6 +1379,7 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("durationMs", static_cast<double>(clip.durationMs));
         item.insert("durationKnown", clip.durationKnown);
         item.insert("sourceDurationMs", static_cast<double>(clip.sourceDurationMs));
+        item.insert("playbackRate", clip.playbackRate);
         QJsonObject color;
         color.insert("brightness", clip.brightness);
         color.insert("contrast", clip.contrast);
@@ -1457,6 +1480,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.durationKnown = item.value("durationKnown").toBool(false);
         clip.sourceDurationMs = qMax<qint64>(0,
             static_cast<qint64>(item.value("sourceDurationMs").toDouble()));
+        clip.playbackRate = qBound(0.25, item.value("playbackRate").toDouble(1.0), 4.0);
         if (clip.durationKnown && clip.sourceDurationMs <= 0)
             clip.sourceDurationMs = clip.sourceInMs + clip.durationMs;
         const QJsonObject color = item.value("color").toObject();
@@ -1833,8 +1857,12 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 && event->modifiers().testFlag(Qt::AltModifier);
             const bool slideGesture = event->modifiers().testFlag(Qt::ShiftModifier)
                 && event->modifiers().testFlag(Qt::AltModifier);
-            const bool multiSelect = event->modifiers().testFlag(Qt::ControlModifier)
+            const bool rateStretchGesture = event->modifiers().testFlag(Qt::ControlModifier)
+                && event->modifiers().testFlag(Qt::ShiftModifier)
                 && !event->modifiers().testFlag(Qt::AltModifier);
+            const bool multiSelect = event->modifiers().testFlag(Qt::ControlModifier)
+                && !event->modifiers().testFlag(Qt::AltModifier)
+                && !event->modifiers().testFlag(Qt::ShiftModifier);
             const bool removingFromSelection =
                 multiSelect && m_selectedClipIds.contains(clickedId);
 
@@ -1909,7 +1937,9 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
                     m_dragMode = DragMode::TrimLeft;
                 } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
-                    if (event->modifiers().testFlag(Qt::AltModifier)) {
+                    if (rateStretchGesture) {
+                        m_dragMode = DragMode::RateStretchRight;
+                    } else if (event->modifiers().testFlag(Qt::AltModifier)) {
                         const qint64 editPoint = m_dragSnapshot.timelineStartMs
                             + m_dragSnapshot.durationMs;
                         for (const Clip &candidate : m_clips) {
@@ -2188,8 +2218,23 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         partner.timelineStartMs = m_rollPartnerSnapshot.timelineStartMs + safeDelta;
         partner.sourceInMs = m_rollPartnerSnapshot.sourceInMs + safeDelta;
         partner.durationMs = m_rollPartnerSnapshot.durationMs - safeDelta;
+    } else if (m_dragMode == DragMode::RateStretchRight) {
+        const qint64 sourceSpanMs = qRound64(
+            m_dragSnapshot.durationMs * m_dragSnapshot.playbackRate);
+        const qint64 proposedDuration = qMax<qint64>(kMinimumClipDurationMs,
+            m_dragSnapshot.durationMs + deltaMs);
+        const qint64 newDuration = qMax<qint64>(kMinimumClipDurationMs,
+            m_timebase.snapMilliseconds(proposedDuration));
+        const double nextRate = static_cast<double>(sourceSpanMs) / newDuration;
+        if (nextRate >= 0.25 && nextRate <= 4.0
+            && (!m_dragSnapshot.durationKnown || m_dragSnapshot.sourceDurationMs <= 0
+                || m_dragSnapshot.sourceInMs + sourceSpanMs
+                    <= m_dragSnapshot.sourceDurationMs)) {
+            clip.durationMs = newDuration;
+            clip.playbackRate = nextRate;
+        }
     } else if (m_dragMode == DragMode::TrimRight
-               || m_dragMode == DragMode::RippleTrimRight) {
+               || m_dragMode == DragMode::RippleTrimRight)
         qint64 proposedEnd = m_dragSnapshot.timelineStartMs
             + m_dragSnapshot.durationMs + deltaMs;
         const qint64 snappedEnd = snapToClipEdges(proposedEnd, m_selectedClip);

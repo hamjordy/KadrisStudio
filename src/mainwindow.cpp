@@ -1883,8 +1883,9 @@ void MainWindow::refreshPausedTimelinePreview()
         if (m_activeVideoClipIds[track] == clip.id
             && !m_waitingForVideoTrack[track]
             && !m_failedVideoTrack[track]) {
+            player->setPlaybackRate(clip.playbackRate);
             player->setPosition(qMax<qint64>(0,
-                clip.sourceInMs + m_sequencePositionMs - clip.timelineStartMs));
+                clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate)));
             player->pause();
             continue;
         }
@@ -2010,6 +2011,7 @@ void MainWindow::syncVideoTracks()
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
         if (clip.id == m_activeVideoClipIds[track]) {
+            m_videoTrackPlayers[track]->setPlaybackRate(clip.playbackRate);
             if (m_waitingForVideoTrack[track]) {
                 handleVideoTrackStatus(track);
             } else if (!m_failedVideoTrack[track]
@@ -2060,7 +2062,8 @@ void MainWindow::handleVideoTrackStatus(int track)
                 return;
             }
             const qint64 sourcePosition =
-                clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+                clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
+            player->setPlaybackRate(clip.playbackRate);
             player->setPosition(qMax<qint64>(0, sourcePosition));
             m_waitingForVideoTrack[track] = false;
             player->pause();
@@ -2092,8 +2095,9 @@ void MainWindow::handleVideoTrackStatus(int track)
         }
 
         const qint64 sourcePosition =
-            clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
-        player->setPosition(qMax<qint64>(0, sourcePosition));
+            clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
+        player->setPlaybackRate(clip.playbackRate);
+            player->setPosition(qMax<qint64>(0, sourcePosition));
         m_waitingForVideoTrack[track] = false;
         player->play();
     } else if (status == QMediaPlayer::InvalidMedia
@@ -2160,9 +2164,10 @@ void MainWindow::syncAudioTracks()
         }
 
         const qint64 sourcePosition =
-            clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+            clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
 
         if (clip.id == m_activeAudioClipIds[audioTrack]) {
+            player->setPlaybackRate(clip.playbackRate);
             if (m_waitingForAudioTrack[audioTrack]) {
                 handleAudioTrackStatus(audioTrack);
                 continue;
@@ -2180,7 +2185,8 @@ void MainWindow::syncAudioTracks()
                 if (qAbs(player->position() - sourcePosition) > 300)
                     player->setPosition(sourcePosition);
             } else {
-                player->setPosition(qMax<qint64>(0, sourcePosition));
+                player->setPlaybackRate(clip.playbackRate);
+            player->setPosition(qMax<qint64>(0, sourcePosition));
                 player->play();
             }
             continue;
@@ -2233,14 +2239,15 @@ void MainWindow::handleAudioTrackStatus(int audioTrack)
         }
 
         const qint64 sourcePosition =
-            clip.sourceInMs + (m_sequencePositionMs - clip.timelineStartMs);
+            clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate);
         if (player->duration() > 0 && sourcePosition >= player->duration()) {
             m_waitingForAudioTrack[audioTrack] = false;
             m_failedAudioTrack[audioTrack] = true;
             return;
         }
 
-        player->setPosition(qMax<qint64>(0, sourcePosition));
+        player->setPlaybackRate(clip.playbackRate);
+            player->setPosition(qMax<qint64>(0, sourcePosition));
         m_waitingForAudioTrack[audioTrack] = false;
         player->play();
     } else if (status == QMediaPlayer::InvalidMedia
