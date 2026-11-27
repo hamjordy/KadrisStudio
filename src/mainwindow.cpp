@@ -222,15 +222,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 if (m_audioSlotPeaks[slot] < 0.001f)
                     m_audioSlotPeaks[slot] = 0.0f;
             }
-            if (outputPeak >= 0.999f)
-                m_audioClipLatched[parentIndex] = true;
-
-            if (outputPeak >= m_audioPeakHold[parentIndex])
-                m_audioPeakHold[parentIndex] = outputPeak;
-            else if (!m_audioClipLatched[parentIndex])
-                m_audioPeakHold[parentIndex] *= 0.94f;
-
-            const float displayedPeak = qMax(outputPeak, m_audioPeakHold[parentIndex]);
+            const float displayedPeak = KadrisAudio::updatePeakHold(
+                outputPeak, m_audioPeakHold[parentIndex], m_audioClipLatched[parentIndex]);
             if (m_audioPeakMeters[parentIndex])
                 m_audioPeakMeters[parentIndex]->setValue(peakToMeterValue(displayedPeak));
             if (m_audioPeakLabels[parentIndex])
@@ -953,8 +946,7 @@ void MainWindow::buildInterface()
         clipIndicator->setVisible(false);
         m_audioClipIndicators[track] = clipIndicator;
         connect(clipIndicator, &QPushButton::clicked, this, [this, track]() {
-            m_audioClipLatched[track] = false;
-            m_audioPeakHold[track] = 0.0f;
+            KadrisAudio::resetPeakHold(m_audioPeakHold[track], m_audioClipLatched[track]);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
             // Clear buffered samples so the old peak cannot reappear after reset.
             for (int slot = track * 4; slot < track * 4 + 4; ++slot)
@@ -1024,8 +1016,7 @@ void MainWindow::buildInterface()
     resetAllPeaksButton->setObjectName("mixerPeakResetAllButton");
     connect(resetAllPeaksButton, &QPushButton::clicked, this, [this]() {
         for (int track = 0; track < 2; ++track) {
-            m_audioClipLatched[track] = false;
-            m_audioPeakHold[track] = 0.0f;
+            KadrisAudio::resetPeakHold(m_audioPeakHold[track], m_audioClipLatched[track]);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
             for (int slot = track * 4; slot < track * 4 + 4; ++slot)
                 m_audioSlotPeaks[slot] = 0.0f;
