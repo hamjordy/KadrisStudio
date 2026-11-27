@@ -487,6 +487,7 @@ void MainWindow::buildInterface()
     inspectorDock->setObjectName("inspectorDock");
     auto *inspector = new QWidget(inspectorDock);
     auto *inspectorLayout = new QVBoxLayout(inspector);
+    inspectorLayout->setSpacing(8);
     auto *inspectorHeading = new QLabel("SOURCE INFORMATION");
     inspectorHeading->setObjectName("sectionTitle");
     m_inspectorLabel = new QLabel("Select a media item to load it in the source monitor.");
@@ -506,6 +507,8 @@ void MainWindow::buildInterface()
             QSlider *slider, int minimum, int maximum, int initial) {
         auto *label = new QLabel(QString("%1: %2").arg(name).arg(initial));
         label->setObjectName("mutedLabel");
+        slider->setObjectName("colorCorrectionSlider");
+        slider->setToolTip(QString("Adjust %1 for the program monitor (%2 to %3).").arg(name).arg(minimum).arg(maximum));
         slider->setRange(minimum, maximum);
         slider->setValue(initial);
         connect(slider, &QSlider::valueChanged, this,
@@ -530,6 +533,10 @@ void MainWindow::buildInterface()
             const QString &name, QSlider *slider) {
         auto *label = new QLabel(name + ": 0");
         label->setObjectName("mutedLabel");
+        slider->setObjectName("colorWheelSlider");
+        slider->setToolTip(QString("Warm or cool the %1 tonal range.").arg(name.toLower()));
+        slider->setObjectName("rgbCurveSlider");
+        slider->setToolTip(QString("Adjust the %1 channel tone curve.").arg(name));
         slider->setRange(-100, 100);
         slider->setValue(0);
         connect(slider, &QSlider::valueChanged, this,
