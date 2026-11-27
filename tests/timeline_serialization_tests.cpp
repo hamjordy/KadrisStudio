@@ -198,6 +198,34 @@ int main(int argc, char **argv)
     assert(activeNestedLayers.at(0).track == 1);
     assert(activeNestedLayers.at(1).track == 1);
 
+    // Nested sequence speed changes both the child timeline mapping and source rate.
+    QJsonObject rateAdjustedChild{
+        {"id", 411}, {"path", "rate-adjusted-child.mp4"}, {"track", 1},
+        {"timelineStartMs", 1000}, {"sourceInMs", 250},
+        {"durationMs", 3000}, {"playbackRate", 1.0}
+    };
+    QJsonObject rateAdjustedNest{
+        {"id", 412}, {"path", "nest://412"}, {"track", 0},
+        {"timelineStartMs", 0}, {"durationMs", 2500},
+        {"sourceDurationMs", 5000}, {"playbackRate", 2.0},
+        {"nestedSequence", true}, {"nestedName", "Fast Nested Scene"},
+        {"nestedClips", QJsonArray{rateAdjustedChild}}
+    };
+    TimelineWidget rateAdjustedPreview;
+    rateAdjustedPreview.fromJson(QJsonArray{rateAdjustedNest});
+    const auto fastNestedLayers =
+        rateAdjustedPreview.clipsAtTimeOnTrack(750, 0);
+    assert(fastNestedLayers.size() == 1);
+    assert(fastNestedLayers.first().path == "rate-adjusted-child.mp4");
+    assert(fastNestedLayers.first().timelineStartMs == 500);
+    assert(fastNestedLayers.first().durationMs == 1500);
+    assert(qAbs(fastNestedLayers.first().playbackRate - 2.0) < 0.001);
+    const qint64 fastNestedSourcePosition =
+        fastNestedLayers.first().sourceInMs
+        + qRound64((750 - fastNestedLayers.first().timelineStartMs)
+                   * fastNestedLayers.first().playbackRate);
+    assert(fastNestedSourcePosition == 750);
+
     // Preview lookup resolves child media at the nested sequence's absolute timeline time.
     TimelineWidget previewNested;
     previewNested.fromJson(nestedSaved);
