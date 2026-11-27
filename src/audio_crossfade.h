@@ -25,4 +25,28 @@ inline double equalPowerCrossfadeGain(qint64 positionMs,
     return incoming ? std::sin(angle) : std::cos(angle);
 }
 
+// Update a track's peak hold and latch clipping at digital full scale.
+// Returns the level to display; a latched clip keeps its peak until reset.
+inline float updatePeakHold(float outputPeak, float &peakHold, bool &clipped)
+{
+    if (!std::isfinite(outputPeak))
+        outputPeak = 0.0f;
+    outputPeak = qBound(0.0f, outputPeak, 1.0f);
+    if (outputPeak >= 0.999f)
+        clipped = true;
+
+    if (outputPeak >= peakHold)
+        peakHold = outputPeak;
+    else if (!clipped)
+        peakHold *= 0.94f;
+
+    return qMax(outputPeak, peakHold);
+}
+
+inline void resetPeakHold(float &peakHold, bool &clipped)
+{
+    peakHold = 0.0f;
+    clipped = false;
+}
+
 } // namespace KadrisAudio
