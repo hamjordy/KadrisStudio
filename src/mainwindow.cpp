@@ -222,10 +222,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 if (m_audioSlotPeaks[slot] < 0.001f)
                     m_audioSlotPeaks[slot] = 0.0f;
             }
+            if (outputPeak >= 0.999f)
+                m_audioClipHoldMs[parentIndex] = 1500;
+            else
+                m_audioClipHoldMs[parentIndex] = qMax(0, m_audioClipHoldMs[parentIndex] - 50);
+
+            if (outputPeak >= m_audioPeakHold[parentIndex])
+                m_audioPeakHold[parentIndex] = outputPeak;
+            else if (m_audioClipHoldMs[parentIndex] == 0)
+                m_audioPeakHold[parentIndex] *= 0.94f;
+
+            const float displayedPeak = qMax(outputPeak, m_audioPeakHold[parentIndex]);
             if (m_audioPeakMeters[parentIndex])
-                m_audioPeakMeters[parentIndex]->setValue(peakToMeterValue(outputPeak));
+                m_audioPeakMeters[parentIndex]->setValue(peakToMeterValue(displayedPeak));
             if (m_audioPeakLabels[parentIndex])
-                m_audioPeakLabels[parentIndex]->setText(peakToLabel(outputPeak));
+                m_audioPeakLabels[parentIndex]->setText(
+                    QStringLiteral("PEAK %1").arg(peakToLabel(m_audioPeakHold[parentIndex])));
+            if (m_audioClipIndicators[parentIndex])
+                m_audioClipIndicators[parentIndex]->setVisible(
+                    m_audioClipHoldMs[parentIndex] > 0);
         }
     });
     m_audioMeterTimer->start();
@@ -930,6 +945,13 @@ void MainWindow::buildInterface()
 #if QT_VERSION < QT_VERSION_CHECK(6, 8, 0)
         peakLabel->setText("Qt 6.8+ required");
 #endif
+        auto *clipIndicator = new QLabel("CLIP", strip);
+        clipIndicator->setAlignment(Qt::AlignCenter);
+        clipIndicator->setStyleSheet(
+            "QLabel { color: #ffffff; background: #c62828; font-weight: bold; "
+            "border-radius: 3px; padding: 1px 5px; }");
+        clipIndicator->setVisible(false);
+        m_audioClipIndicators[track] = clipIndicator;
         auto *peakMeter = new QProgressBar(strip);
         peakMeter->setRange(0, 1000);
         peakMeter->setValue(0);
@@ -943,6 +965,7 @@ void MainWindow::buildInterface()
         m_audioPeakMeters[track] = peakMeter;
         m_audioPeakLabels[track] = peakLabel;
         stripLayout->addWidget(peakLabel);
+        stripLayout->addWidget(clipIndicator);
         stripLayout->addWidget(peakMeter);
         stripLayout->addLayout(switches);
         mixerLayout->addWidget(strip);
