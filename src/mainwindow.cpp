@@ -1352,6 +1352,20 @@ void MainWindow::openRecoveryCenter()
         originals.append(m_projectPath);
     }
 
+    if (!m_projectPath.isEmpty()) {
+        const QFileInfo projectInfo(m_projectPath);
+        QDir projectDirectory(projectInfo.absolutePath());
+        const QString pattern = projectInfo.completeBaseName() + ".backup-*.kadris";
+        const QFileInfoList backups = projectDirectory.entryInfoList(
+            QStringList{pattern}, QDir::Files, QDir::Time);
+        for (const QFileInfo &backup : backups) {
+            recoveryPaths.append(backup.absoluteFilePath());
+            descriptions.append("Backup — " + projectInfo.fileName());
+            kinds.append("backup");
+            originals.append(m_projectPath);
+        }
+    }
+
     QDialog dialog(this);
     dialog.setWindowTitle("KadrisStudio Recovery Center");
     dialog.setMinimumSize(620, 360);
@@ -1434,7 +1448,10 @@ void MainWindow::openRecoveryCenter()
         m_projectDirty = false;
         updateWindowTitle();
         statusBar()->showMessage(kinds.at(index) == "project"
-            ? "Project recovery restored from autosave" : "Unsaved session recovery restored", 6000);
+            ? "Project recovery restored from autosave"
+            : kinds.at(index) == "backup"
+                ? "Project restored from a dated backup"
+                : "Unsaved session recovery restored", 6000);
         dialog.accept();
     });
     dialog.exec();
@@ -1550,23 +1567,19 @@ bool MainWindow::createProjectBackup(const QString &path)
         || projectInfo.suffix().compare("kadris", Qt::CaseInsensitive) != 0)
         return true;
 
-    const QString backupDirectory = path + ".backups";
-    if (!QDir().mkpath(backupDirectory)) {
-        statusBar()->showMessage("Could not create project backup folder — save cancelled", 8000);
-        return false;
-    }
-
+    const QString backupPattern = projectInfo.completeBaseName() + ".backup-*.kadris";
     const QString timestamp = QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss-zzz");
-    const QString backupPath = QDir(backupDirectory).filePath(
-        projectInfo.completeBaseName() + "-" + timestamp + ".kadris");
+    const QString backupPath = QDir(projectInfo.absolutePath()).filePath(
+        projectInfo.completeBaseName() + ".backup-" + timestamp + ".kadris");
     if (!QFile::copy(path, backupPath)) {
         statusBar()->showMessage("Could not create a backup of the existing project — save cancelled", 8000);
         return false;
     }
 
-    QDir backups(backupDirectory);
+    // Keep backups beside the project so relative media paths remain valid when restored.
+    QDir backups(projectInfo.absolutePath());
     QFileInfoList files = backups.entryInfoList(
-        QStringList{QStringLiteral("*.kadris")}, QDir::Files, QDir::Name);
+        QStringList{backupPattern}, QDir::Files, QDir::Name);
     while (files.size() > 10) {
         const QFileInfo oldest = files.takeFirst();
         if (!QFile::remove(oldest.absoluteFilePath())) {
