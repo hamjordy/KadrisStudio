@@ -77,6 +77,9 @@ int main(int argc, char **argv)
     baseFrame.fill(qRgb(200, 200, 200));
     QImage upperFrame(8, 8, QImage::Format_ARGB32);
     upperFrame.fill(qRgb(128, 128, 128));
+    // Reset the earlier color-grade test so blend expectations use neutral pixels.
+    monitor.setTrackColorGrade(0, 0, 0, 100, 0, 0, 0, 0, 0, 0);
+    monitor.setTrackColorGrade(1, 0, 0, 100, 0, 0, 0, 0, 0, 0);
     monitor.setFrame(0, baseFrame);
     monitor.setFrame(1, upperFrame);
 
