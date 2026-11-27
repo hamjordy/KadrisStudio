@@ -1241,6 +1241,9 @@ void MainWindow::newProject()
             != QMessageBox::Yes) return;
     QFile::remove(untitledRecoveryPath());
     m_projectPath.clear();
+    m_nestedEditActive = false;
+    m_nestedClipId = -1;
+    m_nestedParentState = QJsonObject();
     m_sequenceFpsNumerator = 25;
     m_sequenceFpsDenominator = 1;
     m_timeline->setFrameRate(25, 1);
@@ -1695,6 +1698,9 @@ bool MainWindow::readProject(const QString &path)
             && root.value("formatVersion").toInt() != 5
             && root.value("formatVersion").toInt() != 6)) return false;
 
+    m_nestedEditActive = false;
+    m_nestedClipId = -1;
+    m_nestedParentState = QJsonObject();
     m_mediaPaths.clear();
     m_mediaList->clear();
     for (const QJsonValue &value : root.value("mediaFiles").toArray()) {
