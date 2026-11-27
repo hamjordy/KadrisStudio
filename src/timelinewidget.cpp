@@ -997,7 +997,6 @@ bool TimelineWidget::nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *result)
     }
     return true;
 }
-
 qint64 TimelineWidget::sequenceDurationMs() const
 {
     qint64 result = 0;
@@ -1997,7 +1996,6 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event)
                     nearestIndex = i;
                 }
             }
-
             if (nearestIndex >= 0) {
                 bool accepted = false;
                 const QString label = QInputDialog::getText(
@@ -2234,7 +2232,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
             clip.playbackRate = nextRate;
         }
     } else if (m_dragMode == DragMode::TrimRight
-               || m_dragMode == DragMode::RippleTrimRight)
+               || m_dragMode == DragMode::RippleTrimRight) {
         qint64 proposedEnd = m_dragSnapshot.timelineStartMs
             + m_dragSnapshot.durationMs + deltaMs;
         const qint64 snappedEnd = snapToClipEdges(proposedEnd, m_selectedClip);
