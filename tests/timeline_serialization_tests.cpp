@@ -272,6 +272,18 @@ int main(int argc, char **argv)
     assert(fastTrimRight.value("durationMs").toInt() == 6000);
     assert(fastTrimRight.value("sourceInMs").toInt() == 1000);
 
+    // Ctrl+Shift-dragging the right edge must use Rate Stretch, not ordinary trim.
+    QJsonObject mouseRateItem{{"id", 90}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 1000}, {"durationMs", 5000},
+        {"durationKnown", true}, {"sourceDurationMs", 16000}};
+    TimelineWidget mouseRateTimeline;
+    mouseRateTimeline.fromJson(QJsonArray{mouseRateItem});
+    dragTimeline(mouseRateTimeline, QPoint(540, 50), QPoint(620, 50),
+        Qt::ControlModifier | Qt::ShiftModifier);
+    const QJsonObject mouseRate = mouseRateTimeline.toJson().at(0).toObject();
+    assert(mouseRate.value("durationMs").toInt() == 6000);
+    assert(qAbs(mouseRate.value("playbackRate").toDouble() - (5.0 / 6.0)) < 0.001);
+
     QJsonObject fastRollOut{{"id", 88}, {"path", replacementPath}, {"track", 0},
         {"timelineStartMs", 0}, {"sourceInMs", 0}, {"durationMs", 4000},
         {"durationKnown", true}, {"sourceDurationMs", 12000}, {"playbackRate", 2.0}};
