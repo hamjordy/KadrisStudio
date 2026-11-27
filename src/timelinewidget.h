@@ -31,6 +31,7 @@ public:
         double playbackRate = 1.0;
         bool durationKnown = false;
         bool nestedSequence = false;
+        bool nestedContent = false;
         QString nestedName;
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
