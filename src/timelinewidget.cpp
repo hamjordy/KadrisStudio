@@ -138,6 +138,34 @@ TimelineWidget::TimelineWidget(QWidget *parent) : QWidget(parent)
     setFocusPolicy(Qt::StrongFocus);
 }
 
+int TimelineWidget::replaceMediaPath(const QString &oldPath, const QString &newPath)
+{
+    if (oldPath.isEmpty() || newPath.isEmpty() || oldPath == newPath
+        || !QFileInfo::exists(newPath)) return 0;
+
+    int replaced = 0;
+    for (Clip &clip : m_clips) {
+        if (clip.path != oldPath) continue;
+        clip.path = newPath;
+        clip.waveformPeaks.clear();
+        if (clip.track >= 3 && QFileInfo(newPath).suffix().compare(
+                "wav", Qt::CaseInsensitive) == 0) {
+            clip.waveformPeaks = readWaveformPeaks(newPath);
+        }
+        ++replaced;
+        if (clip.id == selectedClipId()) {
+            emit clipActivated(clip.path);
+            emit clipSelectionChanged(clip.id, clip.path, clip.track);
+        }
+    }
+
+    if (replaced > 0) {
+        update();
+        emit timelineEdited();
+    }
+    return replaced;
+}
+
 void TimelineWidget::zoomIn()
 {
     m_pixelsPerSecond = qMin(240, m_pixelsPerSecond + 20);
