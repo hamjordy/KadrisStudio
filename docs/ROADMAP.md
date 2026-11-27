@@ -13,7 +13,9 @@ This roadmap distinguishes implemented prototype functionality from work still r
 ## Milestone 1 — Media and project reliability
 - [ ] Relative media paths
 - [x] Relink a missing media-bin item and update every matching timeline clip without losing edit settings
-- [ ] Autosave, crash recovery, and project backups
+- [x] Timed autosave of dirty projects and recovery of unsaved sessions
+- [x] Recovery Center to inspect, restore, and discard available autosave snapshots
+- [ ] Crash/restart recovery regression tests and rotating project backups
 - [ ] Media metadata, searchable bins, and thumbnail generation
 - [ ] Drag-and-drop import
 - [ ] Collect/archive project media
@@ -70,7 +72,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 
 1. Build a reliable undo/redo history for timeline and Inspector edits.
 2. Add relative project paths so projects survive folder moves.
-3. Add autosave and recovery before expanding the editing feature set.
+3. Add automated crash/restart recovery tests and rotating project backups.
 4. Establish a real render/export pipeline with output validation.
 5. Expand automated tests beyond compilation, including serialization, timeline behavior, and project recovery.
 
