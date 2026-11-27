@@ -31,6 +31,7 @@ private slots:
     void openProject();
     void saveProject();
     void saveProjectAs();
+    void autosaveProject();
     void importMedia();
     void relinkSelectedMedia();
     void addSelectedMediaToTimeline();
@@ -78,6 +79,7 @@ private:
     QPushButton *m_sequenceButton = nullptr;
     QLabel *m_sequenceTimeLabel = nullptr;
     QTimer *m_sequenceTimer = nullptr;
+    QTimer *m_autosaveTimer = nullptr;
     QElapsedTimer m_sequenceClock;
     qint64 m_sequenceClockOriginMs = 0;
     bool m_sequencePlaying = false;
