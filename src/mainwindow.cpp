@@ -2410,8 +2410,7 @@ void MainWindow::applyAudioMixerState()
             const auto clips = m_timeline->clipsAtTimeOnTrack(
                 m_sequencePositionMs, parentTrack);
             for (const auto &clip : clips)
-                if (!clip.audioMuted && !clip.nestedTrackMuted)
-                    activeClips.append(qMakePair(parentIndex, clip));
+                activeClips.append(qMakePair(parentIndex, clip));
         }
     }
 
@@ -2473,7 +2472,8 @@ void MainWindow::applyAudioMixerState()
             const qint64 currentEnd = activeClip->timelineStartMs + activeClip->durationMs;
             for (const auto &entry : activeClips) {
                 const auto &other = entry.second;
-                if (other.id == activeClip->id) continue;
+                if (other.id == activeClip->id
+                    || other.audioMuted || other.nestedTrackMuted) continue;
                 const bool sameParent = entry.first == parentIndex;
                 if (sameParent && other.nestedTrack != activeClip->nestedTrack)
                     continue;
