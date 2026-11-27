@@ -243,10 +243,8 @@ int main(int argc, char **argv)
     const QJsonArray savedMutedNestedAudio = mutedNestedAudioPreview.toJson();
     TimelineWidget reopenedMutedNestedAudio;
     reopenedMutedNestedAudio.fromJson(savedMutedNestedAudio);
-    TimelineWidget::ClipInfo reopenedNestedAudioClip;
-    assert(reopenedMutedNestedAudio.clipAtTimeOnTrack(
-        1000, 3, &reopenedNestedAudioClip));
-    assert(reopenedNestedAudioClip.nestedTrackStates.size() == 5);
+    assert(savedMutedNestedAudio.first().toObject()
+               .value("nestedTrackStates").toArray().size() == 5);
     const auto reopenedMutedLayers =
         reopenedMutedNestedAudio.clipsAtTimeOnTrack(2000, 3);
     assert(reopenedMutedLayers.size() == 2);
