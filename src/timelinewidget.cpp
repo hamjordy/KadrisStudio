@@ -1409,6 +1409,7 @@ bool TimelineWidget::nestSelectedClips(const QString &name)
     nested.timelineStartMs = groupStart;
     nested.durationMs = qMax<qint64>(kMinimumClipDurationMs, groupEnd - groupStart);
     nested.durationKnown = true;
+    nested.sourceDurationMs = nested.durationMs;
     nested.nestedSequence = true;
     nested.nestedName = name.trimmed().isEmpty()
         ? QString("Nested Sequence %1").arg(nested.id) : name.trimmed();
