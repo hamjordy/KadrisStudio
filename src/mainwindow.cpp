@@ -7,6 +7,8 @@
 #include <QCheckBox>
 #include <QAudioOutput>
 #include <QDockWidget>
+#include <QDialog>
+#include <QDateTime>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QSaveFile>
@@ -990,6 +992,8 @@ void MainWindow::buildMenus()
     auto *saveAsAction = file->addAction("Save Project &As...");
     saveAsAction->setShortcut(QKeySequence::SaveAs);
     connect(saveAsAction, &QAction::triggered, this, &MainWindow::saveProjectAs);
+    auto *recoveryAction = file->addAction("Recovery Center...");
+    connect(recoveryAction, &QAction::triggered, this, &MainWindow::openRecoveryCenter);
     file->addSeparator();
     auto *exitAction = file->addAction("E&xit");
     exitAction->setShortcut(QKeySequence::Quit);
@@ -1213,6 +1217,115 @@ void MainWindow::recoverUntitledProject()
             "The recovery file could not be opened and will be discarded.");
         QFile::remove(recoveryPath);
     }
+}
+
+
+void MainWindow::openRecoveryCenter()
+{
+    QStringList recoveryPaths;
+    QStringList descriptions;
+    QStringList kinds;
+    QStringList originals;
+    const QString untitledPath = untitledRecoveryPath();
+    if (QFileInfo::exists(untitledPath)) {
+        recoveryPaths.append(untitledPath);
+        descriptions.append("Unsaved session");
+        kinds.append("untitled");
+        originals.append(QString());
+    }
+    if (!m_projectPath.isEmpty() && QFileInfo::exists(m_projectPath + ".autosave")) {
+        recoveryPaths.append(m_projectPath + ".autosave");
+        descriptions.append(QFileInfo(m_projectPath).fileName());
+        kinds.append("project");
+        originals.append(m_projectPath);
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("KadrisStudio Recovery Center");
+    dialog.setMinimumSize(620, 360);
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *intro = new QLabel("Browse available crash-recovery snapshots. Restore a snapshot or discard one you no longer need.", &dialog);
+    intro->setWordWrap(true);
+    layout->addWidget(intro);
+    auto *list = new QListWidget(&dialog);
+    layout->addWidget(list, 1);
+    for (int i = 0; i < recoveryPaths.size(); ++i) {
+        const QFileInfo info(recoveryPaths.at(i));
+        auto *item = new QListWidgetItem(
+            QString("%1    |    %2").arg(descriptions.at(i),
+                info.lastModified().toString("yyyy-MM-dd hh:mm")), list);
+        item->setData(Qt::UserRole, i);
+        item->setToolTip(recoveryPaths.at(i));
+    }
+    if (recoveryPaths.isEmpty()) {
+        auto *empty = new QListWidgetItem("No recovery snapshots are currently available.", list);
+        empty->setFlags(Qt::NoItemFlags);
+    } else {
+        list->setCurrentRow(0);
+    }
+
+    auto *buttons = new QHBoxLayout();
+    auto *restoreButton = new QPushButton("Restore Selected", &dialog);
+    auto *discardButton = new QPushButton("Discard Selected", &dialog);
+    auto *closeButton = new QPushButton("Close", &dialog);
+    restoreButton->setEnabled(!recoveryPaths.isEmpty());
+    discardButton->setEnabled(!recoveryPaths.isEmpty());
+    buttons->addWidget(restoreButton);
+    buttons->addWidget(discardButton);
+    buttons->addStretch();
+    buttons->addWidget(closeButton);
+    layout->addLayout(buttons);
+    connect(closeButton, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(discardButton, &QPushButton::clicked, &dialog, [&]() {
+        auto *item = list->currentItem();
+        if (!item || item->data(Qt::UserRole).toInt() < 0
+            || item->data(Qt::UserRole).toInt() >= recoveryPaths.size()) return;
+        const int index = item->data(Qt::UserRole).toInt();
+        if (QMessageBox::question(&dialog, "Discard Recovery",
+                "Permanently discard this recovery snapshot?",
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+        if (!QFile::remove(recoveryPaths.at(index))) {
+            QMessageBox::warning(&dialog, "Discard Recovery", "The recovery file could not be removed.");
+            return;
+        }
+        delete list->takeItem(list->row(item));
+        recoveryPaths.removeAt(index);
+        descriptions.removeAt(index);
+        kinds.removeAt(index);
+        originals.removeAt(index);
+        for (int row = 0; row < list->count(); ++row)
+            list->item(row)->setData(Qt::UserRole, row);
+        const bool available = !recoveryPaths.isEmpty();
+        restoreButton->setEnabled(available);
+        discardButton->setEnabled(available);
+        if (!available) {
+            list->clear();
+            auto *empty = new QListWidgetItem("No recovery snapshots are currently available.", list);
+            empty->setFlags(Qt::NoItemFlags);
+        }
+    });
+    connect(restoreButton, &QPushButton::clicked, &dialog, [&]() {
+        auto *item = list->currentItem();
+        if (!item || item->data(Qt::UserRole).toInt() < 0
+            || item->data(Qt::UserRole).toInt() >= recoveryPaths.size()) return;
+        if (m_projectDirty && QMessageBox::question(&dialog, "Replace Current Session",
+                "The current project has unsaved changes. Replace it with this recovery snapshot?",
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+            return;
+        const int index = item->data(Qt::UserRole).toInt();
+        if (!readProject(recoveryPaths.at(index))) {
+            QMessageBox::warning(&dialog, "Restore Recovery", "This recovery snapshot is invalid or could not be opened.");
+            return;
+        }
+        m_projectPath = kinds.at(index) == "project" ? originals.at(index) : QString();
+        m_projectDirty = false;
+        updateWindowTitle();
+        statusBar()->showMessage(kinds.at(index) == "project"
+            ? "Project recovery restored from autosave" : "Unsaved session recovery restored", 6000);
+        dialog.accept();
+    });
+    dialog.exec();
 }
 
 void MainWindow::autosaveProject()
