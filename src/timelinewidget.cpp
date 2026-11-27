@@ -1007,10 +1007,10 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
         return clip;
     };
 
-    std::function<void(const QJsonArray &, qint64, qint64, int, int, double)> collectNested;
-    collectNested = [&](const QJsonArray &children, qint64 localPosition,
-                        qint64 absoluteOffset, int parentTrack, int depth,
-                        double accumulatedRate) {
+    std::function<void(const QJsonArray &, const QJsonArray &, qint64, qint64, int, int, double)> collectNested;
+    collectNested = [&](const QJsonArray &children, const QJsonArray &trackStates,
+                        qint64 localPosition, qint64 absoluteOffset,
+                        int parentTrack, int depth, double accumulatedRate) {
         if (depth > 8 || accumulatedRate <= 0.0) return;
         for (const QJsonValue &value : children) {
             if (!value.isObject()) continue;
@@ -1028,6 +1028,7 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
                 const double nestedRate = item.value("playbackRate").toDouble(1.0);
                 if (nestedRate <= 0.0) continue;
                 collectNested(item.value("nestedClips").toArray(),
+                    item.value("nestedTrackStates").toArray(),
                     qRound64((localPosition - start) * nestedRate),
                     absoluteStart, parentTrack, depth + 1,
                     accumulatedRate * nestedRate);
@@ -1041,8 +1042,12 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             if (childTrack < 0 || childTrack >= kTrackCount
                 || (parentTrack < 3 && childTrack >= 3)
                 || (parentTrack >= 3 && childTrack < 3)) continue;
-            result.append(readClip(item, parentTrack, childTrack,
-                                   absoluteStart, accumulatedRate));
+            ClipInfo resolved = readClip(item, parentTrack, childTrack,
+                                          absoluteStart, accumulatedRate);
+            if (childTrack < trackStates.size())
+                resolved.nestedTrackMuted = trackStates.at(childTrack).toObject()
+                    .value("muted").toBool(false);
+            result.append(resolved);
         }
     };
 
@@ -1052,7 +1057,7 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
 
         if (clip.nestedSequence) {
             const double nestedRate = qMax(0.01, clip.playbackRate);
-            collectNested(clip.nestedClips,
+            collectNested(clip.nestedClips, clip.nestedTrackStates,
                 qRound64((positionMs - clip.timelineStartMs) * nestedRate),
                 clip.timelineStartMs, track, 0, nestedRate);
         } else {
@@ -1557,6 +1562,7 @@ bool TimelineWidget::nestSelectedClips(const QString &name)
     nested.nestedName = name.trimmed().isEmpty()
         ? QString("Nested Sequence %1").arg(nested.id) : name.trimmed();
     nested.nestedClips = children;
+    nested.nestedTrackStates = trackStatesToJson();
 
     for (int i = m_clips.size() - 1; i >= 0; --i) {
         if (selectedIds.contains(m_clips.at(i).id))
@@ -1623,6 +1629,7 @@ QJsonArray TimelineWidget::toJson() const
             item.insert("nestedSequence", true);
             item.insert("nestedName", clip.nestedName);
             item.insert("nestedClips", clip.nestedClips);
+            item.insert("nestedTrackStates", clip.nestedTrackStates);
         }
         QJsonObject color;
         color.insert("brightness", clip.brightness);
@@ -1713,6 +1720,7 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.nestedSequence = isNested;
         clip.nestedName = item.value("nestedName").toString("Nested Sequence");
         clip.nestedClips = item.value("nestedClips").toArray();
+        clip.nestedTrackStates = item.value("nestedTrackStates").toArray();
         if (track >= 3 && QFileInfo(path).suffix().compare(
                 "wav", Qt::CaseInsensitive) == 0 && QFileInfo::exists(path)) {
             clip.waveformPeaks = readWaveformPeaks(path);
