@@ -12,6 +12,8 @@ class QAudioOutput;
 class QCheckBox;
 class QLabel;
 class QMediaPlayer;
+class QProcess;
+class QProgressDialog;
 class QPushButton;
 class QSlider;
 class QTreeWidget;
@@ -36,6 +38,7 @@ private slots:
     void importMedia();
     void relinkSelectedMedia();
     void collectProjectMedia();
+    void exportVideo();
     void setSequenceFrameRate();
     void addSelectedMediaToTimeline();
     void playPause();
@@ -124,4 +127,6 @@ private:
     int m_sequenceFpsDenominator = 1;
     QMediaPlayer *m_player = nullptr;
     QAudioOutput *m_audioOutput = nullptr;
+    QProcess *m_exportProcess = nullptr;
+    QProgressDialog *m_exportProgress = nullptr;
 };
