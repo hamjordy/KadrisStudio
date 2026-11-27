@@ -244,6 +244,7 @@ int main(int argc, char **argv)
     QJsonObject rateAdjustedAudio{
         {"id", 424}, {"path", "rate-adjusted-audio.wav"}, {"track", 3},
         {"timelineStartMs", 0}, {"durationMs", 3000},
+        {"fadeInMs", 600}, {"fadeOutMs", 900},
         {"audioVolumeKeyframes", QJsonArray{
             QJsonObject{{"timeMs", 1000}, {"value", 25}},
             QJsonObject{{"timeMs", 3000}, {"value", 85}}
@@ -262,6 +263,8 @@ int main(int argc, char **argv)
         rateAdjustedAudioPreview.clipsAtTimeOnTrack(1750, 3);
     assert(rateAdjustedAudioLayers.size() == 1);
     assert(rateAdjustedAudioLayers.first().playbackRate == 2.0);
+    assert(rateAdjustedAudioLayers.first().fadeInMs == 300);
+    assert(rateAdjustedAudioLayers.first().fadeOutMs == 450);
     assert(rateAdjustedAudioLayers.first().audioVolumeKeyframes.size() == 2);
     assert(rateAdjustedAudioLayers.first().audioVolumeKeyframes.at(0).x() == 1500.0);
     assert(rateAdjustedAudioLayers.first().audioVolumeKeyframes.at(1).x() == 2500.0);
