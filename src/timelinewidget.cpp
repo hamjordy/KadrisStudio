@@ -1232,7 +1232,7 @@ bool TimelineWidget::slideClip(int clipId, qint64 deltaMs)
 
     if (!previous.durationKnown || previous.sourceDurationMs <= 0
         || previous.playbackRate <= 0.0 || next.playbackRate <= 0.0) return false;
-    const qint64 minimumDelta = std::max({
+    const qint64 minimumDelta = std::max<qint64>({
         -selected.timelineStartMs,
         kMinimumClipDurationMs - previous.durationMs,
         -qFloor(static_cast<double>(next.sourceInMs) / next.playbackRate)
@@ -2180,7 +2180,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
             || m_slidePreviousSnapshot.sourceDurationMs <= 0
             || m_slidePreviousSnapshot.playbackRate <= 0.0
             || m_slideNextSnapshot.playbackRate <= 0.0) return;
-        const qint64 minimumDelta = std::max({
+        const qint64 minimumDelta = std::max<qint64>({
             -m_dragSnapshot.timelineStartMs,
             kMinimumClipDurationMs - m_slidePreviousSnapshot.durationMs,
             -qFloor(static_cast<double>(m_slideNextSnapshot.sourceInMs)
