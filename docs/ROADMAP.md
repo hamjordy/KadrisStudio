@@ -11,7 +11,8 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [x] Windows CI build workflow
 
 ## Milestone 1 — Media and project reliability
-- [ ] Relative media paths and relinking
+- [ ] Relative media paths
+- [x] Relink a missing media-bin item and update every matching timeline clip without losing edit settings
 - [ ] Autosave, crash recovery, and project backups
 - [ ] Media metadata, searchable bins, and thumbnail generation
 - [ ] Drag-and-drop import
@@ -68,7 +69,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 ## Immediate priorities
 
 1. Build a reliable undo/redo history for timeline and Inspector edits.
-2. Add media relinking and relative project paths so projects survive folder moves.
+2. Add relative project paths so projects survive folder moves.
 3. Add autosave and recovery before expanding the editing feature set.
 4. Establish a real render/export pipeline with output validation.
 5. Expand automated tests beyond compilation, including serialization, timeline behavior, and project recovery.
