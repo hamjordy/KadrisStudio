@@ -1011,6 +1011,16 @@ void MainWindow::buildInterface()
     m_masterVolumeSlider->setToolTip("Master level: -60 dB to 0 dB");
     masterLayout->addWidget(masterGainLabel);
     masterLayout->addWidget(m_masterVolumeSlider, 1, Qt::AlignHCenter);
+    auto *masterMuteButton = new QPushButton("M", masterStrip);
+    masterMuteButton->setObjectName("mixerMuteButton");
+    masterMuteButton->setCheckable(true);
+    masterMuteButton->setToolTip("Mute the complete master output");
+    masterLayout->addWidget(masterMuteButton);
+    connect(masterMuteButton, &QPushButton::toggled, this, [this](bool muted) {
+        m_masterMuted = muted;
+        applyAudioMixerState();
+        statusBar()->showMessage(muted ? "Master output muted" : "Master output unmuted", 2000);
+    });
     auto *resetAllPeaksButton = new QPushButton("RESET PEAKS", masterStrip);
     resetAllPeaksButton->setToolTip("Clear Peak Hold and clipping warnings on all audio tracks");
     resetAllPeaksButton->setObjectName("mixerPeakResetAllButton");
@@ -2666,7 +2676,7 @@ void MainWindow::applyAudioMixerState()
 
         output->setVolume(qBound(0.0f,
             m_audioTrackGains[parentIndex] * m_masterGain * clipGain, 1.0f));
-        output->setMuted(m_audioTrackMuted[parentIndex] || mutedBySolo
+        output->setMuted(m_masterMuted || m_audioTrackMuted[parentIndex] || mutedBySolo
             || clipMuted || (m_timeline
                 && m_timeline->isTrackMuted(firstAudioTrack + parentIndex)));
     }
