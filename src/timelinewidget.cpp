@@ -1140,16 +1140,31 @@ bool TimelineWidget::nudgeSelectedClip(int frameDirection)
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()
         || frameDirection == 0) return false;
 
-    Clip &clip = m_clips[m_selectedClip];
-    if (isTrackLocked(clip.track)) return false;
+    QSet<int> ids = m_selectedClipIds;
+    if (ids.isEmpty()) ids.insert(m_clips.at(m_selectedClip).id);
 
-    const qint64 previousStart = clip.timelineStartMs;
-    const qint64 requestedStart = previousStart
-        + (frameDirection < 0 ? -kSnapIntervalMs : kSnapIntervalMs);
-    clip.timelineStartMs = kTimelineTimebase.snapMilliseconds(
-        qMax<qint64>(0, requestedStart));
+    for (const Clip &clip : m_clips) {
+        if (ids.contains(clip.id) && isTrackLocked(clip.track))
+            return false;
+    }
 
-    if (clip.timelineStartMs == previousStart) return false;
+    qint64 delta = frameDirection < 0 ? -kSnapIntervalMs : kSnapIntervalMs;
+    if (delta < 0) {
+        qint64 earliestStart = std::numeric_limits<qint64>::max();
+        for (const Clip &clip : m_clips) {
+            if (ids.contains(clip.id))
+                earliestStart = qMin(earliestStart, clip.timelineStartMs);
+        }
+        if (earliestStart == std::numeric_limits<qint64>::max()) return false;
+        delta = qMax<qint64>(delta, -earliestStart);
+    }
+
+    if (delta == 0) return false;
+    for (Clip &clip : m_clips) {
+        if (ids.contains(clip.id))
+            clip.timelineStartMs = kTimelineTimebase.snapMilliseconds(
+                qMax<qint64>(0, clip.timelineStartMs + delta));
+    }
 
     updateCanvasSize();
     update();
