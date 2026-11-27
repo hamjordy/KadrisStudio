@@ -32,6 +32,8 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --config Release --parallel
+      - name: Run regression tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
       - name: Stage application
         shell: pwsh
         run: |
