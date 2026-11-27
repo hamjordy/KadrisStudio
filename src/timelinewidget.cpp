@@ -1800,7 +1800,8 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
                     m_dragMode = DragMode::TrimLeft;
                 } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
-                    m_dragMode = DragMode::TrimRight;
+                    m_dragMode = event->modifiers().testFlag(Qt::ShiftModifier)
+                        ? DragMode::RippleTrimRight : DragMode::TrimRight;
                 } else {
                     m_dragMode = DragMode::Move;
                 }
@@ -2013,14 +2014,36 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         clip.timelineStartMs = m_dragSnapshot.timelineStartMs + deltaMs;
         clip.sourceInMs = m_dragSnapshot.sourceInMs + deltaMs;
         clip.durationMs = m_dragSnapshot.durationMs - deltaMs;
-    } else if (m_dragMode == DragMode::TrimRight) {
+    } else if (m_dragMode == DragMode::TrimRight
+               || m_dragMode == DragMode::RippleTrimRight) {
         qint64 proposedEnd = m_dragSnapshot.timelineStartMs
             + m_dragSnapshot.durationMs + deltaMs;
         const qint64 snappedEnd = snapToClipEdges(proposedEnd, m_selectedClip);
         if (qAbs(snappedEnd - proposedEnd) <= snapToleranceMs)
             proposedEnd = snappedEnd;
-        clip.durationMs = qMax(kMinimumClipDurationMs,
+        const qint64 newDuration = qMax(kMinimumClipDurationMs,
             proposedEnd - m_dragSnapshot.timelineStartMs);
+        const qint64 durationDelta = newDuration - m_dragSnapshot.durationMs;
+        if (m_dragMode == DragMode::RippleTrimRight && durationDelta != 0) {
+            const qint64 oldEnd = m_dragSnapshot.timelineStartMs
+                + m_dragSnapshot.durationMs;
+            // Validate every downstream edit before moving anything: ripple
+            // trimming must never partially modify a locked track.
+            for (const Clip &other : m_clips) {
+                if (other.id == m_dragSnapshot.id
+                    || other.track != m_dragSnapshot.track
+                    || other.timelineStartMs < oldEnd) continue;
+                if (isTrackLocked(other.track)) return;
+            }
+            for (Clip &other : m_clips) {
+                if (other.id == m_dragSnapshot.id
+                    || other.track != m_dragSnapshot.track
+                    || other.timelineStartMs < oldEnd) continue;
+                other.timelineStartMs = m_timebase.snapMilliseconds(
+                    qMax<qint64>(0, other.timelineStartMs + durationDelta));
+            }
+        }
+        clip.durationMs = newDuration;
     }
 
     updateCanvasSize();

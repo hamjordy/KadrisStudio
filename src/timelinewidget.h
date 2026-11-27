@@ -150,7 +150,7 @@ private:
         QVector<TransformKeyframe> transformKeyframes;
     };
 
-    enum class DragMode { None, Move, TrimLeft, TrimRight };
+    enum class DragMode { None, Move, TrimLeft, TrimRight, RippleTrimRight };
 
     QRect clipRect(int index) const;
     int clipIndexAt(const QPoint &position) const;
