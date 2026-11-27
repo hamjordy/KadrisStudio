@@ -2415,7 +2415,7 @@ void MainWindow::applyAudioMixerState()
             const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack - 3;
             if (candidateLayer != childLayer) continue;
             clipGain = m_timeline->evaluatedAudioVolume(candidate.id, m_sequencePositionMs) / 100.0f;
-            clipMuted = candidate.audioMuted;
+            clipMuted = candidate.audioMuted || candidate.nestedTrackMuted;
             const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - candidate.timelineStartMs);
             if (candidate.fadeInMs > 0 && localMs < candidate.fadeInMs)
                 clipGain *= static_cast<float>(localMs) / candidate.fadeInMs;
