@@ -10,6 +10,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QSaveFile>
+#include <QStandardPaths>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>
@@ -139,6 +140,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     m_autosaveTimer->setInterval(60000);
     connect(m_autosaveTimer, &QTimer::timeout, this, &MainWindow::autosaveProject);
     m_autosaveTimer->start();
+
+    // Offer recovery of an unsaved session from the previous application run.
+    QTimer::singleShot(0, this, &MainWindow::recoverUntitledProject);
 
     connect(m_timeline, &TimelineWidget::clipActivated, this,
         [this](const QString &path) {
@@ -1108,6 +1112,7 @@ void MainWindow::newProject()
     if (!m_mediaPaths.isEmpty()
         && QMessageBox::question(this, "New Project", "Discard the current project state?")
             != QMessageBox::Yes) return;
+    QFile::remove(untitledRecoveryPath());
     m_projectPath.clear();
     m_mediaPaths.clear();
     m_mediaList->clear();
@@ -1158,6 +1163,7 @@ void MainWindow::saveProject()
         return;
     }
     QFile::remove(m_projectPath + ".autosave");
+    QFile::remove(untitledRecoveryPath());
 }
 
 void MainWindow::saveProjectAs()
@@ -1171,14 +1177,55 @@ void MainWindow::saveProjectAs()
         return;
     }
     QFile::remove(m_projectPath + ".autosave");
+    QFile::remove(untitledRecoveryPath());
+}
+
+QString MainWindow::untitledRecoveryPath() const
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+        .filePath("untitled-session.autosave");
+}
+
+void MainWindow::recoverUntitledProject()
+{
+    const QString recoveryPath = untitledRecoveryPath();
+    if (!QFileInfo::exists(recoveryPath)) return;
+
+    const auto choice = QMessageBox::question(this, "Recover Unsaved Session",
+        "KadrisStudio found an autosaved session that was never saved as a project. Recover it?",
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (choice == QMessageBox::No) {
+        QFile::remove(recoveryPath);
+        return;
+    }
+
+    if (readProject(recoveryPath)) {
+        // Keep this as an untitled project; the next manual save will ask for a filename.
+        m_projectPath.clear();
+        updateWindowTitle();
+        statusBar()->showMessage("Recovered the previous unsaved session", 6000);
+    } else {
+        QMessageBox::warning(this, "Recover Unsaved Session",
+            "The recovery file could not be opened and will be discarded.");
+        QFile::remove(recoveryPath);
+    }
 }
 
 void MainWindow::autosaveProject()
 {
-    if (m_projectPath.isEmpty()) return;
-
     const QString originalPath = m_projectPath;
-    const QString recoveryPath = originalPath + ".autosave";
+    QString recoveryPath;
+    if (originalPath.isEmpty()) {
+        const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        if (!QDir().mkpath(appData)) {
+            statusBar()->showMessage("Autosave failed — could not create the recovery folder", 6000);
+            return;
+        }
+        recoveryPath = untitledRecoveryPath();
+    } else {
+        recoveryPath = originalPath + ".autosave";
+    }
+
     if (!writeProject(recoveryPath)) {
         m_projectPath = originalPath;
         updateWindowTitle();
