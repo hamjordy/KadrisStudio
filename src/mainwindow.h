@@ -65,6 +65,7 @@ private:
     void addMediaPath(const QString &path);
     void loadPreview(const QString &path);
     bool writeProject(const QString &path);
+    bool createProjectBackup(const QString &path);
     bool readProject(const QString &path);
     void updateWindowTitle();
     QString untitledRecoveryPath() const;
