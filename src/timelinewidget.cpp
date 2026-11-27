@@ -1700,8 +1700,11 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
         if (index >= 0) {
             const int clickedId = m_clips.at(index).id;
             const bool multiSelect = event->modifiers().testFlag(Qt::ControlModifier);
+            const bool removingFromSelection =
+                multiSelect && m_selectedClipIds.contains(clickedId);
+
             if (multiSelect) {
-                if (m_selectedClipIds.contains(clickedId))
+                if (removingFromSelection)
                     m_selectedClipIds.remove(clickedId);
                 else
                     m_selectedClipIds.insert(clickedId);
@@ -1711,33 +1714,52 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 m_selectedClipIds.clear();
                 m_selectedClipIds.insert(clickedId);
             }
-            m_selectedClip = index;
-            m_dragOrigin = pos;
-            m_dragSnapshot = m_clips.at(index);
-            m_dragGroupSnapshot.clear();
-            if (m_selectedClipIds.contains(clickedId)) {
-                for (const Clip &candidate : m_clips) {
-                    if (m_selectedClipIds.contains(candidate.id))
-                        m_dragGroupSnapshot.append(candidate);
+
+            // Keep the Inspector focused on a clip that is still selected.
+            // Ctrl-clicking a selected clip only changes selection; it must
+            // not accidentally start dragging the clip that was removed.
+            int activeIndex = index;
+            if (removingFromSelection && m_selectedClipIds.size() > 0
+                && m_selectedClipIds.contains(clickedId)) {
+                activeIndex = index;
+            } else if (removingFromSelection) {
+                m_dragMode = DragMode::None;
+                for (int i = m_clips.size() - 1; i >= 0; --i) {
+                    if (m_selectedClipIds.contains(m_clips.at(i).id)) {
+                        activeIndex = i;
+                        break;
+                    }
                 }
             }
-            const QRect bounds = clipRect(index);
-            const bool groupMove = m_selectedClipIds.size() > 1
-                && pos.x() - bounds.left() > kTrimHandleWidth
-                && bounds.right() - pos.x() > kTrimHandleWidth;
-            if (groupMove) {
-                m_dragMode = DragMode::Move;
-            } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
-                m_dragMode = DragMode::TrimLeft;
-            } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
-                m_dragMode = DragMode::TrimRight;
-            } else {
-                m_dragMode = DragMode::Move;
+
+            m_selectedClip = activeIndex;
+            m_dragOrigin = pos;
+            m_dragSnapshot = m_clips.at(activeIndex);
+            m_dragGroupSnapshot.clear();
+            for (const Clip &candidate : m_clips) {
+                if (m_selectedClipIds.contains(candidate.id))
+                    m_dragGroupSnapshot.append(candidate);
             }
 
-            emit clipActivated(m_clips.at(index).path);
-            emit clipSelectionChanged(m_clips.at(index).id,
-                m_clips.at(index).path, m_clips.at(index).track);
+            if (!removingFromSelection || m_selectedClipIds.size() == 1) {
+                const QRect bounds = clipRect(activeIndex);
+                const bool groupMove = m_selectedClipIds.size() > 1
+                    && pos.x() - bounds.left() > kTrimHandleWidth
+                    && bounds.right() - pos.x() > kTrimHandleWidth;
+                if (groupMove) {
+                    m_dragMode = DragMode::Move;
+                } else if (pos.x() - bounds.left() <= kTrimHandleWidth) {
+                    m_dragMode = DragMode::TrimLeft;
+                } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
+                    m_dragMode = DragMode::TrimRight;
+                } else {
+                    m_dragMode = DragMode::Move;
+                }
+            }
+
+            const Clip &activeClip = m_clips.at(activeIndex);
+            emit clipActivated(activeClip.path);
+            emit clipSelectionChanged(activeClip.id, activeClip.path, activeClip.track);
         } else {
             m_selectedClip = -1;
             m_selectedClipIds.clear();
