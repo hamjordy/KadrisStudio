@@ -161,3 +161,17 @@ QSlider#colorWheelSlider:hover::handle:horizontal,
 QSlider#rgbCurveSlider:hover::handle:horizontal {
     background: #e0c8ff;
 }
+
+
+/* Creative look preset selector */
+QComboBox#creativeLookPreset {
+    background: #21182d;
+    border: 1px solid #8956c7;
+    color: #eadcff;
+    font-weight: 600;
+    min-height: 22px;
+}
+QComboBox#creativeLookPreset:hover {
+    border: 1px solid #c6a5f5;
+    background: #2b1f3b;
+}
