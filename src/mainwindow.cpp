@@ -27,6 +27,7 @@
 #include <QInputDialog>
 #include <QLabel>
 #include <QListWidget>
+#include <QLineEdit>
 #include <QMediaPlayer>
 #include <QMenu>
 #include <QMenuBar>
