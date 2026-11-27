@@ -132,8 +132,10 @@ int main(int argc, char **argv)
     int openedNestedClipId = -1;
     QObject::connect(&nestedOpenGesture, &TimelineWidget::nestedSequenceDoubleClicked,
                      [&openedNestedClipId](int id) { openedNestedClipId = id; });
-    QMouseEvent openNestedEvent(QEvent::MouseButtonDblClick, QPointF(230, 55),
-        Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    const int nestedTrack = nestedSaved.first().toObject().value("track").toInt();
+    const int nestedTrackY = 55 + nestedTrack * 41;
+    QMouseEvent openNestedEvent(QEvent::MouseButtonDblClick,
+        QPointF(230, nestedTrackY), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     QApplication::sendEvent(&nestedOpenGesture, &openNestedEvent);
     assert(openedNestedClipId > 0);
     TimelineWidget::ClipInfo openedNestedInfo;
