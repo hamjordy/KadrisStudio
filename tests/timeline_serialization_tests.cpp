@@ -198,6 +198,33 @@ int main(int argc, char **argv)
     assert(activeNestedLayers.at(0).track == 1);
     assert(activeNestedLayers.at(1).track == 1);
 
+    // Nested audio layers are resolved independently on AUDIO parent tracks.
+    QJsonObject nestedAudioOne{
+        {"id", 421}, {"path", "nested-voice.wav"}, {"track", 3},
+        {"timelineStartMs", 0}, {"durationMs", 4000}
+    };
+    QJsonObject nestedAudioTwo{
+        {"id", 422}, {"path", "nested-music.wav"}, {"track", 4},
+        {"timelineStartMs", 500}, {"durationMs", 3000}
+    };
+    QJsonObject nestedAudioContainer{
+        {"id", 423}, {"path", "nest://423"}, {"track", 3},
+        {"timelineStartMs", 1000}, {"durationMs", 5000},
+        {"sourceDurationMs", 5000}, {"nestedSequence", true},
+        {"nestedName", "Audio Scene"},
+        {"nestedClips", QJsonArray{nestedAudioOne, nestedAudioTwo}}
+    };
+    TimelineWidget nestedAudioPreview;
+    nestedAudioPreview.fromJson(QJsonArray{nestedAudioContainer});
+    const auto activeNestedAudio = nestedAudioPreview.clipsAtTimeOnTrack(2000, 3);
+    assert(activeNestedAudio.size() == 2);
+    assert(activeNestedAudio.at(0).path == "nested-voice.wav");
+    assert(activeNestedAudio.at(0).nestedTrack == 3);
+    assert(activeNestedAudio.at(1).path == "nested-music.wav");
+    assert(activeNestedAudio.at(1).nestedTrack == 4);
+    assert(activeNestedAudio.at(0).track == 3);
+    assert(activeNestedAudio.at(1).track == 3);
+
     // Nested sequence speed changes both the child timeline mapping and source rate.
     QJsonObject rateAdjustedChild{
         {"id", 411}, {"path", "rate-adjusted-child.mp4"}, {"track", 1},
