@@ -1390,8 +1390,12 @@ void MainWindow::collectProjectMedia()
         const QString replacement = newPath.isEmpty() ? oldPath : newPath;
         addMediaPath(replacement);
     }
-    for (auto it = pathMap.cbegin(); it != pathMap.cend(); ++it)
-        m_timeline->replaceMediaPath(it.key(), it.value());
+    for (const QString &oldPath : referencedPaths) {
+        const QString canonical = QFileInfo(oldPath).canonicalFilePath();
+        const QString newPath = pathMap.value(QDir::cleanPath(canonical));
+        if (!newPath.isEmpty())
+            m_timeline->replaceMediaPath(oldPath, newPath);
+    }
 
     m_projectDirty = true;
     saveProject();
