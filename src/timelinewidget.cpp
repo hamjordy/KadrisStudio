@@ -2229,6 +2229,20 @@ void TimelineWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         const QPoint pos = event->position().toPoint();
+        const int clipIndex = clipIndexAt(pos);
+        if (clipIndex >= 0 && m_clips.at(clipIndex).nestedSequence) {
+            const Clip &nested = m_clips.at(clipIndex);
+            m_selectedClip = clipIndex;
+            m_selectedClipIds.clear();
+            m_selectedClipIds.insert(nested.id);
+            m_dragGroupSnapshot.clear();
+            m_dragMode = DragMode::None;
+            emit clipSelectionChanged(nested.id, nested.path, nested.track);
+            emit nestedSequenceDoubleClicked(nested.id);
+            update();
+            event->accept();
+            return;
+        }
         const int groupTrack = (pos.y() - kTrackTop) / (kTrackHeight + kTrackGap);
         if (pos.x() < 45 && pos.y() >= kTrackTop
             && groupTrack >= 0 && groupTrack < kTrackCount
