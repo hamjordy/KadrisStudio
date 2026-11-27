@@ -111,5 +111,26 @@ int main(int argc, char **argv)
                                                rendered.height() / 2);
     assert(normal.red() >= 125 && normal.red() <= 131);
 
+    // The program monitor can composite three nested video tracks for each
+    // of the three parent video tracks (nine independent layer slots).
+    QImage nestedBottom(8, 8, QImage::Format_ARGB32);
+    nestedBottom.fill(qRgb(20, 180, 40));
+    QImage nestedTop(8, 8, QImage::Format_ARGB32);
+    nestedTop.fill(qRgb(30, 40, 220));
+    monitor.clearAllFrames();
+    monitor.setFrame(6, nestedBottom);
+    monitor.setFrame(8, nestedTop);
+    rendered.fill(Qt::black);
+    monitor.render(&rendered);
+    const QColor nestedComposite = rendered.pixelColor(rendered.width() / 2,
+                                                         rendered.height() / 2);
+    assert(nestedComposite.blue() > 200 && nestedComposite.green() < 60);
+    monitor.clearFrame(8);
+    rendered.fill(Qt::black);
+    monitor.render(&rendered);
+    const QColor nestedBase = rendered.pixelColor(rendered.width() / 2,
+                                                   rendered.height() / 2);
+    assert(nestedBase.green() > 150 && nestedBase.blue() < 60);
+
     return 0;
 }
