@@ -2331,3 +2331,116 @@ void MainWindow::updateWindowTitle()
         ? "Untitled Project" : QFileInfo(m_projectPath).fileName();
     setWindowTitle(name + " — Kadris Studio");
 }
+
+
+void MainWindow::exportVideo()
+{
+    if (m_exportProcess) {
+        statusBar()->showMessage("An export is already running", 3500);
+        return;
+    }
+
+    const QString ffmpeg = QStandardPaths::findExecutable("ffmpeg");
+    if (ffmpeg.isEmpty()) {
+        QMessageBox::warning(this, "Export Video",
+            "FFmpeg was not found. Install FFmpeg and add its folder to PATH, "
+            "then restart KadrisStudio.");
+        return;
+    }
+
+    const QStringList resolutions = {
+        "1920 × 1080 (Full HD)", "1280 × 720 (HD)", "3840 × 2160 (4K)"
+    };
+    bool accepted = false;
+    const QString resolution = QInputDialog::getItem(
+        this, "Export Settings", "Resolution:", resolutions, 0, false, &accepted);
+    if (!accepted) return;
+
+    int width = 1920;
+    int height = 1080;
+    if (resolution.startsWith("1280")) {
+        width = 1280;
+        height = 720;
+    } else if (resolution.startsWith("3840")) {
+        width = 3840;
+        height = 2160;
+    }
+
+    QString outputPath = QFileDialog::getSaveFileName(
+        this, "Export Video", "KadrisStudio-Export.mp4",
+        "MP4 Video (*.mp4)");
+    if (outputPath.isEmpty()) return;
+    if (QFileInfo(outputPath).suffix().compare("mp4", Qt::CaseInsensitive) != 0)
+        outputPath += ".mp4";
+
+    QStringList arguments;
+    QString error;
+    if (!FfmpegExport::buildArguments(
+            m_timeline->toJson(), width, height,
+            m_sequenceFpsNumerator, m_sequenceFpsDenominator,
+            outputPath, &arguments, &error)) {
+        QMessageBox::warning(this, "Export Video",
+            "The timeline cannot be exported yet:\n\n" + error);
+        return;
+    }
+
+    auto *process = new QProcess(this);
+    m_exportProcess = process;
+    auto *progress = new QProgressDialog(
+        "Rendering your timeline to MP4…", "Cancel Export", 0, 0, this);
+    m_exportProgress = progress;
+    progress->setWindowTitle("KadrisStudio Export");
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
+    connect(progress, &QProgressDialog::canceled, process, &QProcess::kill);
+
+    connect(process,
+        qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+        this, [this, process, progress, outputPath](
+                int exitCode, QProcess::ExitStatus exitStatus) {
+            const QString diagnostics =
+                QString::fromLocal8Bit(process->readAllStandardError()).trimmed();
+            progress->close();
+            m_exportProgress = nullptr;
+            m_exportProcess = nullptr;
+            process->deleteLater();
+            progress->deleteLater();
+
+            if (exitStatus == QProcess::NormalExit && exitCode == 0
+                && QFileInfo::exists(outputPath)
+                && QFileInfo(outputPath).size() > 0) {
+                QMessageBox::information(this, "Export Complete",
+                    "Your video was exported successfully:\n\n" + outputPath);
+                statusBar()->showMessage("MP4 export completed", 5000);
+            } else {
+                const QString detail = diagnostics.isEmpty()
+                    ? QString("FFmpeg exited with code %1.").arg(exitCode)
+                    : diagnostics.right(2500);
+                QMessageBox::warning(this, "Export Failed",
+                    "The video could not be exported.\n\n" + detail);
+            }
+        });
+
+    connect(process, &QProcess::errorOccurred, this,
+        [this, process, progress](QProcess::ProcessError processError) {
+            if (processError != QProcess::FailedToStart) return;
+            const QString detail = process->errorString();
+            progress->close();
+            m_exportProgress = nullptr;
+            m_exportProcess = nullptr;
+            process->deleteLater();
+            progress->deleteLater();
+            QMessageBox::warning(this, "Export Failed",
+                "FFmpeg could not be started:\n\n" + detail);
+        });
+
+    process->setProgram(ffmpeg);
+    process->setArguments(arguments);
+    process->start();
+    if (!process->waitForStarted(1500)) {
+        if (process->error() == QProcess::FailedToStart) return;
+    }
+    statusBar()->showMessage("MP4 export started", 4000);
+}
