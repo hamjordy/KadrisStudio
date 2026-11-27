@@ -46,6 +46,17 @@ if(BUILD_TESTING)
     target_link_libraries(project-media-collection-tests PRIVATE Qt6::Widgets)
     add_test(NAME project-media-collection-tests COMMAND project-media-collection-tests)
 
+    add_executable(program-monitor-tests
+        tests/program_monitor_tests.cpp
+        src/programmonitorwidget.cpp
+        src/programmonitorwidget.h
+    )
+    target_include_directories(program-monitor-tests PRIVATE src)
+    target_link_libraries(program-monitor-tests PRIVATE Qt6::Widgets)
+    add_test(NAME program-monitor-tests COMMAND program-monitor-tests)
+    set_tests_properties(program-monitor-tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    target_compile_options(program-monitor-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
+
     add_executable(timeline-serialization-tests
         tests/timeline_serialization_tests.cpp
         src/timelinewidget.cpp
