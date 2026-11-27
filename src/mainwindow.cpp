@@ -2400,6 +2400,19 @@ void MainWindow::applyAudioMixerState()
 {
     const bool anySolo = m_audioTrackSolo[0] || m_audioTrackSolo[1];
     constexpr int firstAudioTrack = 3;
+
+    // Gather every active clip on both parent audio tracks. This lets the
+    // mixer calculate a true overlap envelope between A1 and A2.
+    QVector<QPair<int, TimelineWidget::ClipInfo>> activeClips;
+    if (m_timeline) {
+        for (int parentIndex = 0; parentIndex < 2; ++parentIndex) {
+            const auto clips = m_timeline->clipsAtTimeOnTrack(
+                m_sequencePositionMs, firstAudioTrack + parentIndex);
+            for (const auto &clip : clips)
+                activeClips.append(qMakePair(parentIndex, clip));
+        }
+    }
+
     for (int slot = 0; slot < 4; ++slot) {
         const int parentIndex = slot / 2;
         const int childLayer = slot % 2;
@@ -2408,14 +2421,20 @@ void MainWindow::applyAudioMixerState()
         const bool mutedBySolo = anySolo && !m_audioTrackSolo[parentIndex];
         float clipGain = 1.0f;
         bool clipMuted = false;
-        const auto clips = m_timeline
-            ? m_timeline->clipsAtTimeOnTrack(m_sequencePositionMs, firstAudioTrack + parentIndex)
-            : QVector<TimelineWidget::ClipInfo>();
-        for (const auto &candidate : clips) {
-            const int candidateLayer = candidate.nestedTrack < 0 ? 0 : candidate.nestedTrack - 3;
-            if (candidateLayer != childLayer) continue;
-            int evaluatedVolume = candidate.audioVolume;
-            const auto &volumeFrames = candidate.audioVolumeKeyframes;
+        const TimelineWidget::ClipInfo *activeClip = nullptr;
+        for (const auto &entry : activeClips) {
+            const auto &candidate = entry.second;
+            const int candidateLayer = candidate.nestedTrack < 0
+                ? 0 : candidate.nestedTrack - 3;
+            if (entry.first == parentIndex && candidateLayer == childLayer) {
+                activeClip = &candidate;
+                break;
+            }
+        }
+
+        if (activeClip) {
+            int evaluatedVolume = activeClip->audioVolume;
+            const auto &volumeFrames = activeClip->audioVolumeKeyframes;
             if (!volumeFrames.isEmpty()) {
                 const double position = static_cast<double>(m_sequencePositionMs);
                 if (position <= volumeFrames.first().x()) {
@@ -2438,19 +2457,47 @@ void MainWindow::applyAudioMixerState()
                 }
             }
             clipGain = qBound(0, evaluatedVolume, 100) / 100.0f;
-            clipMuted = candidate.audioMuted || candidate.nestedTrackMuted;
-            const qint64 localMs = qMax<qint64>(0, m_sequencePositionMs - candidate.timelineStartMs);
-            if (candidate.fadeInMs > 0 && localMs < candidate.fadeInMs)
-                clipGain *= static_cast<float>(localMs) / candidate.fadeInMs;
-            const qint64 remainingMs = qMax<qint64>(0, candidate.durationMs - localMs);
-            if (candidate.fadeOutMs > 0 && remainingMs < candidate.fadeOutMs)
-                clipGain *= static_cast<float>(remainingMs) / candidate.fadeOutMs;
-            break;
+            clipMuted = activeClip->audioMuted || activeClip->nestedTrackMuted;
+            const qint64 localMs = qMax<qint64>(
+                0, m_sequencePositionMs - activeClip->timelineStartMs);
+            if (activeClip->fadeInMs > 0 && localMs < activeClip->fadeInMs)
+                clipGain *= static_cast<float>(localMs) / activeClip->fadeInMs;
+            const qint64 remainingMs = qMax<qint64>(
+                0, activeClip->durationMs - localMs);
+            if (activeClip->fadeOutMs > 0 && remainingMs < activeClip->fadeOutMs)
+                clipGain *= static_cast<float>(remainingMs) / activeClip->fadeOutMs;
+
+            // Equal-power crossfade: the outgoing and incoming clips share
+            // the overlap with cosine/sine curves to avoid a perceived dip.
+            const qint64 currentEnd = activeClip->timelineStartMs
+                + activeClip->durationMs;
+            for (const auto &entry : activeClips) {
+                if (entry.first == parentIndex) continue;
+                const auto &other = entry.second;
+                const qint64 otherEnd = other.timelineStartMs + other.durationMs;
+                const qint64 overlapStart = qMax(
+                    activeClip->timelineStartMs, other.timelineStartMs);
+                const qint64 overlapEnd = qMin(currentEnd, otherEnd);
+                if (overlapEnd <= overlapStart
+                    || m_sequencePositionMs < overlapStart
+                    || m_sequencePositionMs > overlapEnd)
+                    continue;
+                const double progress = qBound(0.0,
+                    static_cast<double>(m_sequencePositionMs - overlapStart)
+                        / static_cast<double>(overlapEnd - overlapStart), 1.0);
+                const double angle = progress * 1.5707963267948966;
+                clipGain *= static_cast<float>(
+                    activeClip->timelineStartMs < other.timelineStartMs
+                        ? std::cos(angle) : std::sin(angle));
+                break;
+            }
         }
+
         output->setVolume(qBound(0.0f,
             m_audioTrackGains[parentIndex] * m_masterGain * clipGain, 1.0f));
         output->setMuted(m_audioTrackMuted[parentIndex] || mutedBySolo
-            || clipMuted || (m_timeline && m_timeline->isTrackMuted(firstAudioTrack + parentIndex)));
+            || clipMuted || (m_timeline
+                && m_timeline->isTrackMuted(firstAudioTrack + parentIndex)));
     }
 }
 
