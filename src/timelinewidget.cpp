@@ -967,95 +967,121 @@ bool TimelineWidget::clipAtTime(qint64 positionMs, ClipInfo *result) const
     return true;
 }
 
-bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track, ClipInfo *result) const
+QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
+    qint64 positionMs, int track) const
 {
-    if (track < 0 || track >= kTrackCount) return false;
+    QVector<ClipInfo> result;
+    if (track < 0 || track >= kTrackCount) return result;
 
-    // Resolve nested sequence contents recursively into the parent track.
-    // Child timeline positions are relative to the nested sequence's origin.
-    std::function<bool(const QJsonArray &, qint64, int, int, ClipInfo *)> resolveNested;
-    resolveNested = [&](const QJsonArray &children, qint64 localPosition,
-                         qint64 absoluteOffset, int parentTrack, ClipInfo *resolved) {
-        // Resolve the topmost/later child first when nested tracks overlap.
-        // This keeps the preview deterministic and lets upper layers cover lower ones.
-        for (int childIndex = children.size() - 1; childIndex >= 0; --childIndex) {
-            const QJsonValue value = children.at(childIndex);
+    const auto readClip = [](const QJsonObject &item, int parentTrack,
+                             int nestedTrack, qint64 absoluteStart) {
+        ClipInfo clip;
+        clip.id = item.value("id").toInt(-1);
+        clip.path = item.value("path").toString();
+        clip.track = parentTrack;
+        clip.nestedTrack = nestedTrack;
+        clip.timelineStartMs = absoluteStart;
+        clip.sourceInMs = static_cast<qint64>(item.value("sourceInMs").toDouble());
+        clip.durationMs = static_cast<qint64>(item.value("durationMs").toDouble());
+        clip.playbackRate = item.value("playbackRate").toDouble(1.0);
+        clip.nestedSequence = false;
+        clip.nestedContent = nestedTrack >= 0;
+        const QJsonObject color = item.value("color").toObject();
+        clip.brightness = color.value("brightness").toInt(0);
+        clip.contrast = color.value("contrast").toInt(0);
+        clip.saturation = color.value("saturation").toInt(100);
+        clip.shadows = color.value("shadows").toInt(0);
+        clip.midtones = color.value("midtones").toInt(0);
+        clip.highlights = color.value("highlights").toInt(0);
+        clip.redCurve = color.value("redCurve").toInt(0);
+        clip.greenCurve = color.value("greenCurve").toInt(0);
+        clip.blueCurve = color.value("blueCurve").toInt(0);
+        clip.scale = item.value("scale").toInt(100);
+        clip.positionX = item.value("positionX").toInt(0);
+        clip.positionY = item.value("positionY").toInt(0);
+        clip.opacity = item.value("opacity").toInt(100);
+        clip.blendMode = item.value("blendMode").toInt(0);
+        return clip;
+    };
+
+    std::function<void(const QJsonArray &, qint64, qint64, int, int)> collectNested;
+    collectNested = [&](const QJsonArray &children, qint64 localPosition,
+                        qint64 absoluteOffset, int parentTrack, int depth) {
+        if (depth > 8) return;
+        for (const QJsonValue &value : children) {
             if (!value.isObject()) continue;
             const QJsonObject item = value.toObject();
-            const qint64 start = static_cast<qint64>(item.value("timelineStartMs").toDouble());
-            const qint64 duration = static_cast<qint64>(item.value("durationMs").toDouble());
-            if (localPosition < start || localPosition >= start + duration) continue;
+            const qint64 start = static_cast<qint64>(
+                item.value("timelineStartMs").toDouble());
+            const qint64 duration = static_cast<qint64>(
+                item.value("durationMs").toDouble());
+            if (duration <= 0 || localPosition < start
+                || localPosition >= start + duration) continue;
 
             if (item.value("nestedSequence").toBool(false)) {
-                if (resolveNested(item.value("nestedClips").toArray(),
-                                  localPosition - start, absoluteOffset + start,
-                                  parentTrack, resolved)) return true;
+                collectNested(item.value("nestedClips").toArray(),
+                    localPosition - start, absoluteOffset + start,
+                    parentTrack, depth + 1);
                 continue;
             }
 
-            if (resolved) {
-                resolved->id = item.value("id").toInt(-1);
-                resolved->path = item.value("path").toString();
-                resolved->track = parentTrack;
-                resolved->timelineStartMs = absoluteOffset + start;
-                resolved->sourceInMs = static_cast<qint64>(item.value("sourceInMs").toDouble());
-                resolved->durationMs = duration;
-                resolved->playbackRate = item.value("playbackRate").toDouble(1.0);
-                resolved->nestedSequence = false;
-                resolved->nestedContent = true;
-                const QJsonObject color = item.value("color").toObject();
-                resolved->brightness = color.value("brightness").toInt(0);
-                resolved->contrast = color.value("contrast").toInt(0);
-                resolved->saturation = color.value("saturation").toInt(100);
-                resolved->shadows = color.value("shadows").toInt(0);
-                resolved->midtones = color.value("midtones").toInt(0);
-                resolved->highlights = color.value("highlights").toInt(0);
-                resolved->redCurve = color.value("redCurve").toInt(0);
-                resolved->greenCurve = color.value("greenCurve").toInt(0);
-                resolved->blueCurve = color.value("blueCurve").toInt(0);
-                resolved->scale = item.value("scale").toInt(100);
-                resolved->positionX = item.value("positionX").toInt(0);
-                resolved->positionY = item.value("positionY").toInt(0);
-                resolved->opacity = item.value("opacity").toInt(100);
-                resolved->blendMode = item.value("blendMode").toInt(0);
-            }
-            return true;
+            const int childTrack = item.value("track").toInt(-1);
+            if (childTrack < 0 || childTrack >= 3) continue;
+            result.append(readClip(item, parentTrack, childTrack,
+                                   absoluteOffset + start));
         }
-        return false;
     };
 
     for (const Clip &clip : m_clips) {
-        if (clip.track != track) continue;
-        const qint64 clipEnd = clip.timelineStartMs + clip.durationMs;
-        if (positionMs < clip.timelineStartMs || positionMs >= clipEnd) continue;
+        if (clip.track != track || positionMs < clip.timelineStartMs
+            || positionMs >= clip.timelineStartMs + clip.durationMs) continue;
 
         if (clip.nestedSequence) {
-            if (resolveNested(clip.nestedClips, positionMs - clip.timelineStartMs,
-                              clip.timelineStartMs, track, result)) return true;
-            continue;
+            collectNested(clip.nestedClips, positionMs - clip.timelineStartMs,
+                          clip.timelineStartMs, track, 0);
+        } else {
+            QJsonObject item;
+            item.insert("id", clip.id);
+            item.insert("path", clip.path);
+            item.insert("sourceInMs", static_cast<double>(clip.sourceInMs));
+            item.insert("durationMs", static_cast<double>(clip.durationMs));
+            item.insert("playbackRate", clip.playbackRate);
+            QJsonObject color;
+            color.insert("brightness", clip.brightness);
+            color.insert("contrast", clip.contrast);
+            color.insert("saturation", clip.saturation);
+            color.insert("shadows", clip.shadows);
+            color.insert("midtones", clip.midtones);
+            color.insert("highlights", clip.highlights);
+            color.insert("redCurve", clip.redCurve);
+            color.insert("greenCurve", clip.greenCurve);
+            color.insert("blueCurve", clip.blueCurve);
+            item.insert("color", color);
+            item.insert("scale", clip.scale);
+            item.insert("positionX", clip.positionX);
+            item.insert("positionY", clip.positionY);
+            item.insert("opacity", clip.opacity);
+            item.insert("blendMode", clip.blendMode);
+            result.append(readClip(item, track, -1, clip.timelineStartMs));
         }
-        if (result) {
-            result->id = clip.id;
-            result->path = clip.path;
-            result->track = clip.track;
-            result->timelineStartMs = clip.timelineStartMs;
-            result->sourceInMs = clip.sourceInMs;
-            result->durationMs = clip.durationMs;
-            result->playbackRate = clip.playbackRate;
-            result->nestedSequence = false;
-            result->nestedContent = false;
-            result->brightness = clip.brightness; result->contrast = clip.contrast;
-            result->saturation = clip.saturation; result->shadows = clip.shadows;
-            result->midtones = clip.midtones; result->highlights = clip.highlights;
-            result->redCurve = clip.redCurve; result->greenCurve = clip.greenCurve;
-            result->blueCurve = clip.blueCurve;
-            result->scale = clip.scale; result->positionX = clip.positionX;
-            result->positionY = clip.positionY;
-            result->opacity = clip.opacity; result->blendMode = clip.blendMode;
-        }
-        return true;
     }
-    return false;
+
+    std::stable_sort(result.begin(), result.end(),
+        [](const ClipInfo &a, const ClipInfo &b) {
+            if (a.nestedTrack != b.nestedTrack)
+                return a.nestedTrack < b.nestedTrack;
+            return a.timelineStartMs < b.timelineStartMs;
+        });
+    return result;
+}
+
+bool TimelineWidget::clipAtTimeOnTrack(qint64 positionMs, int track,
+                                       ClipInfo *result) const
+{
+    const QVector<ClipInfo> clips = clipsAtTimeOnTrack(positionMs, track);
+    if (clips.isEmpty()) return false;
+    if (result) *result = clips.last();
+    return true;
 }
 
 bool TimelineWidget::nextVideoClipAtOrAfter(qint64 positionMs, ClipInfo *result) const
