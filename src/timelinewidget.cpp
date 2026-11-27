@@ -2107,22 +2107,24 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
                 } else if (bounds.right() - pos.x() <= kTrimHandleWidth) {
                     if (rateStretchGesture) {
                         m_dragMode = DragMode::RateStretchRight;
-                    } else if (event->modifiers().testFlag(Qt::AltModifier)) {
-                        const qint64 editPoint = m_dragSnapshot.timelineStartMs
-                            + m_dragSnapshot.durationMs;
-                        for (const Clip &candidate : m_clips) {
-                            if (candidate.id != m_dragSnapshot.id
-                                && candidate.track == m_dragSnapshot.track
-                                && candidate.timelineStartMs == editPoint) {
-                                m_rollPartnerSnapshot = candidate;
-                                break;
+                    } else {
+                        if (event->modifiers().testFlag(Qt::AltModifier)) {
+                            const qint64 editPoint = m_dragSnapshot.timelineStartMs
+                                + m_dragSnapshot.durationMs;
+                            for (const Clip &candidate : m_clips) {
+                                if (candidate.id != m_dragSnapshot.id
+                                    && candidate.track == m_dragSnapshot.track
+                                    && candidate.timelineStartMs == editPoint) {
+                                    m_rollPartnerSnapshot = candidate;
+                                    break;
+                                }
                             }
                         }
+                        m_dragMode = m_rollPartnerSnapshot.id >= 0
+                            ? DragMode::RollTrimRight
+                            : (event->modifiers().testFlag(Qt::ShiftModifier)
+                                ? DragMode::RippleTrimRight : DragMode::TrimRight);
                     }
-                    m_dragMode = m_rollPartnerSnapshot.id >= 0
-                        ? DragMode::RollTrimRight
-                        : (event->modifiers().testFlag(Qt::ShiftModifier)
-                            ? DragMode::RippleTrimRight : DragMode::TrimRight);
                 } else {
                     m_dragMode = DragMode::Move;
                 }
