@@ -12,6 +12,7 @@
 #include <QSaveFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QDir>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -1142,14 +1143,31 @@ void MainWindow::saveProjectAs()
 
 bool MainWindow::writeProject(const QString &path)
 {
+    const QDir projectDirectory = QFileInfo(path).absoluteDir();
     QJsonArray media;
-    for (const QString &item : m_mediaPaths) media.append(item);
+    for (const QString &item : m_mediaPaths) {
+        const QString storedPath = QFileInfo(item).isAbsolute()
+            ? projectDirectory.relativeFilePath(item) : item;
+        media.append(QDir::fromNativeSeparators(storedPath));
+    }
+
+    QJsonArray timelineClips = m_timeline->toJson();
+    for (int i = 0; i < timelineClips.size(); ++i) {
+        QJsonObject clip = timelineClips.at(i).toObject();
+        const QString sourcePath = clip.value("path").toString();
+        if (!sourcePath.isEmpty() && QFileInfo(sourcePath).isAbsolute()) {
+            clip.insert("path", QDir::fromNativeSeparators(
+                projectDirectory.relativeFilePath(sourcePath)));
+            timelineClips.replace(i, clip);
+        }
+    }
+
     QJsonObject root;
     root.insert("format", "kadris-project");
-    root.insert("formatVersion", 4);
+    root.insert("formatVersion", 5);
     root.insert("projectName", QFileInfo(path).completeBaseName());
     root.insert("mediaFiles", media);
-    root.insert("timelineClips", m_timeline->toJson());
+    root.insert("timelineClips", timelineClips);
     root.insert("timelineMarkers", m_timeline->markersToJson());
     root.insert("timelineTrackStates", m_timeline->trackStatesToJson());
 
@@ -1187,13 +1205,30 @@ bool MainWindow::readProject(const QString &path)
         || (root.value("formatVersion").toInt() != 1
             && root.value("formatVersion").toInt() != 2
             && root.value("formatVersion").toInt() != 3
-            && root.value("formatVersion").toInt() != 4)) return false;
+            && root.value("formatVersion").toInt() != 4
+            && root.value("formatVersion").toInt() != 5)) return false;
 
+    const QDir projectDirectory = QFileInfo(path).absoluteDir();
     m_mediaPaths.clear();
     m_mediaList->clear();
-    for (const QJsonValue &value : root.value("mediaFiles").toArray())
-        addMediaPath(value.toString());
-    m_timeline->fromJson(root.value("timelineClips").toArray());
+    for (const QJsonValue &value : root.value("mediaFiles").toArray()) {
+        const QString storedPath = value.toString();
+        const QString resolvedPath = QFileInfo(storedPath).isAbsolute()
+            ? storedPath : projectDirectory.absoluteFilePath(storedPath);
+        addMediaPath(QDir::cleanPath(resolvedPath));
+    }
+
+    QJsonArray timelineClips = root.value("timelineClips").toArray();
+    for (int i = 0; i < timelineClips.size(); ++i) {
+        QJsonObject clip = timelineClips.at(i).toObject();
+        const QString storedPath = clip.value("path").toString();
+        if (!storedPath.isEmpty() && !QFileInfo(storedPath).isAbsolute()) {
+            clip.insert("path", QDir::cleanPath(
+                projectDirectory.absoluteFilePath(storedPath)));
+            timelineClips.replace(i, clip);
+        }
+    }
+    m_timeline->fromJson(timelineClips);
     m_timeline->markersFromJson(root.value("timelineMarkers").toArray());
     m_timeline->trackStatesFromJson(root.value("timelineTrackStates").toArray());
     resetTimelineHistory();
