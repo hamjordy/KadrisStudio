@@ -2428,7 +2428,7 @@ void MainWindow::exportVideo()
                     if (!ok) renderedUs = -1;
                 } else if (line.startsWith("out_time=")) {
                     const QRegularExpression timePattern(
-                        R"(^out_time=(\\d+):(\\d{2}):(\\d{2})\\.(\\d+)$)");
+                        R"(^out_time=(\d+):(\d{2}):(\d{2})\.(\d+)$)");
                     const auto match = timePattern.match(line);
                     if (match.hasMatch()) {
                         const qint64 hours = match.captured(1).toLongLong();
