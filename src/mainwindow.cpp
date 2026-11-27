@@ -2402,6 +2402,7 @@ void MainWindow::exportVideo()
 
     auto *process = new QProcess(this);
     m_exportProcess = process;
+    m_exportCancelled = false;
     auto *progress = new QProgressDialog(
         "Rendering your timeline to MP4… 0%", "Cancel Export", 0, 1000, this);
     m_exportProgress = progress;
@@ -2410,7 +2411,11 @@ void MainWindow::exportVideo()
     progress->setMinimumDuration(0);
     progress->setAutoClose(false);
     progress->setAutoReset(false);
-    connect(progress, &QProgressDialog::canceled, process, &QProcess::kill);
+    connect(progress, &QProgressDialog::canceled, this, [this, process]() {
+        m_exportCancelled = true;
+        statusBar()->showMessage("Cancelling export…", 3000);
+        process->kill();
+    });
 
     connect(process, &QProcess::readyReadStandardOutput, this,
         [process, progress, totalDurationMs, pending = QString()]() mutable {
@@ -2467,18 +2472,27 @@ void MainWindow::exportVideo()
             process->deleteLater();
             progress->deleteLater();
 
-            if (exitStatus == QProcess::NormalExit && exitCode == 0
-                && QFileInfo::exists(outputPath)
-                && QFileInfo(outputPath).size() > 0) {
+            const bool cancelled = m_exportCancelled;
+            m_exportCancelled = false;
+            const bool succeeded = exitStatus == QProcess::NormalExit && exitCode == 0
+                && QFileInfo::exists(outputPath) && QFileInfo(outputPath).size() > 0;
+
+            if (cancelled) {
+                QFile::remove(outputPath);
+                statusBar()->showMessage(
+                    "Export cancelled — incomplete output file removed", 6000);
+            } else if (succeeded) {
                 QMessageBox::information(this, "Export Complete",
                     "Your video was exported successfully:\n\n" + outputPath);
                 statusBar()->showMessage("MP4 export completed", 5000);
             } else {
+                QFile::remove(outputPath);
                 const QString detail = diagnostics.isEmpty()
                     ? QString("FFmpeg exited with code %1.").arg(exitCode)
                     : diagnostics.right(2500);
                 QMessageBox::warning(this, "Export Failed",
-                    "The video could not be exported.\n\n" + detail);
+                    "The video could not be exported. Any incomplete output file was removed.\n\n"
+                    + detail);
             }
         });
 
