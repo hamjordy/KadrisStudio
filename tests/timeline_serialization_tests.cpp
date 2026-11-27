@@ -240,6 +240,32 @@ int main(int argc, char **argv)
     assert(activeNestedAudio.at(1).fadeInMs == 400);
     assert(activeNestedAudio.at(1).fadeOutMs == 700);
 
+    // Nested audio keyframes follow the accumulated playback rate of their containers.
+    QJsonObject rateAdjustedAudio{
+        {"id", 424}, {"path", "rate-adjusted-audio.wav"}, {"track", 3},
+        {"timelineStartMs", 0}, {"durationMs", 3000},
+        {"audioVolumeKeyframes", QJsonArray{
+            QJsonObject{{"timeMs", 1000}, {"value", 25}},
+            QJsonObject{{"timeMs", 3000}, {"value", 85}}
+        }}
+    };
+    QJsonObject rateAdjustedAudioContainer{
+        {"id", 425}, {"path", "nest://425"}, {"track", 3},
+        {"timelineStartMs", 1000}, {"durationMs", 1500},
+        {"sourceDurationMs", 3000}, {"playbackRate", 2.0},
+        {"nestedSequence", true}, {"nestedName", "Fast Audio Scene"},
+        {"nestedClips", QJsonArray{rateAdjustedAudio}}
+    };
+    TimelineWidget rateAdjustedAudioPreview;
+    rateAdjustedAudioPreview.fromJson(QJsonArray{rateAdjustedAudioContainer});
+    const auto rateAdjustedAudioLayers =
+        rateAdjustedAudioPreview.clipsAtTimeOnTrack(1750, 3);
+    assert(rateAdjustedAudioLayers.size() == 1);
+    assert(rateAdjustedAudioLayers.first().playbackRate == 2.0);
+    assert(rateAdjustedAudioLayers.first().audioVolumeKeyframes.size() == 2);
+    assert(rateAdjustedAudioLayers.first().audioVolumeKeyframes.at(0).x() == 1500.0);
+    assert(rateAdjustedAudioLayers.first().audioVolumeKeyframes.at(1).x() == 2500.0);
+
     // Track mute state is retained inside a nested sequence and exposed to the mixer.
     QJsonArray nestedAudioTrackStates;
     for (int track = 0; track < 5; ++track) {
