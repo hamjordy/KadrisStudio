@@ -20,7 +20,7 @@ QPushButton#mixerSoloButton:checked { background: #715629; border-color: #e7c47b
 QGroupBox { background: #151d26; border: 1px solid #34424f; border-radius: 4px; margin-top: 9px; padding: 8px; font-weight: 600; }
 QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #aab8c3; }
 QPushButton#primaryButton { background: #65419b; border: 1px solid #a77be8; color: white; font-weight: 600; min-width: 62px; }
-QLabel#sectionTitle { color: #9fb0bc; font-size: 8pt; font-weight: 700; }
+QLabel#sectionTitle { color: #c6a5f5; font-size: 8pt; font-weight: 700; letter-spacing: 0.6px; }
 QLabel#mutedLabel { color: #8e9ba8; }
 QLabel#timecodeLabel { color: #c6a5f5; font-family: Consolas, monospace; min-width: 104px; }
 QVideoWidget#videoMonitor { background: #05080b; border: 1px solid #293541; }
@@ -138,4 +138,26 @@ QPushButton:disabled, QToolButton:disabled {
     background: #171e26;
     color: #687582;
     border-color: #293541;
+}
+
+
+/* Dedicated inspector controls for professional color work */
+QSlider#colorCorrectionSlider::sub-page:horizontal,
+QSlider#colorWheelSlider::sub-page:horizontal,
+QSlider#rgbCurveSlider::sub-page:horizontal {
+    background: #8956c7;
+}
+QSlider#colorCorrectionSlider::handle:horizontal,
+QSlider#colorWheelSlider::handle:horizontal,
+QSlider#rgbCurveSlider::handle:horizontal {
+    background: #c6a5f5;
+    border: 1px solid #eadcff;
+    width: 13px;
+    margin: -5px 0;
+    border-radius: 6px;
+}
+QSlider#colorCorrectionSlider:hover::handle:horizontal,
+QSlider#colorWheelSlider:hover::handle:horizontal,
+QSlider#rgbCurveSlider:hover::handle:horizontal {
+    background: #e0c8ff;
 }
