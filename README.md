@@ -1,48 +1,72 @@
-# Kadris Studio
+# KadrisStudio
 
-Independent open-source desktop video-editor project for Windows 11.
+KadrisStudio is an independent, open-source Windows desktop video-editor project built with C++20 and Qt 6. It uses an original dark graphite interface with purple accents and its own branding.
 
-**Status: early prototype (0.4.0).** The application provides a native Qt shell, media import, source playback, project save/open, and an interactive timeline foundation. Clips can be moved between tracks, trimmed from either edge, split at the playhead, selected, and deleted. The timeline stores clip timing and track placement in the project. This is not yet a full nonlinear editor: the program monitor combines active video layers, but the prototype is not a frame-accurate render engine. The current Audio Mixer provides basic track faders, Mute/Solo, and master gain; advanced audio processing, meters, routing, frame-accurate rendering/synchronization, effects, color grading, captions, undo/redo, and sequence export remain planned work.
+**Development status:** advanced editing prototype. Core timeline editing, clip-level image/audio controls, keyframes, markers, and multi-selection workflows are implemented. The project is still under active development and is not yet a complete nonlinear editing or export system.
 
-## Current functionality
-- Native C++20 / Qt 6 Windows desktop application.
-- Original SVG brand identity and dark graphite interface.
-- Dockable Media, Inspector, and Timeline panels.
+## Current editing capabilities
+
+### Media and projects
 - Import local video, audio, and image files.
-- Preview a source file using Qt Multimedia (supported formats depend on the Windows multimedia backend).
-- Add imported media to the timeline; supported media duration is read through Qt Multimedia, with a clearly marked five-second estimate when duration metadata is unavailable.
-- Move clips horizontally and between video/audio tracks.
-- Trim clip in/out points by dragging timeline edges.
-- Position the playhead and split a selected clip at that point.
-- Delete selected clips and use the Delete/Backspace keys.
-- Play clips on VIDEO 1, VIDEO 2, and VIDEO 3 concurrently in a layered program monitor, honoring each clip's timeline position and source in-point.
-- Composite decoded video frames from the three active video tracks in track order using alpha-aware image composition.
-- Play clips on AUDIO 1 and AUDIO 2 with independent Qt Multimedia players, aligned to the timeline playhead and clip source in-points.
-- Adjust AUDIO 1 and AUDIO 2 independently with -60 dB to 0 dB faders, Mute and Solo switches, and a shared master fader in a dockable Audio Mixer panel.
-- Save timeline positions, source in-points, durations, and track assignments in project format version 2 (version 1 projects remain readable).
-- Create, save, and reopen .kadris project files.
-- GitHub Actions Windows build workflow.
+- Preview source media through Qt Multimedia (supported formats depend on the Windows multimedia backend).
+- Create, save, and reopen `.kadris` projects.
+- Persist timeline clip positions, source in-points, durations, track assignments, clip adjustments, keyframes, markers, and track states.
+- Read media duration where available; use a clearly marked five-second estimate when duration metadata is unavailable.
+
+### Timeline
+- Multi-track clip placement, selection, movement, trimming, splitting, deletion, duplication, and ripple deletion.
+- Multi-select clips with Ctrl-click; move, delete, duplicate, ripple-delete, and nudge selected groups together.
+- Move selected clip groups between tracks while preserving relative track offsets.
+- Frame-based navigation and snapping on the current 25 fps timeline.
+- Snap clip edges to other clip edges and timeline markers.
+- Add, navigate to, and remove timeline markers.
+- Lock and mute individual tracks.
+- Display WAV audio waveforms, fade overlays, and audio automation curves/keyframe markers.
+
+### Video and image adjustments
+- Per-clip brightness, contrast, saturation, color wheels, and RGB curve controls.
+- Per-clip transform (scale and X/Y position), opacity, and blend modes.
+- Brightness, contrast, transform, and opacity keyframes with interpolation.
+- Persist clip adjustments and keyframes in project files.
+
+### Audio
+- Per-clip volume, mute, fade-in, and fade-out.
+- Audio volume automation keyframes with interpolation.
+- Audio Mixer with track faders, Mute/Solo, and master gain.
+- Basic synchronized timeline playback on the supported audio tracks.
+
+## Important limitations
+
+- The current preview/playback pipeline is not a frame-accurate final render engine.
+- Sequence export, an export queue, and verified output rendering are not yet implemented.
+- WAV waveform visualization is currently limited to supported WAV PCM/float formats.
+- Multiple overlapping audio clips per track, advanced routing, sample-accurate mixing, audio meters, and professional audio effects remain future work.
+- Proxy media, relinking, project media collection, autosave/recovery, and a full undo/redo history remain future work.
+- Supported media formats depend on the installed Qt/Windows multimedia backend.
 
 ## Build on Windows 11
+
 Requirements: Visual Studio 2022 C++ tools, CMake 3.24+, Ninja, and Qt 6.8+ with Widgets, Multimedia, MultimediaWidgets, and Svg.
 
-    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
-    cmake --build build --parallel
-    .\build\kadris-studio.exe
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64"
+cmake --build build --parallel
+.\build\kadris-studio.exe
+```
 
-Replace the Qt path with your local Qt installation. The Windows GitHub Actions workflow installs the required modules and builds the application.
+Replace the Qt path with your local Qt installation. The GitHub Actions Windows workflow checks that the project configures and builds.
 
 ## Repository layout
-- src/ — application source
-- assets/ — brand assets
-- resources/ — Qt stylesheet
-- docs/ — roadmap and technical notes
-- .github/workflows/ — Windows CI
+- `src/` — application source
+- `assets/` — original brand assets
+- `resources/` — Qt stylesheet and resources
+- `docs/` — roadmap and technical notes
+- `.github/workflows/` — Windows CI
 
-## Roadmap and limitations
-See docs/ROADMAP.md. Timeline edits are now stored in a time-based clip model, but the timeline does not yet render a multi-clip sequence, provide frame-accurate timebase editing, or include undo/redo.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for completed work and the next development milestones.
 
-## License
-GNU GPL-3.0-or-later. Review THIRD_PARTY_LICENSES.md before adding or redistributing external codecs, plugins, models, or libraries.
+## License and project identity
 
-“Kadris Studio” is a working project name; trademark and domain clearance have not yet been completed. This is an independent project and is not affiliated with Adobe.
+Licensed under GNU GPL-3.0-or-later. Review `THIRD_PARTY_LICENSES.md` before adding or redistributing external codecs, plugins, models, or libraries.
+
+“KadrisStudio” is a working project name; trademark and domain clearance have not yet been completed. This is an independent project and is not affiliated with Adobe or other video-editing brands.
