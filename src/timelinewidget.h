@@ -168,6 +168,7 @@ private:
         bool audioMuted = false;
         QVector<float> waveformPeaks;
         QJsonArray nestedClips;
+        QJsonArray nestedTrackStates;
         int fadeInMs = 0, fadeOutMs = 0;
         QVector<Keyframe> audioVolumeKeyframes;
         QVector<Keyframe> opacityKeyframes;
