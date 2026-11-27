@@ -2367,6 +2367,23 @@ void MainWindow::exportVideo()
         height = 2160;
     }
 
+    const QStringList qualityOptions = {
+        "Best quality (larger file)", "High quality (balanced)",
+        "Smaller file (faster export)"
+    };
+    const QString quality = QInputDialog::getItem(
+        this, "Export Settings", "Encoding quality:", qualityOptions, 1, false, &accepted);
+    if (!accepted) return;
+    int qualityCrf = 23;
+    QString encodingPreset = "medium";
+    if (quality.startsWith("Best")) {
+        qualityCrf = 18;
+        encodingPreset = "slow";
+    } else if (quality.startsWith("Smaller")) {
+        qualityCrf = 28;
+        encodingPreset = "fast";
+    }
+
     QString outputPath = QFileDialog::getSaveFileName(
         this, "Export Video", "KadrisStudio-Export.mp4",
         "MP4 Video (*.mp4)");
@@ -2379,7 +2396,7 @@ void MainWindow::exportVideo()
     if (!FfmpegExport::buildArguments(
             m_timeline->toJson(), width, height,
             m_sequenceFpsNumerator, m_sequenceFpsDenominator,
-            outputPath, &arguments, &error)) {
+            outputPath, &arguments, &error, qualityCrf, encodingPreset)) {
         QMessageBox::warning(this, "Export Video",
             "The timeline cannot be exported yet:\n\n" + error);
         return;
