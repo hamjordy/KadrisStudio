@@ -43,6 +43,9 @@ if(BUILD_TESTING)
     target_link_libraries(timeline-serialization-tests PRIVATE Qt6::Widgets Qt6::Multimedia)
     add_test(NAME timeline-serialization-tests COMMAND timeline-serialization-tests)
     set_tests_properties(timeline-serialization-tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # Keep assert-based regression checks active even in Release CI builds.
+    target_compile_options(frame-timebase-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
+    target_compile_options(timeline-serialization-tests PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/UNDEBUG> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-UNDEBUG>)
 endif()
 
 if(MSVC)
