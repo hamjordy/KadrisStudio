@@ -43,8 +43,10 @@ public:
         int blendMode = 0;
         int audioVolume = 100;
         bool audioMuted = false;
+        bool nestedTrackMuted = false;
         QVector<float> waveformPeaks;
         QJsonArray nestedClips;
+        QJsonArray nestedTrackStates;
         int fadeInMs = 0, fadeOutMs = 0;
     };
 
