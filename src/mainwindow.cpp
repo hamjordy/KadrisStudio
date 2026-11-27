@@ -1885,8 +1885,11 @@ void MainWindow::refreshPausedTimelinePreview()
             && !m_waitingForVideoTrack[track]
             && !m_failedVideoTrack[track]) {
             player->setPlaybackRate(clip.playbackRate);
-            player->setPosition(qMax<qint64>(0,
-                clip.sourceInMs + static_cast<qint64>((m_sequencePositionMs - clip.timelineStartMs) * clip.playbackRate)));
+            const qint64 timelineOffset = qMax<qint64>(
+                0, m_sequencePositionMs - clip.timelineStartMs);
+            const qint64 sourcePosition = qMax<qint64>(0,
+                clip.sourceInMs + qRound64(timelineOffset * clip.playbackRate));
+            player->setPosition(sourcePosition);
             player->pause();
             continue;
         }
