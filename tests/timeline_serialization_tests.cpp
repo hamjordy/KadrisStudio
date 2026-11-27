@@ -170,6 +170,34 @@ int main(int argc, char **argv)
     assert(recursivePreview.clipAtTimeOnTrack(3000, 0, &recursiveResolved));
     assert(recursiveResolved.path == "clip-b.mp4");
 
+    // Nested sequences retain every active video layer, not just one flattened child.
+    QJsonObject nestedLayerOne{
+        {"id", 401}, {"path", "layer-bottom.mp4"}, {"track", 0},
+        {"timelineStartMs", 0}, {"durationMs", 4000}
+    };
+    QJsonObject nestedLayerTwo{
+        {"id", 402}, {"path", "layer-top.mp4"}, {"track", 2},
+        {"timelineStartMs", 500}, {"durationMs", 3000}
+    };
+    QJsonObject layeredContainer{
+        {"id", 403}, {"path", "nest://403"}, {"track", 1},
+        {"timelineStartMs", 1000}, {"durationMs", 5000},
+        {"sourceDurationMs", 5000}, {"nestedSequence", true},
+        {"nestedName", "Layered Scene"},
+        {"nestedClips", QJsonArray{nestedLayerOne, nestedLayerTwo}}
+    };
+    TimelineWidget layeredPreview;
+    layeredPreview.fromJson(QJsonArray{layeredContainer});
+    const QVector<TimelineWidget::ClipInfo> activeNestedLayers =
+        layeredPreview.clipsAtTimeOnTrack(2000, 1);
+    assert(activeNestedLayers.size() == 2);
+    assert(activeNestedLayers.at(0).path == "layer-bottom.mp4");
+    assert(activeNestedLayers.at(0).nestedTrack == 0);
+    assert(activeNestedLayers.at(1).path == "layer-top.mp4");
+    assert(activeNestedLayers.at(1).nestedTrack == 2);
+    assert(activeNestedLayers.at(0).track == 1);
+    assert(activeNestedLayers.at(1).track == 1);
+
     // Preview lookup resolves child media at the nested sequence's absolute timeline time.
     TimelineWidget previewNested;
     previewNested.fromJson(nestedSaved);
