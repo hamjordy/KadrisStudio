@@ -1056,7 +1056,7 @@ bool TimelineWidget::splitSelectedClipAtPlayhead()
     Clip right = original;
     right.id = m_nextClipId++;
     right.timelineStartMs = m_playheadMs;
-    right.sourceInMs += leftDuration;
+    right.sourceInMs += qRound64(leftDuration * original.playbackRate);
     right.durationMs -= leftDuration;
 
     m_clips[m_selectedClip].durationMs = leftDuration;
@@ -1090,7 +1090,7 @@ int TimelineWidget::splitAllClipsAtPlayhead()
         Clip right = original;
         right.id = m_nextClipId++;
         right.timelineStartMs = splitTime;
-        right.sourceInMs += leftDuration;
+        right.sourceInMs += qRound64(leftDuration * original.playbackRate);
         right.durationMs -= leftDuration;
 
         m_clips[i].durationMs = leftDuration;
