@@ -246,6 +246,51 @@ int main(int argc, char **argv)
     const QJsonArray fastSplitAllClips = fastSplitAllTimeline.toJson();
     assert(fastSplitAllClips.at(1).toObject().value("sourceInMs").toInt() == 5000);
 
+    // Track targeting limits Add Edit to All Tracks to enabled tracks.
+    QJsonArray targetedSplitInput{
+        QJsonObject{{"id", 91}, {"path", replacementPath}, {"track", 0},
+            {"timelineStartMs", 0}, {"durationMs", 5000}},
+        QJsonObject{{"id", 92}, {"path", replacementPath}, {"track", 1},
+            {"timelineStartMs", 0}, {"durationMs", 5000}}
+    };
+    TimelineWidget targetedSplitTimeline;
+    targetedSplitTimeline.fromJson(targetedSplitInput);
+    QJsonArray targetStates = targetedSplitTimeline.trackStatesToJson();
+    QJsonObject disabledTarget = targetStates.at(1).toObject();
+    disabledTarget.insert("targeted", false);
+    targetStates[1] = disabledTarget;
+    targetedSplitTimeline.trackStatesFromJson(targetStates);
+    targetedSplitTimeline.setPlayheadMs(2000);
+    assert(targetedSplitTimeline.splitAllClipsAtPlayhead() == 1);
+
+    // Ripple delete also shifts later clips on sync-locked tracks.
+    QJsonArray syncRippleInput{
+        QJsonObject{{"id", 93}, {"path", replacementPath}, {"track", 0},
+            {"timelineStartMs", 0}, {"durationMs", 2000}},
+        QJsonObject{{"id", 94}, {"path", replacementPath}, {"track", 0},
+            {"timelineStartMs", 2000}, {"durationMs", 3000}},
+        QJsonObject{{"id", 95}, {"path", replacementPath}, {"track", 1},
+            {"timelineStartMs", 3000}, {"durationMs", 2000}}
+    };
+    TimelineWidget syncRippleTimeline;
+    syncRippleTimeline.fromJson(syncRippleInput);
+    QJsonArray syncStates = syncRippleTimeline.trackStatesToJson();
+    QJsonObject syncTrack = syncStates.at(1).toObject();
+    syncTrack.insert("syncLocked", true);
+    syncStates[1] = syncTrack;
+    syncRippleTimeline.trackStatesFromJson(syncStates);
+    assert(syncRippleTimeline.rippleDeleteSelectedClip());
+    const QJsonArray syncRippleResult = syncRippleTimeline.toJson();
+    assert(syncRippleResult.size() == 2);
+    bool shiftedSyncClip = false;
+    for (const QJsonValue &value : syncRippleResult) {
+        const QJsonObject clip = value.toObject();
+        if (clip.value("id").toInt() == 95) {
+            shiftedSyncClip = clip.value("timelineStartMs").toInt() == 1000;
+        }
+    }
+    assert(shiftedSyncClip);
+
     // Mouse-driven trim and roll edits must translate timeline movement
     // into source movement using each clip's playback rate.
     auto dragTimeline = [](TimelineWidget &widget, const QPoint &from,
