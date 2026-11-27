@@ -62,6 +62,8 @@ public:
     bool isTrackMuted(int track) const;
     bool isTrackTargeted(int track) const;
     bool isTrackSyncLocked(int track) const;
+    QString trackGroup(int track) const;
+    void setTrackGroup(int track, const QString &groupName);
     QJsonArray trackStatesToJson() const;
     void trackStatesFromJson(const QJsonArray &states);
     void goToNextMarker();
@@ -188,6 +190,7 @@ private:
     bool m_trackMuted[5] = {false, false, false, false, false};
     bool m_trackTargeted[5] = {true, true, true, true, true};
     bool m_trackSyncLocked[5] = {false, false, false, false, false};
+    QString m_trackGroups[5];
     int m_selectedClip = -1;
     int m_nextClipId = 1;
     qint64 m_playheadMs = 0;
