@@ -1000,11 +1000,15 @@ void MainWindow::buildMenus()
     connect(exitAction, &QAction::triggered, this, [this]() { close(); });
 
     QMenu *edit = menuBar()->addMenu("&Edit");
-    auto *undoAction = edit->addAction("Undo Timeline Edit");
+    auto *undoAction = edit->addAction("Undo");
     undoAction->setShortcut(QKeySequence::Undo);
+    undoAction->setShortcutContext(Qt::ApplicationShortcut);
+    undoAction->setStatusTip("Undo the last timeline or Inspector change");
     connect(undoAction, &QAction::triggered, this, &MainWindow::undoTimelineEdit);
-    auto *redoAction = edit->addAction("Redo Timeline Edit");
-    redoAction->setShortcut(QKeySequence("Ctrl+Shift+Z"));
+    auto *redoAction = edit->addAction("Redo");
+    redoAction->setShortcuts({QKeySequence("Ctrl+Shift+Z"), QKeySequence("Ctrl+Y")});
+    redoAction->setShortcutContext(Qt::ApplicationShortcut);
+    redoAction->setStatusTip("Redo the last undone timeline or Inspector change");
     connect(redoAction, &QAction::triggered, this, &MainWindow::redoTimelineEdit);
 
     QMenu *view = menuBar()->addMenu("&View");
@@ -1500,7 +1504,9 @@ void MainWindow::undoTimelineEdit()
     m_redoHistory.append(captureTimelineState());
     const QJsonObject previousState = m_undoHistory.takeLast();
     restoreTimelineState(previousState);
-    statusBar()->showMessage("Timeline edit undone", 2500);
+    m_projectDirty = true;
+    refreshPausedTimelinePreview();
+    statusBar()->showMessage("Undo complete", 2500);
 }
 
 void MainWindow::redoTimelineEdit()
@@ -1512,9 +1518,12 @@ void MainWindow::redoTimelineEdit()
 
     stopSequencePlayback(false);
     m_undoHistory.append(captureTimelineState());
+    if (m_undoHistory.size() > 100) m_undoHistory.removeFirst();
     const QJsonObject nextState = m_redoHistory.takeLast();
     restoreTimelineState(nextState);
-    statusBar()->showMessage("Timeline edit restored", 2500);
+    m_projectDirty = true;
+    refreshPausedTimelinePreview();
+    statusBar()->showMessage("Redo complete", 2500);
 }
 
 void MainWindow::importMedia()
