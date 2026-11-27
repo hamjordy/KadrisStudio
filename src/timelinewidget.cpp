@@ -2156,7 +2156,10 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         const int destinationTrack = trackAt(pos.y());
         if (!isTrackLocked(destinationTrack)) clip.track = destinationTrack;
     } else if (m_dragMode == DragMode::TrimLeft) {
-        const qint64 minimumDelta = -m_dragSnapshot.sourceInMs;
+        if (m_dragSnapshot.playbackRate <= 0.0) return;
+        const qint64 minimumDelta = -qFloor(
+            static_cast<double>(m_dragSnapshot.sourceInMs)
+            / m_dragSnapshot.playbackRate);
         const qint64 maximumDelta =
             m_dragSnapshot.durationMs - kMinimumClipDurationMs;
         deltaMs = qBound(minimumDelta, deltaMs, maximumDelta);
@@ -2168,7 +2171,8 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         deltaMs = qBound(minimumDelta,
             proposedStart - m_dragSnapshot.timelineStartMs, maximumDelta);
         clip.timelineStartMs = m_dragSnapshot.timelineStartMs + deltaMs;
-        clip.sourceInMs = m_dragSnapshot.sourceInMs + deltaMs;
+        clip.sourceInMs = m_dragSnapshot.sourceInMs
+            + qRound64(deltaMs * m_dragSnapshot.playbackRate);
         clip.durationMs = m_dragSnapshot.durationMs - deltaMs;
     } else if (m_dragMode == DragMode::Slide) {
         const int previousIndex = indexForClipId(m_slidePreviousSnapshot.id);
@@ -2216,11 +2220,24 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
             || m_rollPartnerSnapshot.track != m_dragSnapshot.track) return;
         // A roll edit moves one shared cut: the outgoing clip gains exactly
         // the duration that the incoming clip loses, preserving the sequence end.
-        const qint64 minimumDelta = qMax(
+        if (m_dragSnapshot.playbackRate <= 0.0
+            || m_rollPartnerSnapshot.playbackRate <= 0.0) return;
+        const qint64 minimumDelta = std::max<qint64>({
             kMinimumClipDurationMs - m_dragSnapshot.durationMs,
-            -m_rollPartnerSnapshot.sourceInMs);
-        const qint64 maximumDelta =
+            -qFloor(static_cast<double>(m_rollPartnerSnapshot.sourceInMs)
+                    / m_rollPartnerSnapshot.playbackRate)
+        });
+        qint64 maximumDelta =
             m_rollPartnerSnapshot.durationMs - kMinimumClipDurationMs;
+        if (m_dragSnapshot.durationKnown && m_dragSnapshot.sourceDurationMs > 0) {
+            const qint64 outgoingSourceRemaining = m_dragSnapshot.sourceDurationMs
+                - m_dragSnapshot.sourceInMs
+                - qRound64(m_dragSnapshot.durationMs * m_dragSnapshot.playbackRate);
+            maximumDelta = qMin(maximumDelta, qFloor(
+                static_cast<double>(outgoingSourceRemaining)
+                / m_dragSnapshot.playbackRate));
+        }
+        if (minimumDelta > maximumDelta) return;
         deltaMs = qBound(minimumDelta, deltaMs, maximumDelta);
         const qint64 rolledDelta = deltaMs < 0
             ? -m_timebase.snapMilliseconds(-deltaMs)
@@ -2229,7 +2246,8 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         clip.durationMs = m_dragSnapshot.durationMs + safeDelta;
         Clip &partner = m_clips[partnerIndex];
         partner.timelineStartMs = m_rollPartnerSnapshot.timelineStartMs + safeDelta;
-        partner.sourceInMs = m_rollPartnerSnapshot.sourceInMs + safeDelta;
+        partner.sourceInMs = m_rollPartnerSnapshot.sourceInMs
+            + qRound64(safeDelta * m_rollPartnerSnapshot.playbackRate);
         partner.durationMs = m_rollPartnerSnapshot.durationMs - safeDelta;
     } else if (m_dragMode == DragMode::RateStretchRight) {
         const qint64 sourceSpanMs = qRound64(
@@ -2253,8 +2271,17 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         const qint64 snappedEnd = snapToClipEdges(proposedEnd, m_selectedClip);
         if (qAbs(snappedEnd - proposedEnd) <= snapToleranceMs)
             proposedEnd = snappedEnd;
-        const qint64 newDuration = qMax(kMinimumClipDurationMs,
+        qint64 newDuration = qMax(kMinimumClipDurationMs,
             proposedEnd - m_dragSnapshot.timelineStartMs);
+        if (m_dragSnapshot.playbackRate <= 0.0) return;
+        if (m_dragSnapshot.durationKnown && m_dragSnapshot.sourceDurationMs > 0) {
+            const qint64 availableSource = m_dragSnapshot.sourceDurationMs
+                - m_dragSnapshot.sourceInMs;
+            const qint64 maximumDuration = qFloor(
+                static_cast<double>(availableSource) / m_dragSnapshot.playbackRate);
+            newDuration = qMin(newDuration, maximumDuration);
+        }
+        if (newDuration < kMinimumClipDurationMs) return;
         const qint64 durationDelta = newDuration - m_dragSnapshot.durationMs;
         if (m_dragMode == DragMode::RippleTrimRight && durationDelta != 0) {
             const qint64 oldEnd = m_dragSnapshot.timelineStartMs
