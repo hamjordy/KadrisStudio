@@ -9,6 +9,8 @@
 #include <array>
 
 class QAudioOutput;
+class QAudioBufferOutput;
+class QProgressBar;
 class QCheckBox;
 class QLabel;
 class QMediaPlayer;
@@ -102,6 +104,11 @@ private:
     std::array<bool, 9> m_failedVideoTrack{{false, false, false, false, false, false, false, false, false}};
     std::array<QMediaPlayer *, 8> m_audioTrackPlayers{};
     std::array<QAudioOutput *, 8> m_audioTrackOutputs{};
+    std::array<QAudioBufferOutput *, 8> m_audioBufferOutputs{};
+    std::array<float, 8> m_audioSlotPeaks{};
+    std::array<QProgressBar *, 2> m_audioPeakMeters{};
+    std::array<QLabel *, 2> m_audioPeakLabels{};
+    QTimer *m_audioMeterTimer = nullptr;
     std::array<int, 8> m_activeAudioClipIds{{-1, -1, -1, -1, -1, -1, -1, -1}};
     std::array<bool, 8> m_waitingForAudioTrack{{false, false, false, false, false, false, false, false}};
     std::array<bool, 8> m_failedAudioTrack{{false, false, false, false, false, false, false, false}};
