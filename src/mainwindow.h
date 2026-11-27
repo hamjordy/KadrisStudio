@@ -74,6 +74,8 @@ private:
     void updateDuration(qint64 duration);
     QString formatTime(qint64 milliseconds) const;
     void updateSequenceTimeLabel();
+    bool openSelectedNestedSequence();
+    bool returnToParentSequence();
 
     QString m_projectPath;
     QStringList m_mediaPaths;
@@ -124,6 +126,9 @@ private:
     QJsonObject m_lastTimelineState;
     bool m_restoringTimeline = false;
     bool m_projectDirty = false;
+    bool m_nestedEditActive = false;
+    int m_nestedClipId = -1;
+    QJsonObject m_nestedParentState;
     int m_sequenceFpsNumerator = 25;
     int m_sequenceFpsDenominator = 1;
     QMediaPlayer *m_player = nullptr;
