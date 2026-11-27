@@ -126,9 +126,12 @@ private:
     QJsonObject m_lastTimelineState;
     bool m_restoringTimeline = false;
     bool m_projectDirty = false;
-    bool m_nestedEditActive = false;
-    int m_nestedClipId = -1;
-    QJsonObject m_nestedParentState;
+    struct NestedEditContext {
+        QJsonObject parentState;
+        int clipId = -1;
+        QString name;
+    };
+    QVector<NestedEditContext> m_nestedEditStack;
     int m_sequenceFpsNumerator = 25;
     int m_sequenceFpsDenominator = 1;
     QMediaPlayer *m_player = nullptr;
