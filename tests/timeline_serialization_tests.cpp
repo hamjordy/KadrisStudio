@@ -339,6 +339,31 @@ int main(int argc, char **argv)
     assert(mouseRate.value("durationMs").toInt() == 6000);
     assert(qAbs(mouseRate.value("playbackRate").toDouble() - (5.0 / 6.0)) < 0.001);
 
+    // Ripple trim propagates its duration change to sync-locked tracks.
+    QJsonArray syncTrimInput{
+        QJsonObject{{"id", 96}, {"path", replacementPath}, {"track", 0},
+            {"timelineStartMs", 0}, {"durationMs", 5000}},
+        QJsonObject{{"id", 97}, {"path", replacementPath}, {"track", 0},
+            {"timelineStartMs", 5000}, {"durationMs", 3000}},
+        QJsonObject{{"id", 98}, {"path", replacementPath}, {"track", 1},
+            {"timelineStartMs", 6000}, {"durationMs", 2000}}
+    };
+    TimelineWidget syncTrimTimeline;
+    syncTrimTimeline.fromJson(syncTrimInput);
+    QJsonArray syncTrimStates = syncTrimTimeline.trackStatesToJson();
+    QJsonObject syncTrimTrack = syncTrimStates.at(1).toObject();
+    syncTrimTrack.insert("syncLocked", true);
+    syncTrimStates[1] = syncTrimTrack;
+    syncTrimTimeline.trackStatesFromJson(syncTrimStates);
+    dragTimeline(syncTrimTimeline, QPoint(540, 50), QPoint(620, 50), Qt::ShiftModifier);
+    bool shiftedTrimSyncClip = false;
+    for (const QJsonValue &value : syncTrimTimeline.toJson()) {
+        const QJsonObject clip = value.toObject();
+        if (clip.value("id").toInt() == 98)
+            shiftedTrimSyncClip = clip.value("timelineStartMs").toInt() == 7000;
+    }
+    assert(shiftedTrimSyncClip);
+
     QJsonObject fastRollOut{{"id", 88}, {"path", replacementPath}, {"track", 0},
         {"timelineStartMs", 0}, {"sourceInMs", 0}, {"durationMs", 4000},
         {"durationKnown", true}, {"sourceDurationMs", 12000}, {"playbackRate", 2.0}};
