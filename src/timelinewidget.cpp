@@ -974,7 +974,8 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
     if (track < 0 || track >= kTrackCount) return result;
 
     const auto readClip = [](const QJsonObject &item, int parentTrack,
-                             int nestedTrack, qint64 absoluteStart) {
+                             int nestedTrack, qint64 absoluteStart,
+                             double accumulatedRate) {
         ClipInfo clip;
         clip.id = item.value("id").toInt(-1);
         clip.path = item.value("path").toString();
@@ -982,8 +983,10 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
         clip.nestedTrack = nestedTrack;
         clip.timelineStartMs = absoluteStart;
         clip.sourceInMs = static_cast<qint64>(item.value("sourceInMs").toDouble());
-        clip.durationMs = static_cast<qint64>(item.value("durationMs").toDouble());
-        clip.playbackRate = item.value("playbackRate").toDouble(1.0);
+        clip.durationMs = qMax<qint64>(1, qRound64(
+            item.value("durationMs").toDouble() / accumulatedRate));
+        clip.playbackRate = item.value("playbackRate").toDouble(1.0)
+            * accumulatedRate;
         clip.nestedSequence = false;
         clip.nestedContent = nestedTrack >= 0;
         const QJsonObject color = item.value("color").toObject();
@@ -1004,10 +1007,11 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
         return clip;
     };
 
-    std::function<void(const QJsonArray &, qint64, qint64, int, int)> collectNested;
+    std::function<void(const QJsonArray &, qint64, qint64, int, int, double)> collectNested;
     collectNested = [&](const QJsonArray &children, qint64 localPosition,
-                        qint64 absoluteOffset, int parentTrack, int depth) {
-        if (depth > 8) return;
+                        qint64 absoluteOffset, int parentTrack, int depth,
+                        double accumulatedRate) {
+        if (depth > 8 || accumulatedRate <= 0.0) return;
         for (const QJsonValue &value : children) {
             if (!value.isObject()) continue;
             const QJsonObject item = value.toObject();
@@ -1018,17 +1022,22 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             if (duration <= 0 || localPosition < start
                 || localPosition >= start + duration) continue;
 
+            const qint64 absoluteStart = absoluteOffset
+                + qRound64(start / accumulatedRate);
             if (item.value("nestedSequence").toBool(false)) {
+                const double nestedRate = item.value("playbackRate").toDouble(1.0);
+                if (nestedRate <= 0.0) continue;
                 collectNested(item.value("nestedClips").toArray(),
-                    localPosition - start, absoluteOffset + start,
-                    parentTrack, depth + 1);
+                    qRound64((localPosition - start) * nestedRate),
+                    absoluteStart, parentTrack, depth + 1,
+                    accumulatedRate * nestedRate);
                 continue;
             }
 
             const int childTrack = item.value("track").toInt(-1);
             if (childTrack < 0 || childTrack >= 3) continue;
             result.append(readClip(item, parentTrack, childTrack,
-                                   absoluteOffset + start));
+                                   absoluteStart, accumulatedRate));
         }
     };
 
@@ -1037,8 +1046,10 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             || positionMs >= clip.timelineStartMs + clip.durationMs) continue;
 
         if (clip.nestedSequence) {
-            collectNested(clip.nestedClips, positionMs - clip.timelineStartMs,
-                          clip.timelineStartMs, track, 0);
+            const double nestedRate = qMax(0.01, clip.playbackRate);
+            collectNested(clip.nestedClips,
+                qRound64((positionMs - clip.timelineStartMs) * nestedRate),
+                clip.timelineStartMs, track, 0, nestedRate);
         } else {
             QJsonObject item;
             item.insert("id", clip.id);
@@ -1062,7 +1073,7 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             item.insert("positionY", clip.positionY);
             item.insert("opacity", clip.opacity);
             item.insert("blendMode", clip.blendMode);
-            result.append(readClip(item, track, -1, clip.timelineStartMs));
+            result.append(readClip(item, track, -1, clip.timelineStartMs, 1.0));
         }
     }
 
