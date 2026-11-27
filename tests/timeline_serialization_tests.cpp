@@ -106,6 +106,20 @@ int main(int argc, char **argv)
     assert(slipTimeline.selectedClipInfo(&slipAfter));
     assert(slipAfter.sourceInMs == 0);
 
+    // Slip offsets and source bounds scale with the clip playback rate.
+    QJsonObject fastSlipItem{{"id", 78}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 1000}, {"durationMs", 4000},
+        {"durationKnown", true}, {"sourceDurationMs", 12000}, {"playbackRate", 2.0}};
+    TimelineWidget fastSlipTimeline;
+    fastSlipTimeline.fromJson(QJsonArray{fastSlipItem});
+    assert(fastSlipTimeline.slipClip(78, 1000));
+    TimelineWidget::ClipInfo fastSlipInfo;
+    assert(fastSlipTimeline.selectedClipInfo(&fastSlipInfo));
+    assert(fastSlipInfo.sourceInMs == 3000);
+    assert(fastSlipTimeline.slipClip(78, 100000));
+    assert(fastSlipTimeline.selectedClipInfo(&fastSlipInfo));
+    assert(fastSlipInfo.sourceInMs == 4000);
+
     // Rate Stretch keeps the source span fixed and stores the playback speed.
     QJsonObject rateItem{{"id", 79}, {"path", replacementPath}, {"track", 0},
         {"timelineStartMs", 0}, {"sourceInMs", 1000}, {"durationMs", 4000},
@@ -147,5 +161,14 @@ int main(int argc, char **argv)
     assert(slidNext.value("timelineStartMs").toInt() == 8000);
     assert(slidNext.value("sourceInMs").toInt() == 3000);
     assert(slidNext.value("durationMs").toInt() == 4000);
+
+    // Slide advances the next clip's source window at that clip's playback rate.
+    nextItem.insert("playbackRate", 2.0);
+    TimelineWidget fastSlideTimeline;
+    fastSlideTimeline.fromJson(QJsonArray{previousItem, selectedItem, nextItem});
+    assert(fastSlideTimeline.slideClip(82, 1000));
+    const QJsonObject fastSlidNext = fastSlideTimeline.toJson().at(2).toObject();
+    assert(fastSlidNext.value("sourceInMs").toInt() == 4000);
+    assert(fastSlidNext.value("durationMs").toInt() == 4000);
     return 0;
 }
