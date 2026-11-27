@@ -1,6 +1,7 @@
 #include "programmonitorwidget.h"
 
 #include <QApplication>
+#include <QColor>
 #include <QImage>
 
 #include <cassert>
