@@ -2042,7 +2042,9 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         const qint64 maximumDelta =
             m_rollPartnerSnapshot.durationMs - kMinimumClipDurationMs;
         deltaMs = qBound(minimumDelta, deltaMs, maximumDelta);
-        const qint64 rolledDelta = m_timebase.snapMilliseconds(deltaMs);
+        const qint64 rolledDelta = deltaMs < 0
+            ? -m_timebase.snapMilliseconds(-deltaMs)
+            : m_timebase.snapMilliseconds(deltaMs);
         const qint64 safeDelta = qBound(minimumDelta, rolledDelta, maximumDelta);
         clip.durationMs = m_dragSnapshot.durationMs + safeDelta;
         Clip &partner = m_clips[partnerIndex];
