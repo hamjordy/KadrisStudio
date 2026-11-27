@@ -30,6 +30,10 @@ public:
         qint64 sourceDurationMs = 0;
         double playbackRate = 1.0;
         bool durationKnown = false;
+        bool nestedSequence = false;
+        QString nestedName;
+        bool nestedSequence = false;
+        QString nestedName;
         int brightness = 0, contrast = 0, saturation = 100;
         int shadows = 0, midtones = 0, highlights = 0;
         int redCurve = 0, greenCurve = 0, blueCurve = 0;
@@ -40,6 +44,8 @@ public:
         int audioVolume = 100;
         bool audioMuted = false;
         QVector<float> waveformPeaks;
+        QJsonArray nestedClips;
+        QJsonArray nestedClips;
         int fadeInMs = 0, fadeOutMs = 0;
     };
 
@@ -103,6 +109,8 @@ public:
     int splitAllClipsAtPlayhead();
     bool deleteSelectedClip();
     bool duplicateSelectedClip();
+    bool nestSelectedClips(const QString &name);
+    bool unnestSelectedClip();
     bool rippleDeleteSelectedClip();
     bool nudgeSelectedClip(int frameDirection);
     bool slipClip(int clipId, qint64 deltaMs);
