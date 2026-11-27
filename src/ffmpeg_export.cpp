@@ -26,7 +26,8 @@ QString atempoFilters(double rate)
 bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height,
                                   int fpsNumerator, int fpsDenominator,
                                   const QString &outputPath, QStringList *arguments,
-                                  QString *error)
+                                  QString *error, int qualityCrf,
+                                  const QString &encodingPreset)
 {
     auto fail = [error](const QString &message) {
         if (error) *error = message;
@@ -37,6 +38,12 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     if (outputPath.trimmed().isEmpty()) return fail("Choose an output file.");
     if (width < 16 || height < 16 || fpsNumerator <= 0 || fpsDenominator <= 0)
         return fail("The export resolution or frame rate is invalid.");
+    const QStringList allowedPresets = {
+        "ultrafast", "superfast", "veryfast", "faster", "fast",
+        "medium", "slow", "slower", "veryslow"
+    };
+    if (qualityCrf < 0 || qualityCrf > 51 || !allowedPresets.contains(encodingPreset))
+        return fail("The video quality or encoding preset is invalid.");
 
     struct Segment {
         int input = -1;
@@ -165,7 +172,8 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     }
 
     *arguments << "-t" << number(totalDuration)
-               << "-c:v" << "libx264" << "-preset" << "medium"
+               << "-c:v" << "libx264" << "-preset" << encodingPreset
+               << "-crf" << QString::number(qualityCrf)
                << "-pix_fmt" << "yuv420p" << "-r" << fps;
     if (!audio.isEmpty()) *arguments << "-c:a" << "aac" << "-b:a" << "192k";
     *arguments << "-movflags" << "+faststart" << "-y" << outputPath;
