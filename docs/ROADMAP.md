@@ -40,7 +40,8 @@ This roadmap distinguishes implemented prototype functionality from work still r
 - [x] Track targeting for Add Edit to All Tracks and per-track sync locks for ripple delete and ripple trim
 - [x] Basic nested-sequence container, serialization, unnesting, preview lookup, and nested export expansion
 - [x] Named track groups: assign tracks to shared groups, display group labels, and persist in projects
-- [ ] Group-aware bulk track controls and full nested-sequence open/edit workflow
+- [x] Group-aware bulk track controls (Shift-click T/L/S/M applies to the named track group)
+- [ ] Full nested-sequence open/edit workflow with parent navigation and safe save-back
 
 ## Milestone 3 — Preview, compositing, and rendering
 - [x] Basic timeline playback across supported video clips
