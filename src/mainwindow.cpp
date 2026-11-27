@@ -1019,6 +1019,27 @@ void MainWindow::buildInterface()
     m_masterVolumeSlider->setToolTip("Master level: -60 dB to 0 dB");
     masterLayout->addWidget(masterGainLabel);
     masterLayout->addWidget(m_masterVolumeSlider, 1, Qt::AlignHCenter);
+    auto *resetAllPeaksButton = new QPushButton("RESET PEAKS", masterStrip);
+    resetAllPeaksButton->setToolTip("Clear Peak Hold and clipping warnings on all audio tracks");
+    resetAllPeaksButton->setObjectName("mixerPeakResetAllButton");
+    connect(resetAllPeaksButton, &QPushButton::clicked, this, [this]() {
+        for (int track = 0; track < 2; ++track) {
+            m_audioClipLatched[track] = false;
+            m_audioPeakHold[track] = 0.0f;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+            for (int slot = track * 4; slot < track * 4 + 4; ++slot)
+                m_audioSlotPeaks[slot] = 0.0f;
+#endif
+            if (m_audioClipIndicators[track])
+                m_audioClipIndicators[track]->setVisible(false);
+            if (m_audioPeakLabels[track])
+                m_audioPeakLabels[track]->setText(QStringLiteral("PEAK -INF dBFS"));
+            if (m_audioPeakMeters[track])
+                m_audioPeakMeters[track]->setValue(0);
+        }
+        statusBar()->showMessage("All audio peak meters reset", 2500);
+    });
+    masterLayout->addWidget(resetAllPeaksButton);
     mixerLayout->addWidget(masterStrip);
 
     connect(m_masterVolumeSlider, &QSlider::valueChanged, this,
