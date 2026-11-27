@@ -273,6 +273,16 @@ bool TimelineWidget::isTrackMuted(int track) const
     return track >= 0 && track < kTrackCount && m_trackMuted[track];
 }
 
+bool TimelineWidget::isTrackTargeted(int track) const
+{
+    return track >= 0 && track < kTrackCount && m_trackTargeted[track];
+}
+
+bool TimelineWidget::isTrackSyncLocked(int track) const
+{
+    return track >= 0 && track < kTrackCount && m_trackSyncLocked[track];
+}
+
 QJsonArray TimelineWidget::trackStatesToJson() const
 {
     QJsonArray states;
@@ -280,6 +290,8 @@ QJsonArray TimelineWidget::trackStatesToJson() const
         QJsonObject state;
         state.insert("locked", m_trackLocked[track]);
         state.insert("muted", m_trackMuted[track]);
+        state.insert("targeted", m_trackTargeted[track]);
+        state.insert("syncLocked", m_trackSyncLocked[track]);
         states.append(state);
     }
     return states;
@@ -291,6 +303,8 @@ void TimelineWidget::trackStatesFromJson(const QJsonArray &states)
         const QJsonObject state = track < states.size() ? states.at(track).toObject() : QJsonObject{};
         m_trackLocked[track] = state.value("locked").toBool(false);
         m_trackMuted[track] = state.value("muted").toBool(false);
+        m_trackTargeted[track] = state.value("targeted").toBool(true);
+        m_trackSyncLocked[track] = state.value("syncLocked").toBool(false);
     }
     update();
     for (int track = 0; track < kTrackCount; ++track)
@@ -1141,7 +1155,7 @@ int TimelineWidget::splitAllClipsAtPlayhead()
     // the indices of clips that are still waiting to be examined.
     for (int i = m_clips.size() - 1; i >= 0; --i) {
         const Clip original = m_clips.at(i);
-        if (isTrackLocked(original.track)) continue;
+        if (isTrackLocked(original.track) || !isTrackTargeted(original.track)) continue;
 
         const qint64 clipEnd = original.timelineStartMs + original.durationMs;
         if (splitTime <= original.timelineStartMs + kMinimumClipDurationMs
@@ -1851,15 +1865,29 @@ void TimelineWidget::paintEvent(QPaintEvent *event)
         p.fillRect(QRect(kTrackLabelWidth, y, width() - kTrackLabelWidth - 8,
                          kTrackHeight), QColor("#151c24"));
         p.setPen(track < 3 ? QColor("#c1ccd5") : QColor("#a2b3bf"));
-        p.drawText(QRect(16, y, 56, kTrackHeight),
-                   Qt::AlignVCenter | Qt::AlignLeft, tracks.at(track));
-        const QRect lockRect(75, y + 6, 20, 22);
-        const QRect muteRect(99, y + 6, 20, 22);
+        const QString shortName = track < 3
+            ? QString("V%1").arg(track + 1) : QString("A%1").arg(track - 2);
+        p.drawText(QRect(13, y, 32, kTrackHeight),
+                   Qt::AlignVCenter | Qt::AlignLeft, shortName);
+        const QRect targetRect(46, y + 6, 18, 22);
+        const QRect lockRect(65, y + 6, 18, 22);
+        const QRect syncRect(84, y + 6, 18, 22);
+        const QRect muteRect(103, y + 6, 18, 22);
+        p.setPen(QPen(m_trackTargeted[track] ? QColor("#79c8ff") : QColor("#596875"), 1));
+        p.setBrush(m_trackTargeted[track] ? QColor("#24445a") : QColor("#202a34"));
+        p.drawRoundedRect(targetRect, 3, 3);
+        p.setPen(m_trackTargeted[track] ? QColor("#ffffff") : QColor("#aab7c2"));
+        p.drawText(targetRect, Qt::AlignCenter, m_trackTargeted[track] ? "T" : "t");
         p.setPen(QPen(m_trackLocked[track] ? QColor("#d78cff") : QColor("#596875"), 1));
         p.setBrush(m_trackLocked[track] ? QColor("#49305f") : QColor("#202a34"));
         p.drawRoundedRect(lockRect, 3, 3);
         p.setPen(m_trackLocked[track] ? QColor("#ffffff") : QColor("#aab7c2"));
         p.drawText(lockRect, Qt::AlignCenter, m_trackLocked[track] ? "L" : "l");
+        p.setPen(QPen(m_trackSyncLocked[track] ? QColor("#a8dc8b") : QColor("#596875"), 1));
+        p.setBrush(m_trackSyncLocked[track] ? QColor("#354d2d") : QColor("#202a34"));
+        p.drawRoundedRect(syncRect, 3, 3);
+        p.setPen(m_trackSyncLocked[track] ? QColor("#ffffff") : QColor("#aab7c2"));
+        p.drawText(syncRect, Qt::AlignCenter, m_trackSyncLocked[track] ? "S" : "s");
         p.setPen(QPen(m_trackMuted[track] ? QColor("#e6a36f") : QColor("#596875"), 1));
         p.setBrush(m_trackMuted[track] ? QColor("#59402d") : QColor("#202a34"));
         p.drawRoundedRect(muteRect, 3, 3);
@@ -2004,10 +2032,12 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton) {
         const QPoint pos = event->position().toPoint();
         const int controlTrack = (pos.y() - kTrackTop) / (kTrackHeight + kTrackGap);
-        if (pos.x() >= 74 && pos.x() < 124 && pos.y() >= kTrackTop
+        if (pos.x() >= 46 && pos.x() < 124 && pos.y() >= kTrackTop
             && controlTrack >= 0 && controlTrack < kTrackCount
             && (pos.y() - kTrackTop) % (kTrackHeight + kTrackGap) < kTrackHeight) {
-            if (pos.x() < 98) m_trackLocked[controlTrack] = !m_trackLocked[controlTrack];
+            if (pos.x() < 65) m_trackTargeted[controlTrack] = !m_trackTargeted[controlTrack];
+            else if (pos.x() < 84) m_trackLocked[controlTrack] = !m_trackLocked[controlTrack];
+            else if (pos.x() < 103) m_trackSyncLocked[controlTrack] = !m_trackSyncLocked[controlTrack];
             else m_trackMuted[controlTrack] = !m_trackMuted[controlTrack];
             update();
             emit trackStateChanged(controlTrack);
