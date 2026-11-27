@@ -55,7 +55,7 @@ void ProgramMonitorWidget::setCaption(const QString &caption)
 
 void ProgramMonitorWidget::setColorCorrection(int brightness, int contrast, int saturation)
 {
-    for (int track = 0; track < 3; ++track) {
+    for (int track = 0; track < kLayerCount; ++track) {
         const ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
         setTrackColorGrade(track, brightness, contrast, saturation,
             grade.shadows, grade.midtones, grade.highlights,
@@ -84,7 +84,7 @@ void ProgramMonitorWidget::setRgbCurves(int red, int green, int blue)
 void ProgramMonitorWidget::setTrackColorGrade(int track, int brightness, int contrast,
     int saturation, int shadows, int midtones, int highlights, int red, int green, int blue)
 {
-    if (track < 0 || track >= 3) return;
+    if (track < 0 || track >= kLayerCount) return;
     ColorGrade &grade = m_colorGrades[static_cast<size_t>(track)];
     const ColorGrade next{
         qBound(-100, brightness, 100), qBound(-100, contrast, 100),
@@ -253,7 +253,7 @@ void ProgramMonitorWidget::paintEvent(QPaintEvent *event)
     QStringList activeTracks;
     for (size_t i = 0; i < m_frames.size(); ++i) {
         if (!m_frames[i].isNull())
-            activeTracks.append(QString("V%1").arg(static_cast<int>(i) + 1));
+            activeTracks.append(QString("L%1").arg(static_cast<int>(i) + 1));
     }
 
     if (!activeTracks.isEmpty()) {
