@@ -170,5 +170,28 @@ int main(int argc, char **argv)
     const QJsonObject fastSlidNext = fastSlideTimeline.toJson().at(2).toObject();
     assert(fastSlidNext.value("sourceInMs").toInt() == 4000);
     assert(fastSlidNext.value("durationMs").toInt() == 4000);
+    // Splitting a 2x clip must advance the second segment by twice the timeline offset.
+    QJsonObject fastSplitItem{{"id", 84}, {"path", replacementPath}, {"track", 0},
+        {"timelineStartMs", 0}, {"sourceInMs", 1000}, {"durationMs", 6000},
+        {"durationKnown", true}, {"sourceDurationMs", 16000}, {"playbackRate", 2.0}};
+    TimelineWidget fastSplitTimeline;
+    fastSplitTimeline.fromJson(QJsonArray{fastSplitItem});
+    fastSplitTimeline.setPlayheadMs(2000);
+    assert(fastSplitTimeline.splitSelectedClipAtPlayhead());
+    const QJsonArray fastSplitClips = fastSplitTimeline.toJson();
+    assert(fastSplitClips.size() == 2);
+    assert(fastSplitClips.at(0).toObject().value("durationMs").toInt() == 2000);
+    assert(fastSplitClips.at(1).toObject().value("sourceInMs").toInt() == 5000);
+    assert(fastSplitClips.at(1).toObject().value("durationMs").toInt() == 4000);
+
+    QJsonObject fastSplitAllItem = fastSplitItem;
+    fastSplitAllItem.insert("id", 85);
+    TimelineWidget fastSplitAllTimeline;
+    fastSplitAllTimeline.fromJson(QJsonArray{fastSplitAllItem});
+    fastSplitAllTimeline.setPlayheadMs(2000);
+    assert(fastSplitAllTimeline.splitAllClipsAtPlayhead() == 1);
+    const QJsonArray fastSplitAllClips = fastSplitAllTimeline.toJson();
+    assert(fastSplitAllClips.at(1).toObject().value("sourceInMs").toInt() == 5000);
+
     return 0;
 }
