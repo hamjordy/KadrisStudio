@@ -1245,9 +1245,7 @@ void MainWindow::newProject()
             != QMessageBox::Yes) return;
     QFile::remove(untitledRecoveryPath());
     m_projectPath.clear();
-    m_nestedEditActive = false;
-    m_nestedClipId = -1;
-    m_nestedParentState = QJsonObject();
+    m_nestedEditStack.clear();
     m_sequenceFpsNumerator = 25;
     m_sequenceFpsDenominator = 1;
     m_timeline->setFrameRate(25, 1);
@@ -1621,28 +1619,43 @@ bool MainWindow::writeProject(const QString &path)
     QJsonArray timelineClips = m_timeline->toJson();
     QJsonArray timelineMarkers = m_timeline->markersToJson();
     QJsonArray timelineTrackStates = m_timeline->trackStatesToJson();
-    if (m_nestedEditActive) {
-        timelineClips = m_nestedParentState.value("clips").toArray();
-        timelineMarkers = m_nestedParentState.value("markers").toArray();
-        timelineTrackStates = m_nestedParentState.value("tracks").toArray();
-        for (int i = 0; i < timelineClips.size(); ++i) {
-            QJsonObject parentClip = timelineClips.at(i).toObject();
-            if (parentClip.value("id").toInt() != m_nestedClipId) continue;
-            const QJsonArray childClips = m_timeline->toJson();
-            parentClip.insert("nestedClips", childClips);
-            qint64 nestedEnd = 0;
-            for (const QJsonValue &childValue : childClips) {
-                const QJsonObject child = childValue.toObject();
-                nestedEnd = qMax(nestedEnd,
-                    static_cast<qint64>(child.value("timelineStartMs").toDouble())
-                    + static_cast<qint64>(child.value("durationMs").toDouble()));
+    if (!m_nestedEditStack.isEmpty()) {
+        QJsonArray editedClips = m_timeline->toJson();
+        QJsonObject rootState;
+        for (int depth = m_nestedEditStack.size() - 1; depth >= 0; --depth) {
+            const NestedEditContext &context = m_nestedEditStack.at(depth);
+            QJsonObject parentState = context.parentState;
+            QJsonArray parentClips = parentState.value("clips").toArray();
+            bool foundParent = false;
+            for (int i = 0; i < parentClips.size(); ++i) {
+                QJsonObject parentClip = parentClips.at(i).toObject();
+                if (parentClip.value("id").toInt() != context.clipId) continue;
+                parentClip.insert("nestedClips", editedClips);
+                qint64 nestedEnd = 0;
+                for (const QJsonValue &childValue : editedClips) {
+                    const QJsonObject child = childValue.toObject();
+                    nestedEnd = qMax(nestedEnd,
+                        static_cast<qint64>(child.value("timelineStartMs").toDouble())
+                        + static_cast<qint64>(child.value("durationMs").toDouble()));
+                }
+                const qint64 nestedDuration = qMax<qint64>(1000, nestedEnd);
+                parentClip.insert("durationMs", static_cast<double>(nestedDuration));
+                parentClip.insert("sourceDurationMs", static_cast<double>(nestedDuration));
+                parentClips.replace(i, parentClip);
+                foundParent = true;
+                break;
             }
-            const qint64 nestedDuration = qMax<qint64>(1000, nestedEnd);
-            parentClip.insert("durationMs", static_cast<double>(nestedDuration));
-            parentClip.insert("sourceDurationMs", static_cast<double>(nestedDuration));
-            timelineClips.replace(i, parentClip);
-            break;
+            if (!foundParent) {
+                statusBar()->showMessage("Could not save nested sequence: parent clip is missing", 7000);
+                return false;
+            }
+            parentState.insert("clips", parentClips);
+            editedClips = parentClips;
+            if (depth == 0) rootState = parentState;
         }
+        timelineClips = editedClips;
+        timelineMarkers = rootState.value("markers").toArray();
+        timelineTrackStates = rootState.value("tracks").toArray();
     }
     for (int i = 0; i < timelineClips.size(); ++i) {
         QJsonObject clip = timelineClips.at(i).toObject();
@@ -1702,9 +1715,7 @@ bool MainWindow::readProject(const QString &path)
             && root.value("formatVersion").toInt() != 5
             && root.value("formatVersion").toInt() != 6)) return false;
 
-    m_nestedEditActive = false;
-    m_nestedClipId = -1;
-    m_nestedParentState = QJsonObject();
+    m_nestedEditStack.clear();
     m_mediaPaths.clear();
     m_mediaList->clear();
     for (const QJsonValue &value : root.value("mediaFiles").toArray()) {
@@ -1770,35 +1781,41 @@ void MainWindow::restoreTimelineState(const QJsonObject &state)
 
 bool MainWindow::openSelectedNestedSequence()
 {
-    if (m_nestedEditActive) return false;
     TimelineWidget::ClipInfo clip;
     if (!m_timeline->selectedClipInfo(&clip) || !clip.nestedSequence)
         return false;
     stopSequencePlayback(true);
-    m_nestedParentState = captureTimelineState();
-    m_nestedClipId = clip.id;
-    m_nestedEditActive = true;
+    NestedEditContext context;
+    context.parentState = captureTimelineState();
+    context.clipId = clip.id;
+    context.name = clip.nestedName;
+    m_nestedEditStack.append(context);
     m_timeline->fromJson(clip.nestedClips);
     resetTimelineHistory();
     m_projectDirty = true;
-    m_inspectorLabel->setText(QString("Nested sequence: %1\\nEdit its clips, then use Sequence > Back to Parent Sequence.")
-        .arg(clip.nestedName));
-    statusBar()->showMessage(QString("Opened nested sequence: %1").arg(clip.nestedName), 4500);
+    QStringList breadcrumbs;
+    for (const NestedEditContext &level : m_nestedEditStack)
+        breadcrumbs.append(level.name.isEmpty() ? QStringLiteral("Nested sequence") : level.name);
+    m_inspectorLabel->setText(QString("Sequence path: %1\nEdit clips here; Shift+Enter returns one level.")
+        .arg(breadcrumbs.join("  /  ")));
+    statusBar()->showMessage(QString("Opened nested sequence: %1 (depth %2)")
+        .arg(clip.nestedName).arg(m_nestedEditStack.size()), 4500);
     refreshPausedTimelinePreview();
     return true;
 }
 
 bool MainWindow::returnToParentSequence()
 {
-    if (!m_nestedEditActive) return false;
+    if (m_nestedEditStack.isEmpty()) return false;
     stopSequencePlayback(true);
     const QJsonArray childClips = m_timeline->toJson();
-    QJsonObject parentState = m_nestedParentState;
+    const NestedEditContext context = m_nestedEditStack.constLast();
+    QJsonObject parentState = context.parentState;
     QJsonArray parentClips = parentState.value("clips").toArray();
     bool updated = false;
     for (int i = 0; i < parentClips.size(); ++i) {
         QJsonObject parentClip = parentClips.at(i).toObject();
-        if (parentClip.value("id").toInt() != m_nestedClipId) continue;
+        if (parentClip.value("id").toInt() != context.clipId) continue;
         parentClip.insert("nestedClips", childClips);
         qint64 nestedEnd = 0;
         for (const QJsonValue &childValue : childClips) {
@@ -1816,15 +1833,22 @@ bool MainWindow::returnToParentSequence()
     }
     if (!updated) return false;
     parentState.insert("clips", parentClips);
-    m_nestedEditActive = false;
-    m_nestedClipId = -1;
-    m_nestedParentState = QJsonObject();
+    m_nestedEditStack.removeLast();
     restoreTimelineState(parentState);
     resetTimelineHistory();
     m_projectDirty = true;
-    m_inspectorLabel->setText("Parent sequence restored. Nested changes are saved in the project.");
+    if (m_nestedEditStack.isEmpty()) {
+        m_inspectorLabel->setText("Root sequence restored. Nested changes are preserved.");
+        statusBar()->showMessage("Returned to root sequence", 4500);
+    } else {
+        QStringList breadcrumbs;
+        for (const NestedEditContext &level : m_nestedEditStack)
+            breadcrumbs.append(level.name.isEmpty() ? QStringLiteral("Nested sequence") : level.name);
+        m_inspectorLabel->setText(QString("Sequence path: %1\nShift+Enter returns one level.")
+            .arg(breadcrumbs.join("  /  ")));
+        statusBar()->showMessage(QString("Returned one level — nesting depth %1").arg(m_nestedEditStack.size()), 4500);
+    }
     refreshPausedTimelinePreview();
-    statusBar()->showMessage("Returned to parent sequence — nested edits preserved", 4500);
     return true;
 }
 
