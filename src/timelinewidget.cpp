@@ -1093,23 +1093,40 @@ bool TimelineWidget::rippleDeleteSelectedClip()
 {
     if (m_selectedClip < 0 || m_selectedClip >= m_clips.size()) return false;
 
-    const Clip selected = m_clips.at(m_selectedClip);
-    if (isTrackLocked(selected.track)) return false;
+    QSet<int> ids = m_selectedClipIds;
+    if (ids.isEmpty()) ids.insert(m_clips.at(m_selectedClip).id);
 
-    const qint64 rippleStart = selected.timelineStartMs;
-    const qint64 rippleEnd = selected.timelineStartMs + selected.durationMs;
-    const qint64 rippleDuration = selected.durationMs;
-    const int removedId = selected.id;
+    qint64 rippleStart = std::numeric_limits<qint64>::max();
+    qint64 rippleEnd = 0;
+    for (const Clip &clip : m_clips) {
+        if (!ids.contains(clip.id)) continue;
+        if (isTrackLocked(clip.track)) return false;
+        rippleStart = qMin(rippleStart, clip.timelineStartMs);
+        rippleEnd = qMax(rippleEnd, clip.timelineStartMs + clip.durationMs);
+    }
+    if (rippleStart == std::numeric_limits<qint64>::max()
+        || rippleEnd <= rippleStart) return false;
 
-    m_clips.removeAt(m_selectedClip);
+    const qint64 rippleDuration = rippleEnd - rippleStart;
+    // Ripple is an all-or-nothing edit: never leave locked clips out of sync.
+    for (const Clip &clip : m_clips) {
+        if (!ids.contains(clip.id) && clip.timelineStartMs >= rippleEnd
+            && isTrackLocked(clip.track)) return false;
+    }
+
+    for (int i = m_clips.size() - 1; i >= 0; --i) {
+        if (ids.contains(m_clips.at(i).id))
+            m_clips.removeAt(i);
+    }
     for (Clip &clip : m_clips) {
-        if (clip.timelineStartMs >= rippleEnd && !isTrackLocked(clip.track))
+        if (clip.timelineStartMs >= rippleEnd)
             clip.timelineStartMs = qMax<qint64>(0,
                 kTimelineTimebase.snapMilliseconds(clip.timelineStartMs - rippleDuration));
     }
 
-    Q_UNUSED(removedId);
     m_selectedClip = -1;
+    m_selectedClipIds.clear();
+    m_dragGroupSnapshot.clear();
     m_playheadMs = rippleStart;
     updateCanvasSize();
     update();
