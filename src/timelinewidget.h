@@ -43,6 +43,7 @@ public:
         int blendMode = 0;
         int audioVolume = 100;
         bool audioMuted = false;
+        QVector<QPointF> audioVolumeKeyframes;
         bool nestedTrackMuted = false;
         QVector<float> waveformPeaks;
         QJsonArray nestedClips;
