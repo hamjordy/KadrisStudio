@@ -2065,12 +2065,24 @@ void TimelineWidget::mousePressEvent(QMouseEvent *event)
         if (pos.x() >= 46 && pos.x() < 124 && pos.y() >= kTrackTop
             && controlTrack >= 0 && controlTrack < kTrackCount
             && (pos.y() - kTrackTop) % (kTrackHeight + kTrackGap) < kTrackHeight) {
-            if (pos.x() < 65) m_trackTargeted[controlTrack] = !m_trackTargeted[controlTrack];
-            else if (pos.x() < 84) m_trackLocked[controlTrack] = !m_trackLocked[controlTrack];
-            else if (pos.x() < 103) m_trackSyncLocked[controlTrack] = !m_trackSyncLocked[controlTrack];
-            else m_trackMuted[controlTrack] = !m_trackMuted[controlTrack];
+            const bool groupedToggle = event->modifiers().testFlag(Qt::ShiftModifier)
+                && !m_trackGroups[controlTrack].isEmpty();
+            const QString groupName = m_trackGroups[controlTrack];
+            const bool newValue = pos.x() < 65 ? !m_trackTargeted[controlTrack]
+                : (pos.x() < 84 ? !m_trackLocked[controlTrack]
+                : (pos.x() < 103 ? !m_trackSyncLocked[controlTrack]
+                                 : !m_trackMuted[controlTrack]));
+            for (int track = 0; track < kTrackCount; ++track) {
+                if (track != controlTrack
+                    && (!groupedToggle || m_trackGroups[track] != groupName))
+                    continue;
+                if (pos.x() < 65) m_trackTargeted[track] = newValue;
+                else if (pos.x() < 84) m_trackLocked[track] = newValue;
+                else if (pos.x() < 103) m_trackSyncLocked[track] = newValue;
+                else m_trackMuted[track] = newValue;
+                emit trackStateChanged(track);
+            }
             update();
-            emit trackStateChanged(controlTrack);
             emit timelineEdited();
             event->accept();
             return;
