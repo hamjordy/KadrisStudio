@@ -1816,6 +1816,7 @@ void MainWindow::stopSequencePlayback(bool resetToStart)
         if (m_timeline) m_timeline->setPlayheadMs(0);
     }
     updateSequenceTimeLabel();
+    refreshPausedTimelinePreview();
 }
 
 void MainWindow::tickSequencePlayback()
