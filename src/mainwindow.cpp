@@ -2011,13 +2011,27 @@ void MainWindow::syncVideoTracks()
             clip.saturation, clip.shadows, clip.midtones, clip.highlights,
             clip.redCurve, clip.greenCurve, clip.blueCurve);
         if (clip.id == m_activeVideoClipIds[track]) {
-            m_videoTrackPlayers[track]->setPlaybackRate(clip.playbackRate);
+            QMediaPlayer *player = m_videoTrackPlayers[track];
+            player->setPlaybackRate(clip.playbackRate);
             if (m_waitingForVideoTrack[track]) {
                 handleVideoTrackStatus(track);
-            } else if (!m_failedVideoTrack[track]
-                && m_videoTrackPlayers[track]->playbackState()
-                    != QMediaPlayer::PlayingState) {
-                m_videoTrackPlayers[track]->play();
+            } else if (!m_failedVideoTrack[track]) {
+                const qint64 timelineOffset = qMax<qint64>(
+                    0, m_sequencePositionMs - clip.timelineStartMs);
+                const qint64 sourcePosition = qMax<qint64>(0,
+                    clip.sourceInMs + qRound64(timelineOffset * clip.playbackRate));
+                if (player->playbackState() == QMediaPlayer::PlayingState) {
+                    // Keep the decoded video aligned to the sequence clock without
+                    // seeking every frame; large corrections recover from decoder drift.
+                    constexpr qint64 videoDriftToleranceMs = 500;
+                    if (qAbs(player->position() - sourcePosition)
+                        > videoDriftToleranceMs) {
+                        player->setPosition(sourcePosition);
+                    }
+                } else {
+                    player->setPosition(sourcePosition);
+                    player->play();
+                }
             }
             continue;
         }
