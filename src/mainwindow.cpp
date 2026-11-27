@@ -156,6 +156,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
     // Offer recovery of an unsaved session from the previous application run.
     QTimer::singleShot(0, this, &MainWindow::recoverUntitledProject);
 
+    connect(m_timeline, &TimelineWidget::nestedSequenceDoubleClicked, this,
+        [this](int) {
+            if (!openSelectedNestedSequence())
+                statusBar()->showMessage("This nested sequence could not be opened", 4000);
+        });
     connect(m_timeline, &TimelineWidget::clipActivated, this,
         [this](const QString &path) {
             m_inspectorLabel->setText(QString("Timeline clip: %1\n\n"
@@ -1168,7 +1173,6 @@ void MainWindow::buildMenus()
             statusBar()->showMessage("Nested sequence created. Its contents are preserved in the project.", 5000);
     });
     auto *openNestedAction = sequence->addAction("Open Selected Nested Sequence");
-    openNestedAction->setShortcut(QKeySequence("Enter"));
     connect(openNestedAction, &QAction::triggered, this, [this]() {
         if (!openSelectedNestedSequence())
             statusBar()->showMessage("Select a nested sequence to open", 3500);
