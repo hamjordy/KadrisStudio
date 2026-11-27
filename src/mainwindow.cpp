@@ -1917,7 +1917,7 @@ void MainWindow::stepSequenceFrame(int direction)
         statusBar()->showMessage("Pause the timeline before frame stepping", 2500);
         return;
     }
-    const FrameTimebase timebase(25, 1);
+    const FrameTimebase timebase(m_sequenceFpsNumerator, m_sequenceFpsDenominator);
     const qint64 currentFrame = timebase.millisecondsToFrame(m_sequencePositionMs);
     const qint64 targetFrame = qMax<qint64>(0, currentFrame + direction);
     const qint64 durationFrames = timebase.millisecondsToFrame(
@@ -2255,7 +2255,7 @@ void MainWindow::handleAudioTrackStatus(int audioTrack)
 void MainWindow::updateSequenceTimeLabel()
 {
     if (m_sequenceTimeLabel) {
-        const FrameTimebase timebase(25, 1);
+        const FrameTimebase timebase(m_sequenceFpsNumerator, m_sequenceFpsDenominator);
         m_sequenceTimeLabel->setText(QString::fromStdString(
             timebase.timecode(timebase.millisecondsToFrame(m_sequencePositionMs))));
     }
