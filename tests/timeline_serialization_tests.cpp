@@ -78,5 +78,32 @@ int main(int argc, char **argv)
     assert(clip.audioMuted);
     assert(clip.fadeInMs == 450);
     assert(clip.fadeOutMs == 700);
+
+    // Slip edits shift the source window while preserving timeline placement and duration.
+    QJsonObject slipItem;
+    slipItem.insert("id", 77);
+    slipItem.insert("path", replacementPath);
+    slipItem.insert("track", 0);
+    slipItem.insert("timelineStartMs", 9000);
+    slipItem.insert("sourceInMs", 1000);
+    slipItem.insert("durationMs", 5000);
+    slipItem.insert("durationKnown", true);
+    slipItem.insert("sourceDurationMs", 12000);
+    TimelineWidget slipTimeline;
+    slipTimeline.fromJson(QJsonArray{slipItem});
+    TimelineWidget::ClipInfo slipBefore;
+    assert(slipTimeline.selectedClipInfo(&slipBefore));
+    assert(slipTimeline.slipClip(77, 1000));
+    TimelineWidget::ClipInfo slipAfter;
+    assert(slipTimeline.selectedClipInfo(&slipAfter));
+    assert(slipAfter.sourceInMs == 2000);
+    assert(slipAfter.timelineStartMs == slipBefore.timelineStartMs);
+    assert(slipAfter.durationMs == slipBefore.durationMs);
+    assert(slipTimeline.slipClip(77, 100000));
+    assert(slipTimeline.selectedClipInfo(&slipAfter));
+    assert(slipAfter.sourceInMs == 7000);
+    assert(slipTimeline.slipClip(77, -100000));
+    assert(slipTimeline.selectedClipInfo(&slipAfter));
+    assert(slipAfter.sourceInMs == 0);
     return 0;
 }

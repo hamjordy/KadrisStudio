@@ -74,7 +74,7 @@ This roadmap distinguishes implemented prototype functionality from work still r
 1. Add automated crash/restart recovery tests and rotating project backups.
 2. Establish a real render/export pipeline with output validation.
 3. Expand automated tests beyond compilation, including serialization, timeline behavior, and project recovery.
-4. Add slip, slide, and rate-stretch editing modes.
+4. Add slide and rate-stretch editing modes.
 
 ## Long-term target
 
