@@ -235,10 +235,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
                 .arg(track < 3 ? "VIDEO" : "AUDIO")
                 .arg(track < 3 ? track + 1 : track - 2) + " track settings updated", 2500);
         });
-        m_lastTimelineState = m_timeline->toJson();
+        m_lastTimelineState = captureTimelineState();
     connect(m_timeline, &TimelineWidget::timelineEdited, this,
         [this]() {
-            const QJsonArray currentState = m_timeline->toJson();
+            const QJsonObject currentState = captureTimelineState();
             if (!m_restoringTimeline && currentState != m_lastTimelineState) {
                 m_undoHistory.append(m_lastTimelineState);
                 if (m_undoHistory.size() > 100) m_undoHistory.removeFirst();
@@ -1195,11 +1195,32 @@ bool MainWindow::readProject(const QString &path)
 }
 
 
+QJsonObject MainWindow::captureTimelineState() const
+{
+    QJsonObject state;
+    if (!m_timeline) return state;
+    state.insert("clips", m_timeline->toJson());
+    state.insert("markers", m_timeline->markersToJson());
+    state.insert("tracks", m_timeline->trackStatesToJson());
+    return state;
+}
+
+void MainWindow::restoreTimelineState(const QJsonObject &state)
+{
+    if (!m_timeline) return;
+    m_restoringTimeline = true;
+    m_timeline->fromJson(state.value("clips").toArray());
+    m_timeline->markersFromJson(state.value("markers").toArray());
+    m_timeline->trackStatesFromJson(state.value("tracks").toArray());
+    m_restoringTimeline = false;
+    m_lastTimelineState = captureTimelineState();
+}
+
 void MainWindow::resetTimelineHistory()
 {
     m_undoHistory.clear();
     m_redoHistory.clear();
-    m_lastTimelineState = m_timeline ? m_timeline->toJson() : QJsonArray{};
+    m_lastTimelineState = captureTimelineState();
 }
 
 void MainWindow::undoTimelineEdit()
@@ -1210,12 +1231,9 @@ void MainWindow::undoTimelineEdit()
     }
 
     stopSequencePlayback(false);
-    m_redoHistory.append(m_timeline->toJson());
-    const QJsonArray previousState = m_undoHistory.takeLast();
-    m_restoringTimeline = true;
-    m_timeline->fromJson(previousState);
-    m_restoringTimeline = false;
-    m_lastTimelineState = previousState;
+    m_redoHistory.append(captureTimelineState());
+    const QJsonObject previousState = m_undoHistory.takeLast();
+    restoreTimelineState(previousState);
     statusBar()->showMessage("Timeline edit undone", 2500);
 }
 
@@ -1227,12 +1245,9 @@ void MainWindow::redoTimelineEdit()
     }
 
     stopSequencePlayback(false);
-    m_undoHistory.append(m_timeline->toJson());
-    const QJsonArray nextState = m_redoHistory.takeLast();
-    m_restoringTimeline = true;
-    m_timeline->fromJson(nextState);
-    m_restoringTimeline = false;
-    m_lastTimelineState = nextState;
+    m_undoHistory.append(captureTimelineState());
+    const QJsonObject nextState = m_redoHistory.takeLast();
+    restoreTimelineState(nextState);
     statusBar()->showMessage("Timeline edit restored", 2500);
 }
 
