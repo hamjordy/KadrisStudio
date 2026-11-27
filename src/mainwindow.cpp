@@ -2020,8 +2020,7 @@ void MainWindow::toggleSequencePlayback()
         m_sequenceClock.invalidate();
         for (int slot = 0; slot < 9; ++slot)
             m_videoTrackPlayers[slot]->pause();
-        for (int track = 0; track < 2; ++track)
-            m_audioTrackPlayers[track]->pause();
+        for (int track = 0; track < 4; ++track)\1m_audioTrackPlayers[track]->pause();
         m_sequenceButton->setText("Play Timeline");
         statusBar()->showMessage("Timeline playback paused", 3000);
         return;
@@ -2085,8 +2084,7 @@ void MainWindow::stopSequencePlayback(bool resetToStart)
         m_waitingForVideoTrack[slot] = false;
         m_failedVideoTrack[slot] = false;
     }
-    for (int track = 0; track < 2; ++track) {
-        m_audioTrackPlayers[track]->stop();
+    for (int track = 0; track < 4; ++track) {\n        m_audioTrackPlayers[track]->stop();
         m_audioTrackPlayers[track]->setSource(QUrl());
         m_activeAudioClipIds[track] = -1;
         m_waitingForAudioTrack[track] = false;
