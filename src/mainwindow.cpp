@@ -3,6 +3,7 @@
 #include "programmonitorwidget.h"
 #include "frame_timebase.h"
 #include "project_media_paths.h"
+#include "project_media_collection.h"
 
 #include <QAction>
 #include <QCheckBox>
@@ -1108,6 +1109,10 @@ void MainWindow::buildMenus()
     auto *relinkAction = media->addAction("&Relink Selected Media...");
     relinkAction->setShortcut(QKeySequence("Ctrl+Shift+R"));
     connect(relinkAction, &QAction::triggered, this, &MainWindow::relinkSelectedMedia);
+    media->addSeparator();
+    auto *collectMediaAction = media->addAction("&Collect Project Media...");
+    collectMediaAction->setToolTip("Copy all referenced media into a Media folder beside the project");
+    connect(collectMediaAction, &QAction::triggered, this, &MainWindow::collectProjectMedia);
 
     auto *toolbar = addToolBar("Main");
     toolbar->setObjectName("mainToolbar");
@@ -1331,6 +1336,74 @@ void MainWindow::openRecoveryCenter()
         dialog.accept();
     });
     dialog.exec();
+}
+
+
+void MainWindow::collectProjectMedia()
+{
+    if (m_projectPath.isEmpty()) {
+        const auto choice = QMessageBox::question(this, "Collect Project Media",
+            "Save this project before collecting its media?",
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        if (choice != QMessageBox::Yes) return;
+        saveProjectAs();
+        if (m_projectPath.isEmpty()) return;
+    }
+
+    const QString projectFolder = QFileInfo(m_projectPath).absolutePath();
+    const QString mediaFolder = QDir(projectFolder).filePath("Media");
+    if (QMessageBox::question(this, "Collect Project Media",
+            QString("Copy every available media file used by this project into:\n%1\n\n"
+                    "The project references will then be updated and the project saved.")
+                .arg(QDir::toNativeSeparators(mediaFolder)),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
+        return;
+
+    QStringList referencedPaths = m_mediaPaths;
+    const QJsonArray clips = m_timeline->toJson();
+    for (const QJsonValue &value : clips) {
+        const QString path = value.toObject().value("path").toString();
+        if (!path.isEmpty()) referencedPaths.append(path);
+    }
+
+    QHash<QString, QString> pathMap;
+    QStringList missingFiles;
+    QString error;
+    if (!ProjectMediaCollection::copyReferencedMedia(
+            referencedPaths, mediaFolder, &pathMap, &missingFiles, &error)) {
+        QString details = error;
+        if (!missingFiles.isEmpty()) {
+            details += "\n\nMissing files:";
+            for (const QString &missing : missingFiles)
+                details += "\n• " + missing;
+        }
+        QMessageBox::warning(this, "Collect Project Media", details);
+        return;
+    }
+
+    const QStringList previousMediaPaths = m_mediaPaths;
+    m_mediaPaths.clear();
+    m_mediaList->clear();
+    for (const QString &oldPath : previousMediaPaths) {
+        const QString canonical = QFileInfo(oldPath).canonicalFilePath();
+        const QString newPath = pathMap.value(QDir::cleanPath(canonical));
+        const QString replacement = newPath.isEmpty() ? oldPath : newPath;
+        addMediaPath(replacement);
+    }
+    for (auto it = pathMap.cbegin(); it != pathMap.cend(); ++it)
+        m_timeline->replaceMediaPath(it.key(), it.value());
+
+    m_projectDirty = true;
+    saveProject();
+    if (m_projectDirty) {
+        statusBar()->showMessage(
+            "Media was copied, but the project could not be saved. Save the project to keep the new references.",
+            8000);
+        return;
+    }
+    statusBar()->showMessage(
+        QString("Collected %1 unique media file(s) into the project Media folder")
+            .arg(pathMap.size()), 6000);
 }
 
 void MainWindow::autosaveProject()
