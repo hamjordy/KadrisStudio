@@ -2143,7 +2143,7 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         if (previousIndex < 0 || nextIndex < 0
             || isTrackLocked(m_slidePreviousSnapshot.track)
             || isTrackLocked(m_slideNextSnapshot.track)) return;
-        const qint64 minimumDelta = qMax({
+        const qint64 minimumDelta = std::max({
             -m_dragSnapshot.timelineStartMs,
             kMinimumClipDurationMs - m_slidePreviousSnapshot.durationMs,
             -m_slideNextSnapshot.sourceInMs
