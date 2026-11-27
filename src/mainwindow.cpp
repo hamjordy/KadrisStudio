@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "audio_crossfade.h"
 #include "timelinewidget.h"
 #include "programmonitorwidget.h"
 #include "frame_timebase.h"
@@ -2406,10 +2407,16 @@ void MainWindow::applyAudioMixerState()
     QVector<QPair<int, TimelineWidget::ClipInfo>> activeClips;
     if (m_timeline) {
         for (int parentIndex = 0; parentIndex < 2; ++parentIndex) {
+            const int parentTrack = firstAudioTrack + parentIndex;
+            if (m_audioTrackMuted[parentIndex]
+                || m_timeline->isTrackMuted(parentTrack))
+                continue;
             const auto clips = m_timeline->clipsAtTimeOnTrack(
-                m_sequencePositionMs, firstAudioTrack + parentIndex);
-            for (const auto &clip : clips)
-                activeClips.append(qMakePair(parentIndex, clip));
+                m_sequencePositionMs, parentTrack);
+            for (const auto &clip : clips) {
+                if (!clip.audioMuted && !clip.nestedTrackMuted)
+                    activeClips.append(qMakePair(parentIndex, clip));
+            }
         }
     }
 
@@ -2482,13 +2489,11 @@ void MainWindow::applyAudioMixerState()
                     || m_sequencePositionMs < overlapStart
                     || m_sequencePositionMs > overlapEnd)
                     continue;
-                const double progress = qBound(0.0,
-                    static_cast<double>(m_sequencePositionMs - overlapStart)
-                        / static_cast<double>(overlapEnd - overlapStart), 1.0);
-                const double angle = progress * 1.5707963267948966;
+                const bool incoming = activeClip->timelineStartMs
+                    >= other.timelineStartMs;
                 clipGain *= static_cast<float>(
-                    activeClip->timelineStartMs < other.timelineStartMs
-                        ? std::cos(angle) : std::sin(angle));
+                    KadrisAudio::equalPowerCrossfadeGain(
+                        m_sequencePositionMs, overlapStart, overlapEnd, incoming));
                 break;
             }
         }
