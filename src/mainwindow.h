@@ -95,11 +95,11 @@ private:
     qint64 m_sequenceClockOriginMs = 0;
     bool m_sequencePlaying = false;
     qint64 m_sequencePositionMs = 0;
-    std::array<QMediaPlayer *, 3> m_videoTrackPlayers{};
-    std::array<QVideoSink *, 3> m_videoTrackSinks{};
-    std::array<int, 3> m_activeVideoClipIds{{-1, -1, -1}};
-    std::array<bool, 3> m_waitingForVideoTrack{{false, false, false}};
-    std::array<bool, 3> m_failedVideoTrack{{false, false, false}};
+    std::array<QMediaPlayer *, 9> m_videoTrackPlayers{};
+    std::array<QVideoSink *, 9> m_videoTrackSinks{};
+    std::array<int, 9> m_activeVideoClipIds{{-1, -1, -1, -1, -1, -1, -1, -1, -1}};
+    std::array<bool, 9> m_waitingForVideoTrack{{false, false, false, false, false, false, false, false, false}};
+    std::array<bool, 9> m_failedVideoTrack{{false, false, false, false, false, false, false, false, false}};
     std::array<QMediaPlayer *, 2> m_audioTrackPlayers{};
     std::array<QAudioOutput *, 2> m_audioTrackOutputs{};
     std::array<int, 2> m_activeAudioClipIds{{-1, -1}};
