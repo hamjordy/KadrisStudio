@@ -126,6 +126,7 @@ private:
     std::array<bool, 2> m_audioTrackSolo{{false, false}};
     QSlider *m_masterVolumeSlider = nullptr;
     float m_masterGain = 1.0f;
+    bool m_masterMuted = false;
     TimelineWidget *m_timeline = nullptr;
     std::array<QSlider *, 9> m_clipColorSliders{};
     std::array<QSlider *, 3> m_clipTransformSliders{};
