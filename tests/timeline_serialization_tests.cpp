@@ -34,6 +34,21 @@ int main(int argc, char **argv)
     assert(KadrisAudio::equalPowerCrossfadeGain(
         1500, 2000, 1000, false) == 1.0);
 
+    // Peak hold decays normally, but clipping remains latched until reset.
+    float heldPeak = 0.0f;
+    bool clipLatched = false;
+    assert(qAbs(KadrisAudio::updatePeakHold(0.8f, heldPeak, clipLatched) - 0.8f) < 0.0001f);
+    assert(!clipLatched);
+    const float decayedPeak = KadrisAudio::updatePeakHold(0.2f, heldPeak, clipLatched);
+    assert(decayedPeak < 0.8f && decayedPeak > 0.2f);
+    assert(KadrisAudio::updatePeakHold(1.0f, heldPeak, clipLatched) == 1.0f);
+    assert(clipLatched && heldPeak == 1.0f);
+    KadrisAudio::updatePeakHold(0.1f, heldPeak, clipLatched);
+    assert(clipLatched && heldPeak == 1.0f);
+    KadrisAudio::resetPeakHold(heldPeak, clipLatched);
+    assert(heldPeak == 0.0f && !clipLatched);
+    assert(KadrisAudio::updatePeakHold(0.0f, heldPeak, clipLatched) == 0.0f);
+
     TimelineWidget timeline;
 
     timeline.addClip("missing-media.mp4");
