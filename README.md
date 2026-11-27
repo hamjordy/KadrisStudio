@@ -10,6 +10,7 @@ KadrisStudio is an independent, open-source Windows desktop video-editor project
 - Import local video, audio, and image files.
 - Preview source media through Qt Multimedia (supported formats depend on the Windows multimedia backend).
 - Create, save, and reopen `.kadris` projects.
+- Store imported media references relative to the project file when possible, while retaining support for older absolute-path projects.
 - Persist timeline clip positions, source in-points, durations, track assignments, clip adjustments, keyframes, markers, and track states.
 - Read media duration where available; use a clearly marked five-second estimate when duration metadata is unavailable.
 
@@ -42,7 +43,7 @@ KadrisStudio is an independent, open-source Windows desktop video-editor project
 - Sequence export, an export queue, and verified output rendering are not yet implemented.
 - WAV waveform visualization is currently limited to supported WAV PCM/float formats.
 - Multiple overlapping audio clips per track, advanced routing, sample-accurate mixing, audio meters, and professional audio effects remain future work.
-- Proxy media, project media collection, and a full undo/redo history remain future work. Autosave and a recovery center are implemented, but still need broader crash/recovery testing.
+- Proxy media and project media collection remain future work. Timeline undo/redo (up to 100 states), autosave, and the Recovery Center are implemented, but still need broader runtime and crash/recovery testing.
 - Supported media formats depend on the installed Qt/Windows multimedia backend.
 
 ## Build on Windows 11
