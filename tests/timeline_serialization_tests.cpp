@@ -201,11 +201,13 @@ int main(int argc, char **argv)
     // Nested audio layers are resolved independently on AUDIO parent tracks.
     QJsonObject nestedAudioOne{
         {"id", 421}, {"path", "nested-voice.wav"}, {"track", 3},
-        {"timelineStartMs", 0}, {"durationMs", 4000}
+        {"timelineStartMs", 0}, {"durationMs", 4000},
+        {"audioVolume", 75}, {"fadeInMs", 600}, {"fadeOutMs", 900}
     };
     QJsonObject nestedAudioTwo{
         {"id", 422}, {"path", "nested-music.wav"}, {"track", 4},
-        {"timelineStartMs", 500}, {"durationMs", 3000}
+        {"timelineStartMs", 500}, {"durationMs", 3000},
+        {"audioVolume", 60}, {"fadeInMs", 400}, {"fadeOutMs", 700}
     };
     QJsonObject nestedAudioContainer{
         {"id", 423}, {"path", "nest://423"}, {"track", 3},
@@ -224,6 +226,12 @@ int main(int argc, char **argv)
     assert(activeNestedAudio.at(1).nestedTrack == 4);
     assert(activeNestedAudio.at(0).track == 3);
     assert(activeNestedAudio.at(1).track == 3);
+    assert(activeNestedAudio.at(0).audioVolume == 75);
+    assert(activeNestedAudio.at(0).fadeInMs == 600);
+    assert(activeNestedAudio.at(0).fadeOutMs == 900);
+    assert(activeNestedAudio.at(1).audioVolume == 60);
+    assert(activeNestedAudio.at(1).fadeInMs == 400);
+    assert(activeNestedAudio.at(1).fadeOutMs == 700);
 
     // Track mute state is retained inside a nested sequence and exposed to the mixer.
     QJsonArray nestedAudioTrackStates;
