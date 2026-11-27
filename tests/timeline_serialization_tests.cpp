@@ -143,6 +143,25 @@ int main(int argc, char **argv)
     assert(openedNestedInfo.id == openedNestedClipId);
     assert(openedNestedInfo.nestedSequence);
 
+    // A nested sequence can itself contain another nested sequence and survives reload.
+    QJsonObject innerContainer;
+    innerContainer.insert("id", 303);
+    innerContainer.insert("path", "nest://303");
+    innerContainer.insert("track", 0);
+    innerContainer.insert("timelineStartMs", 0);
+    innerContainer.insert("durationMs", 5000);
+    innerContainer.insert("sourceDurationMs", 5000);
+    innerContainer.insert("nestedSequence", true);
+    innerContainer.insert("nestedName", "Inner Montage");
+    innerContainer.insert("nestedClips", nestedSaved);
+    TimelineWidget recursiveNested;
+    recursiveNested.fromJson(QJsonArray{innerContainer});
+    const QJsonArray recursiveSaved = recursiveNested.toJson();
+    assert(recursiveSaved.size() == 1);
+    const QJsonObject restoredInner = recursiveSaved.first().toObject();
+    assert(restoredInner.value("nestedSequence").toBool());
+    assert(restoredInner.value("nestedClips").toArray() == nestedSaved);
+
     // Preview lookup resolves child media at the nested sequence's absolute timeline time.
     TimelineWidget previewNested;
     previewNested.fromJson(nestedSaved);
