@@ -9,6 +9,7 @@
 #include <QDockWidget>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QSaveFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QGroupBox>
@@ -1149,13 +1150,21 @@ bool MainWindow::writeProject(const QString &path)
     root.insert("timelineMarkers", m_timeline->markersToJson());
     root.insert("timelineTrackStates", m_timeline->trackStatesToJson());
 
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
         statusBar()->showMessage("Could not save project: " + file.errorString(), 8000);
         return false;
     }
-    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
-    file.close();
+    const QByteArray projectData = QJsonDocument(root).toJson(QJsonDocument::Indented);
+    if (file.write(projectData) != projectData.size()) {
+        statusBar()->showMessage("Could not write complete project: " + file.errorString(), 8000);
+        file.cancelWriting();
+        return false;
+    }
+    if (!file.commit()) {
+        statusBar()->showMessage("Could not finalize project save: " + file.errorString(), 8000);
+        return false;
+    }
     m_projectPath = path;
     updateWindowTitle();
     statusBar()->showMessage("Project saved", 4000);
