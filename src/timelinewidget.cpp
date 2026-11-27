@@ -1849,10 +1849,28 @@ void TimelineWidget::mouseMoveEvent(QMouseEvent *event)
         for (const Marker &marker : m_markers)
             considerSnap(marker.timeMs);
         bestDelta = qMax<qint64>(-groupStart, bestDelta);
+
+        // A grouped drag may also change tracks. Preserve each clip's
+        // relative track offset and reject the entire move if any destination
+        // is outside the timeline or locked.
+        const int trackDelta = trackAt(pos.y()) - m_dragSnapshot.track;
+        bool canMoveGroup = true;
+        for (const Clip &snapshot : m_dragGroupSnapshot) {
+            const int destinationTrack = snapshot.track + trackDelta;
+            if (destinationTrack < 0 || destinationTrack >= kTrackCount
+                || isTrackLocked(destinationTrack)) {
+                canMoveGroup = false;
+                break;
+            }
+        }
+        if (!canMoveGroup) return;
+
         for (const Clip &snapshot : m_dragGroupSnapshot) {
             const int targetIndex = indexForClipId(snapshot.id);
-            if (targetIndex >= 0)
+            if (targetIndex >= 0) {
                 m_clips[targetIndex].timelineStartMs = snapshot.timelineStartMs + bestDelta;
+                m_clips[targetIndex].track = snapshot.track + trackDelta;
+            }
         }
         updateCanvasSize();
         update();
