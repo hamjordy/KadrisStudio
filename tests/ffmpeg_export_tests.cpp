@@ -71,6 +71,35 @@ int main()
     assert(dissolveGraph.contains("enable='gte(t,1.500000)'"));
     assert(dissolveGraph.indexOf("[1:v:0]") < dissolveGraph.indexOf("[0:v:0]"));
 
+    // Multiple independent dissolves can be rendered in one multi-layer sequence.
+    QJsonObject middle = video;
+    middle.insert("timelineStartMs", 1500);
+    middle.insert("durationMs", 2000);
+    middle.insert("track", 1);
+    middle.insert("videoTransitionInMs", 500);
+    middle.insert("videoTransitionOutMs", 500);
+    QJsonObject first = outgoing;
+    QJsonObject last = video;
+    last.insert("timelineStartMs", 3000);
+    last.insert("durationMs", 2000);
+    last.insert("track", 2);
+    last.insert("videoTransitionInMs", 500);
+    assert(FfmpegExport::buildArguments(QJsonArray{last, middle, first}, 1280, 720, 25, 1,
+                                        "multiple-dissolves.mp4", &args, &error));
+    const QString multipleDissolveGraph = args.join(" ");
+    assert(multipleDissolveGraph.count("fade=t=in:") == 2);
+    assert(multipleDissolveGraph.count("overlay=eof_action=pass:shortest=0") == 3);
+    assert(multipleDissolveGraph.contains("st=1.500000:d=0.500000:alpha=1"));
+    assert(multipleDissolveGraph.contains("st=3.000000:d=0.500000:alpha=1"));
+
+    // An incoming transition that could match two outgoing clips is rejected.
+    QJsonObject ambiguousOutgoing = first;
+    ambiguousOutgoing.insert("id", 44);
+    assert(!FfmpegExport::buildArguments(
+        QJsonArray{first, ambiguousOutgoing, incoming}, 1280, 720, 25, 1,
+        "ambiguous-dissolve.mp4", &args, &error));
+    assert(error.contains("multiple outgoing clips"));
+
     assert(FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
                                         "render.mp4", &args, &error, 18, "slow"));
     assert(args.contains("18"));
