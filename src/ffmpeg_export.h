@@ -7,8 +7,8 @@
 class FfmpegExport
 {
 public:
-    // Builds a basic, frame-accurate FFmpeg command for cuts-only timelines.
-    // Advanced clip effects are rejected rather than silently omitted.
+    // Builds an FFmpeg command for timeline cuts and supported two-layer video Cross Dissolves.
+    // Unsupported clip effects are rejected rather than silently omitted.
     static bool buildArguments(const QJsonArray &clips, int width, int height,
                                int fpsNumerator, int fpsDenominator,
                                const QString &outputPath, QStringList *arguments,
