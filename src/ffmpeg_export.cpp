@@ -235,7 +235,8 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
                        .arg(number(segment.duration * segment.rate)).arg(number(segment.rate))
                        .arg(number(segment.start)).arg(fps).arg(width).arg(height);
         if (segment.videoTransitionIn > 0.0) {
-            videoChain += QString(",format=rgba,fade=t=in:st=0:d=%1:alpha=1")
+            videoChain += QString(",format=rgba,fade=t=in:st=%1:d=%2:alpha=1")
+                              .arg(number(segment.start))
                               .arg(number(segment.videoTransitionIn));
         }
         videoChain += QString("[%1]").arg(label);
