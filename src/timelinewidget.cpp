@@ -711,6 +711,42 @@ bool TimelineWidget::setClipAudioSettings(int clipId, int volume, int fadeInMs, 
     return true;
 }
 
+bool TimelineWidget::applyCrossDissolveToSelectedClips()
+{
+    if (m_selectedClipIds.size() != 2) return false;
+
+    Clip *first = nullptr;
+    Clip *second = nullptr;
+    for (Clip &clip : m_clips) {
+        if (!m_selectedClipIds.contains(clip.id)) continue;
+        if (clip.track >= 3 || clip.nestedSequence || isTrackLocked(clip.track))
+            return false;
+        if (!first) first = &clip;
+        else second = &clip;
+    }
+    if (!first || !second || first->track == second->track) return false;
+
+    Clip *outgoing = first;
+    Clip *incoming = second;
+    if (incoming->timelineStartMs < outgoing->timelineStartMs)
+        std::swap(outgoing, incoming);
+
+    // The incoming image must be composited above the outgoing image.
+    // The overlap is the explicit transition duration; ordinary clip
+    // overlaps remain untouched unless both clips are selected.
+    if (incoming->track <= outgoing->track) return false;
+    const qint64 overlapStart = incoming->timelineStartMs;
+    const qint64 overlapEnd = qMin(outgoing->timelineStartMs + outgoing->durationMs,
+                                   incoming->timelineStartMs + incoming->durationMs);
+    const qint64 overlapMs = overlapEnd - overlapStart;
+    if (overlapMs < kMinimumClipDurationMs || overlapMs > 5000) return false;
+
+    incoming->fadeInMs = static_cast<int>(overlapMs);
+    update();
+    emit timelineEdited();
+    return true;
+}
+
 bool TimelineWidget::setClipAudioMuted(int clipId, bool muted)
 {
     const int index = indexForClipId(clipId);
