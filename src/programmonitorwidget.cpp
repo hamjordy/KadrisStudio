@@ -145,6 +145,15 @@ void ProgramMonitorWidget::rebuildCorrectedFrames()
         rebuildCorrectedFrame(track);
 }
 
+void ProgramMonitorWidget::setImageEffects(int blur, int sharpen, int vignette)
+{
+    m_blur = qBound(0, blur, 100);
+    m_sharpen = qBound(0, sharpen, 100);
+    m_vignette = qBound(0, vignette, 100);
+    rebuildCorrectedFrames();
+    update();
+}
+
 void ProgramMonitorWidget::rebuildCorrectedFrame(int frameIndex)
 {
     if (frameIndex < 0 || frameIndex >= static_cast<int>(m_frames.size())) return;
@@ -192,6 +201,53 @@ void ProgramMonitorWidget::rebuildCorrectedFrame(int frameIndex)
                     red = color.red(); green = color.green(); blue = color.blue();
                 }
                 line[x] = qRgba(red, green, blue, qAlpha(pixel));
+            }
+        }
+        if (m_blur > 0 || m_sharpen > 0) {
+            const QImage source = image;
+            for (int y = 1; y < image.height() - 1; ++y) {
+                QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+                for (int x = 1; x < image.width() - 1; ++x) {
+                    const QRgb center = source.pixel(x, y);
+                    int sums[3] = {0, 0, 0};
+                    int neighbors[3] = {0, 0, 0};
+                    for (int dy = -1; dy <= 1; ++dy) {
+                        for (int dx = -1; dx <= 1; ++dx) {
+                            if (dx == 0 && dy == 0) continue;
+                            const QRgb p = source.pixel(x + dx, y + dy);
+                            sums[0] += qRed(p); sums[1] += qGreen(p); sums[2] += qBlue(p);
+                            if (std::abs(dx) + std::abs(dy) == 1) {
+                                neighbors[0] += qRed(p); neighbors[1] += qGreen(p); neighbors[2] += qBlue(p);
+                            }
+                        }
+                    }
+                    int channels[3] = {qRed(center), qGreen(center), qBlue(center)};
+                    for (int c = 0; c < 3; ++c) {
+                        const double blurred = (sums[c] + channels[c]) / 9.0;
+                        const double blurMix = m_blur / 100.0;
+                        const double sharpenMix = m_sharpen / 100.0;
+                        const double sharpened = channels[c] * 2.0 - neighbors[c] / 4.0;
+                        channels[c] = qBound(0, qRound(channels[c] * (1.0 - blurMix)
+                            + blurred * blurMix + (sharpened - channels[c]) * sharpenMix), 255);
+                    }
+                    line[x] = qRgba(channels[0], channels[1], channels[2], qAlpha(center));
+                }
+            }
+        }
+        if (m_vignette > 0) {
+            const double cx = (image.width() - 1) / 2.0;
+            const double cy = (image.height() - 1) / 2.0;
+            const double maxDistance = std::sqrt(cx * cx + cy * cy);
+            for (int y = 0; y < image.height(); ++y) {
+                QRgb *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+                for (int x = 0; x < image.width(); ++x) {
+                    const double distance = std::sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+                    const double amount = (m_vignette / 100.0) * qBound(0.0, distance / maxDistance, 1.0) * 0.72;
+                    const QRgb p = line[x];
+                    line[x] = qRgba(qRound(qRed(p) * (1.0 - amount)),
+                        qRound(qGreen(p) * (1.0 - amount)),
+                        qRound(qBlue(p) * (1.0 - amount)), qAlpha(p));
+                }
             }
         }
         m_correctedFrames[static_cast<size_t>(frameIndex)] = image;
