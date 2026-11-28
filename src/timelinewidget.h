@@ -50,6 +50,7 @@ public:
         QJsonArray nestedClips;
         QJsonArray nestedTrackStates;
         int fadeInMs = 0, fadeOutMs = 0;
+        int videoTransitionInMs = 0, videoTransitionOutMs = 0;
     };
 
     void addClip(const QString &path);
@@ -173,6 +174,7 @@ private:
         QJsonArray nestedClips;
         QJsonArray nestedTrackStates;
         int fadeInMs = 0, fadeOutMs = 0;
+        int videoTransitionInMs = 0, videoTransitionOutMs = 0;
         QVector<Keyframe> audioVolumeKeyframes;
         QVector<Keyframe> opacityKeyframes;
         struct TransformKeyframe { qint64 timeMs = 0; double scale = 100.0; double x = 0.0; double y = 0.0; };
