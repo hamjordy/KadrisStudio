@@ -88,6 +88,7 @@ public:
     bool setClipOpacity(int clipId, int opacity);
     bool setClipBlendMode(int clipId, int blendMode);
     bool setClipAudioSettings(int clipId, int volume, int fadeInMs, int fadeOutMs);
+    bool applyCrossDissolveToSelectedClips();
     bool setClipAudioMuted(int clipId, bool muted);
     bool addAudioVolumeKeyframe(int clipId, qint64 timelineTimeMs, int volume);
     bool removeAudioVolumeKeyframeAt(int clipId, qint64 timelineTimeMs);
