@@ -1403,6 +1403,19 @@ void MainWindow::buildMenus()
         if (!m_sequencePlaying)
             toggleSequencePlayback();
     });
+    auto *crossDissolveAction = sequence->addAction("Apply Cross Dissolve to Selected Clips");
+    crossDissolveAction->setShortcut(QKeySequence("Ctrl+Alt+D"));
+    crossDissolveAction->setStatusTip(
+        "Apply a real-time opacity dissolve to two overlapping clips on separate video tracks");
+    connect(crossDissolveAction, &QAction::triggered, this, [this]() {
+        if (!m_timeline->applyCrossDissolveToSelectedClips())
+            statusBar()->showMessage(
+                "Select two overlapping video clips; the incoming clip must be on the higher track",
+                5000);
+        else
+            statusBar()->showMessage("Cross Dissolve applied to the selected clip overlap", 3500);
+    });
+
     auto *splitAllAction = sequence->addAction("Add Edit to All Tracks");
     splitAllAction->setShortcut(QKeySequence("Ctrl+Shift+K"));
     connect(splitAllAction, &QAction::triggered, this, [this]() {
