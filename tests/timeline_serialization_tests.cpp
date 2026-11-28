@@ -634,5 +634,13 @@ int main(int argc, char **argv)
     assert(fastRollClips.at(1).toObject().value("sourceInMs").toInt() == 3000);
     assert(fastRollClips.at(1).toObject().value("durationMs").toInt() == 4000);
 
+    // Video fade envelopes reach zero at each edge and full opacity outside fades.
+    assert(qAbs(KadrisAudio::videoFadeOpacity(0, 4000, 1000, 1000)) < 0.000001);
+    assert(qAbs(KadrisAudio::videoFadeOpacity(500, 4000, 1000, 1000) - 0.5) < 0.000001);
+    assert(qAbs(KadrisAudio::videoFadeOpacity(1500, 4000, 1000, 1000) - 1.0) < 0.000001);
+    assert(qAbs(KadrisAudio::videoFadeOpacity(3500, 4000, 1000, 1000) - 0.5) < 0.000001);
+    assert(qAbs(KadrisAudio::videoFadeOpacity(4000, 4000, 1000, 1000)) < 0.000001);
+    assert(qAbs(KadrisAudio::videoFadeOpacity(2000, 4000, 0, 0) - 1.0) < 0.000001);
+
     return 0;
 }
