@@ -68,8 +68,8 @@ int main(int argc, char **argv)
     assert(dissolveTimeline.applyCrossDissolveToSelectedClips());
     const QJsonArray dissolvedClips = dissolveTimeline.toJson();
     assert(dissolvedClips.size() == 2);
-    assert(dissolvedClips.at(0).toObject().value("fadeOutMs").toInt() == 0);
-    assert(dissolvedClips.at(1).toObject().value("fadeInMs").toInt() == 2000);
+    assert(dissolvedClips.at(0).toObject().value("videoTransitionOutMs").toInt() == 2000);
+    assert(dissolvedClips.at(1).toObject().value("videoTransitionInMs").toInt() == 2000);
 
     TimelineWidget nonOverlappingDissolve;
     nonOverlappingDissolve.resize(1600, 300);
