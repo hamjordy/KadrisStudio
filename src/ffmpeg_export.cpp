@@ -242,8 +242,9 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         videoChain += QString("[%1]").arg(label);
         filters << videoChain;
         const QString next = QString("mix%1").arg(layer);
-        filters << QString("[%1][%2]overlay=eof_action=pass:shortest=0[%3]")
-                       .arg(current, label, next);
+        filters << QString("[%1][%2]overlay=eof_action=pass:shortest=0:"
+                           "enable='gte(t,%3)'[%4]")
+                       .arg(current, label).arg(number(segment.start)).arg(next);
         current = next;
         ++layer;
     }
