@@ -1,4 +1,5 @@
 #include "ffmpeg_export.h"
+#include "audio_crossfade.h"
 
 #include <QFileInfo>
 #include <QRegularExpression>
