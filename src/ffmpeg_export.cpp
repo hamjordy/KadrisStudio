@@ -179,39 +179,41 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     if (video.isEmpty()) return fail("Add at least one video clip to the timeline.");
     if (totalDuration <= 0.0) return fail("The timeline has no duration.");
 
+    // Every transition must have exactly one counterpart. This allows multiple
+    // independent dissolves in a sequence while rejecting ambiguous pairings.
     for (const Segment &incoming : video) {
         if (incoming.videoTransitionIn <= 0.0) continue;
-        bool matchedOutgoing = false;
+        int matches = 0;
         for (const Segment &outgoing : video) {
             if (outgoing.videoTransitionOut <= 0.0) continue;
             if (KadrisAudio::validVideoCrossDissolve(
                     outgoing.timelineStartMs, outgoing.durationMs, outgoing.track,
                     qRound64(outgoing.videoTransitionOut * 1000.0),
                     incoming.timelineStartMs, incoming.durationMs, incoming.track,
-                    qRound64(incoming.videoTransitionIn * 1000.0))) {
-                matchedOutgoing = true;
-                break;
-            }
+                    qRound64(incoming.videoTransitionIn * 1000.0)))
+                ++matches;
         }
-        if (!matchedOutgoing)
+        if (matches == 0)
             return fail("A Cross Dissolve has no matching outgoing clip on a lower video track.");
+        if (matches > 1)
+            return fail("A Cross Dissolve matches multiple outgoing clips; make the transition pairing unambiguous.");
     }
     for (const Segment &outgoing : video) {
         if (outgoing.videoTransitionOut <= 0.0) continue;
-        bool matchedIncoming = false;
+        int matches = 0;
         for (const Segment &incoming : video) {
             if (incoming.videoTransitionIn <= 0.0) continue;
             if (KadrisAudio::validVideoCrossDissolve(
                     outgoing.timelineStartMs, outgoing.durationMs, outgoing.track,
                     qRound64(outgoing.videoTransitionOut * 1000.0),
                     incoming.timelineStartMs, incoming.durationMs, incoming.track,
-                    qRound64(incoming.videoTransitionIn * 1000.0))) {
-                matchedIncoming = true;
-                break;
-            }
+                    qRound64(incoming.videoTransitionIn * 1000.0)))
+                ++matches;
         }
-        if (!matchedIncoming)
+        if (matches == 0)
             return fail("A Cross Dissolve has no matching incoming clip on a higher video track.");
+        if (matches > 1)
+            return fail("A Cross Dissolve matches multiple incoming clips; make the transition pairing unambiguous.");
     }
 
     std::stable_sort(video.begin(), video.end(), [](const Segment &a, const Segment &b) {
