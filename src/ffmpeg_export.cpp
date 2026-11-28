@@ -96,6 +96,8 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         double duration = 0.0;
         double sourceIn = 0.0;
         double rate = 1.0;
+        double videoTransitionIn = 0.0;
+        double videoTransitionOut = 0.0;
         int volume = 100;
         bool muted = false;
     };
