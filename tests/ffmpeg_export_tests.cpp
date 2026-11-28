@@ -53,6 +53,7 @@ int main()
     outgoing.insert("timelineStartMs", 0);
     outgoing.insert("durationMs", 2000);
     outgoing.insert("track", 0);
+    outgoing.insert("videoTransitionOutMs", 500);
     QJsonObject incoming = video;
     incoming.insert("timelineStartMs", 1500);
     incoming.insert("durationMs", 2000);
@@ -62,6 +63,8 @@ int main()
                                         "cross-dissolve.mp4", &args, &error));
     const QString dissolveGraph = args.join(" ");
     assert(dissolveGraph.contains("fade=t=in:st=1.500000:d=0.500000:alpha=1"));
+    assert(dissolveGraph.contains("format=rgba"));
+    assert(dissolveGraph.contains("overlay=eof_action=pass:shortest=0"));
     assert(dissolveGraph.contains("+1.500000/TB"));
     assert(dissolveGraph.contains("overlay=eof_action=pass:shortest=0"));
     assert(dissolveGraph.contains("enable='gte(t,0.000000)'"));
