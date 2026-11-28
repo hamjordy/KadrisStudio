@@ -642,5 +642,17 @@ int main(int argc, char **argv)
     assert(qAbs(KadrisAudio::videoFadeOpacity(4000, 4000, 1000, 1000)) < 0.000001);
     assert(qAbs(KadrisAudio::videoFadeOpacity(2000, 4000, 0, 0) - 1.0) < 0.000001);
 
+    // Video Cross Dissolve uses complementary linear image opacities.
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(1000, 1000, 2000, false) - 1.0) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(1000, 1000, 2000, true)) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(1500, 1000, 2000, false) - 0.5) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(1500, 1000, 2000, true) - 0.5) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(2000, 1000, 2000, false)) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(2000, 1000, 2000, true) - 1.0) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(500, 1000, 2000, false) - 1.0) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(2500, 1000, 2000, true) - 1.0) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(1500, 2000, 1000, false)) < 0.000001);
+    assert(qAbs(KadrisAudio::videoCrossDissolveOpacity(1500, 2000, 1000, true) - 1.0) < 0.000001);
+
     return 0;
 }
