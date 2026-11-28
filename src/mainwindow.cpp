@@ -641,6 +641,41 @@ void MainWindow::buildInterface()
         });
     inspectorLayout->addWidget(lookPresetCombo);
 
+    auto *effectsHeading = new QLabel("IMAGE EFFECTS");
+    effectsHeading->setObjectName("sectionTitle");
+    inspectorLayout->addWidget(effectsHeading);
+    auto *blurSlider = new QSlider(Qt::Horizontal);
+    auto *sharpenSlider = new QSlider(Qt::Horizontal);
+    auto *vignetteSlider = new QSlider(Qt::Horizontal);
+    auto addImageEffectSlider = [this, inspectorLayout, blurSlider, sharpenSlider, vignetteSlider](
+            const QString &name, QSlider *slider) {
+        auto *label = new QLabel(name + ": 0%");
+        label->setObjectName("mutedLabel");
+        slider->setObjectName("colorCorrectionSlider");
+        slider->setRange(0, 100);
+        slider->setValue(0);
+        slider->setToolTip(name + " strength (0–100%). Applied to the program preview.");
+        connect(slider, &QSlider::valueChanged, this,
+            [this, label, name, blurSlider, sharpenSlider, vignetteSlider](int value) {
+                label->setText(QString("%1: %2%").arg(name).arg(value));
+                m_monitor->setImageEffects(blurSlider->value(),
+                    sharpenSlider->value(), vignetteSlider->value());
+            });
+        inspectorLayout->addWidget(label);
+        inspectorLayout->addWidget(slider);
+    };
+    addImageEffectSlider("Blur", blurSlider);
+    addImageEffectSlider("Sharpen", sharpenSlider);
+    addImageEffectSlider("Vignette", vignetteSlider);
+    auto *resetEffects = new QPushButton("Reset Image Effects");
+    connect(resetEffects, &QPushButton::clicked, this,
+        [blurSlider, sharpenSlider, vignetteSlider]() {
+            blurSlider->setValue(0);
+            sharpenSlider->setValue(0);
+            vignetteSlider->setValue(0);
+        });
+    inspectorLayout->addWidget(resetEffects);
+
     auto *resetColor = new QPushButton("Reset Color Correction");
     connect(resetColor, &QPushButton::clicked, this,
         [brightnessSlider, contrastSlider, saturationSlider, shadowWheel, midtoneWheel, highlightWheel, redCurve, greenCurve, blueCurve]() {
