@@ -2460,11 +2460,23 @@ void MainWindow::refreshPausedTimelinePreview()
             m_monitor->setTrackTransform(slot, scale, x, y);
             const qint64 clipElapsedMs = qMax<qint64>(0,
                 m_sequencePositionMs - clip.timelineStartMs);
+            double transitionOpacity = 1.0;
+            if (clip.videoTransitionInMs > 0) {
+                transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
+                    m_sequencePositionMs, clip.timelineStartMs,
+                    clip.timelineStartMs + clip.videoTransitionInMs, true);
+            } else if (clip.videoTransitionOutMs > 0) {
+                const qint64 transitionEnd = clip.timelineStartMs + clip.durationMs;
+                transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
+                    m_sequencePositionMs, transitionEnd - clip.videoTransitionOutMs,
+                    transitionEnd, false);
+            }
             const double fadeGain = KadrisAudio::videoFadeOpacity(
                 clipElapsedMs, clip.durationMs, clip.fadeInMs, clip.fadeOutMs);
             const int animatedOpacity = clip.nestedContent ? clip.opacity
                 : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs);
-            m_monitor->setTrackOpacity(slot, qRound(animatedOpacity * fadeGain));
+            m_monitor->setTrackOpacity(slot,
+                qRound(animatedOpacity * fadeGain * transitionOpacity));
             m_monitor->setTrackBlendMode(slot, clip.blendMode);
             m_monitor->setTrackColorGrade(slot, brightness, contrast, clip.saturation,
                 clip.shadows, clip.midtones, clip.highlights, clip.redCurve,
@@ -2593,8 +2605,25 @@ void MainWindow::syncVideoTracks()
             if (!clip.nestedContent)
                 m_timeline->evaluatedTransform(clip.id, m_sequencePositionMs, &scale, &x, &y);
             m_monitor->setTrackTransform(slot, scale, x, y);
-            m_monitor->setTrackOpacity(slot, clip.nestedContent ? clip.opacity
-                : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs));
+            double transitionOpacity = 1.0;
+            if (clip.videoTransitionInMs > 0) {
+                transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
+                    m_sequencePositionMs, clip.timelineStartMs,
+                    clip.timelineStartMs + clip.videoTransitionInMs, true);
+            } else if (clip.videoTransitionOutMs > 0) {
+                const qint64 transitionEnd = clip.timelineStartMs + clip.durationMs;
+                transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
+                    m_sequencePositionMs, transitionEnd - clip.videoTransitionOutMs,
+                    transitionEnd, false);
+            }
+            const qint64 clipElapsedMs = qMax<qint64>(0,
+                m_sequencePositionMs - clip.timelineStartMs);
+            const double fadeGain = KadrisAudio::videoFadeOpacity(
+                clipElapsedMs, clip.durationMs, clip.fadeInMs, clip.fadeOutMs);
+            const int animatedOpacity = clip.nestedContent ? clip.opacity
+                : m_timeline->evaluatedOpacity(clip.id, m_sequencePositionMs);
+            m_monitor->setTrackOpacity(slot,
+                qRound(animatedOpacity * fadeGain * transitionOpacity));
             m_monitor->setTrackBlendMode(slot, clip.blendMode);
             m_monitor->setTrackColorGrade(slot, brightness, contrast, clip.saturation,
                 clip.shadows, clip.midtones, clip.highlights, clip.redCurve,
