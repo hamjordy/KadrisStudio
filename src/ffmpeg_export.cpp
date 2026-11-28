@@ -98,6 +98,8 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         double rate = 1.0;
         double videoTransitionIn = 0.0;
         double videoTransitionOut = 0.0;
+        qint64 timelineStartMs = 0;
+        qint64 durationMs = 0;
         int volume = 100;
         bool muted = false;
     };
@@ -154,6 +156,10 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         segment.duration = durationMs / 1000.0;
         segment.sourceIn = sourceInMs / 1000.0;
         segment.rate = rate;
+        segment.timelineStartMs = qRound64(startMs);
+        segment.durationMs = qRound64(durationMs);
+        segment.videoTransitionOut = qMax(0.0,
+            clip.value("videoTransitionOutMs").toDouble(0.0)) / 1000.0;
         segment.volume = qBound(0, clip.value("audioVolume").toInt(100), 100);
         segment.muted = clip.value("audioMuted").toBool(false);
         segment.videoTransitionIn = qMax(0.0,
@@ -171,6 +177,41 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
 
     if (video.isEmpty()) return fail("Add at least one video clip to the timeline.");
     if (totalDuration <= 0.0) return fail("The timeline has no duration.");
+
+    for (const Segment &incoming : video) {
+        if (incoming.videoTransitionIn <= 0.0) continue;
+        bool matchedOutgoing = false;
+        for (const Segment &outgoing : video) {
+            if (outgoing.videoTransitionOut <= 0.0) continue;
+            if (KadrisAudio::validVideoCrossDissolve(
+                    outgoing.timelineStartMs, outgoing.durationMs, outgoing.track,
+                    qRound64(outgoing.videoTransitionOut * 1000.0),
+                    incoming.timelineStartMs, incoming.durationMs, incoming.track,
+                    qRound64(incoming.videoTransitionIn * 1000.0))) {
+                matchedOutgoing = true;
+                break;
+            }
+        }
+        if (!matchedOutgoing)
+            return fail("A Cross Dissolve has no matching outgoing clip on a lower video track.");
+    }
+    for (const Segment &outgoing : video) {
+        if (outgoing.videoTransitionOut <= 0.0) continue;
+        bool matchedIncoming = false;
+        for (const Segment &incoming : video) {
+            if (incoming.videoTransitionIn <= 0.0) continue;
+            if (KadrisAudio::validVideoCrossDissolve(
+                    outgoing.timelineStartMs, outgoing.durationMs, outgoing.track,
+                    qRound64(outgoing.videoTransitionOut * 1000.0),
+                    incoming.timelineStartMs, incoming.durationMs, incoming.track,
+                    qRound64(incoming.videoTransitionIn * 1000.0))) {
+                matchedIncoming = true;
+                break;
+            }
+        }
+        if (!matchedIncoming)
+            return fail("A Cross Dissolve has no matching incoming clip on a higher video track.");
+    }
 
     std::stable_sort(video.begin(), video.end(), [](const Segment &a, const Segment &b) {
         if (a.track != b.track) return a.track < b.track;
