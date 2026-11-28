@@ -61,7 +61,9 @@ int main()
     assert(FfmpegExport::buildArguments(QJsonArray{incoming, outgoing}, 1280, 720, 25, 1,
                                         "cross-dissolve.mp4", &args, &error));
     const QString dissolveGraph = args.join(" ");
-    assert(dissolveGraph.contains("fade=t=in:st=0:d=0.500000:alpha=1"));
+    assert(dissolveGraph.contains("fade=t=in:st=1.500000:d=0.500000:alpha=1"));
+    assert(dissolveGraph.contains("+1.500000/TB"));
+    assert(dissolveGraph.contains("overlay=eof_action=pass:shortest=0"));
     assert(dissolveGraph.indexOf("[1:v:0]") < dissolveGraph.indexOf("[0:v:0]"));
 
     assert(FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
@@ -97,8 +99,8 @@ int main()
                                         "nested-render.mp4", &args, &error));
     const QString nestedGraph = args.join(" ");
     assert(!nestedGraph.contains("nest://"));
-    assert(nestedGraph.contains("between(t,3.25,5.25)"));
-    assert(nestedGraph.contains("between(t,3.5,4.5)"));
+    assert(nestedGraph.contains("+3.250000/TB"));
+    assert(nestedGraph.contains("+3.500000/TB"));
     assert(nestedGraph.contains("amix=inputs=1"));
 
     QJsonObject unsupportedNested = nested;
