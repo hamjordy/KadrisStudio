@@ -154,7 +154,14 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         segment.rate = rate;
         segment.volume = qBound(0, clip.value("audioVolume").toInt(100), 100);
         segment.muted = clip.value("audioMuted").toBool(false);
-        if (track < 3) video.append(segment);
+        segment.videoTransitionIn = qMax(0.0,
+            clip.value("videoTransitionInMs").toDouble(0.0)) / 1000.0;
+        if (track < 3) {
+            if (segment.videoTransitionIn > segment.duration)
+                return fail(QString("Clip %1 has a Cross Dissolve longer than the clip.")
+                            .arg(clip.value("id").toInt()));
+            video.append(segment);
+        }
         else audio.append(segment);
         totalDuration = qMax(totalDuration, segment.start + segment.duration);
         *arguments << "-i" << path;
@@ -162,6 +169,11 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
 
     if (video.isEmpty()) return fail("Add at least one video clip to the timeline.");
     if (totalDuration <= 0.0) return fail("The timeline has no duration.");
+
+    std::stable_sort(video.begin(), video.end(), [](const Segment &a, const Segment &b) {
+        if (a.track != b.track) return a.track < b.track;
+        return a.start < b.start;
+    });
 
     const QString fps = QString("%1/%2").arg(fpsNumerator).arg(fpsDenominator);
     QStringList filters;
@@ -171,12 +183,18 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     int layer = 0;
     for (const Segment &segment : video) {
         const QString label = QString("v%1").arg(layer);
-        filters << QString("[%1:v:0]trim=start=%2:duration=%3,setpts=(PTS-STARTPTS)/%4,"
+        QString videoChain = QString("[%1:v:0]trim=start=%2:duration=%3,setpts=(PTS-STARTPTS)/%4,"
                            "fps=%5,scale=%6:%7:force_original_aspect_ratio=decrease,"
-                           "pad=%6:%7:(ow-iw)/2:(oh-ih)/2,setsar=1[%8]")
+                           "pad=%6:%7:(ow-iw)/2:(oh-ih)/2,setsar=1")
                        .arg(segment.input).arg(number(segment.sourceIn))
                        .arg(number(segment.duration * segment.rate)).arg(number(segment.rate))
-                       .arg(fps).arg(width).arg(height).arg(label);
+                       .arg(fps).arg(width).arg(height);
+        if (segment.videoTransitionIn > 0.0) {
+            videoChain += QString(",format=rgba,fade=t=in:st=0:d=%1:alpha=1")
+                              .arg(number(segment.videoTransitionIn));
+        }
+        videoChain += QString("[%1]").arg(label);
+        filters << videoChain;
         const QString next = QString("mix%1").arg(layer);
         filters << QString("[%1][%2]overlay=eof_action=pass:shortest=0:"
                            "enable='between(t,%3,%4)'[%5]")
