@@ -2465,12 +2465,7 @@ void MainWindow::refreshPausedTimelinePreview()
                 transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
                     m_sequencePositionMs, clip.timelineStartMs,
                     clip.timelineStartMs + clip.videoTransitionInMs, true);
-            } else if (clip.videoTransitionOutMs > 0) {
-                const qint64 transitionEnd = clip.timelineStartMs + clip.durationMs;
-                transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
-                    m_sequencePositionMs, transitionEnd - clip.videoTransitionOutMs,
-                    transitionEnd, false);
-            }
+            } // Keep the outgoing layer opaque; the incoming layer fades over it.
             const double fadeGain = KadrisAudio::videoFadeOpacity(
                 clipElapsedMs, clip.durationMs, clip.fadeInMs, clip.fadeOutMs);
             const int animatedOpacity = clip.nestedContent ? clip.opacity
@@ -2610,12 +2605,7 @@ void MainWindow::syncVideoTracks()
                 transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
                     m_sequencePositionMs, clip.timelineStartMs,
                     clip.timelineStartMs + clip.videoTransitionInMs, true);
-            } else if (clip.videoTransitionOutMs > 0) {
-                const qint64 transitionEnd = clip.timelineStartMs + clip.durationMs;
-                transitionOpacity = KadrisAudio::videoCrossDissolveOpacity(
-                    m_sequencePositionMs, transitionEnd - clip.videoTransitionOutMs,
-                    transitionEnd, false);
-            }
+            } // Keep the outgoing layer opaque; the incoming layer fades over it.
             const qint64 clipElapsedMs = qMax<qint64>(0,
                 m_sequencePositionMs - clip.timelineStartMs);
             const double fadeGain = KadrisAudio::videoFadeOpacity(
