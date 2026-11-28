@@ -59,6 +59,30 @@ inline double videoCrossDissolveOpacity(qint64 positionMs,
     return incoming ? progress : 1.0 - progress;
 }
 
+
+// Validate the paired metadata used by a two-layer video Cross Dissolve.
+inline bool validVideoCrossDissolve(qint64 outgoingStartMs,
+                                    qint64 outgoingDurationMs,
+                                    int outgoingTrack,
+                                    qint64 outgoingTransitionMs,
+                                    qint64 incomingStartMs,
+                                    qint64 incomingDurationMs,
+                                    int incomingTrack,
+                                    qint64 incomingTransitionMs)
+{
+    if (outgoingTransitionMs <= 0 || incomingTransitionMs <= 0
+        || outgoingTransitionMs != incomingTransitionMs
+        || incomingTrack <= outgoingTrack
+        || outgoingDurationMs <= 0 || incomingDurationMs <= 0
+        || incomingStartMs < outgoingStartMs)
+        return false;
+
+    const qint64 overlapEndMs = qMin(outgoingStartMs + outgoingDurationMs,
+                                     incomingStartMs + incomingDurationMs);
+    const qint64 overlapMs = overlapEndMs - incomingStartMs;
+    return overlapMs > 0 && overlapMs == outgoingTransitionMs;
+}
+
 // Update a track's peak hold and latch clipping at digital full scale.
 // Returns the level to display; a latched clip keeps its peak until reset.
 inline float updatePeakHold(float outputPeak, float &peakHold, bool &clipped)
