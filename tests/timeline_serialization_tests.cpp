@@ -34,6 +34,17 @@ int main(int argc, char **argv)
     assert(KadrisAudio::equalPowerCrossfadeGain(
         1500, 2000, 1000, false) == 1.0);
 
+    // Export only accepts matching Cross Dissolve metadata on adjacent
+    // overlapping clips, with the incoming image on the higher layer.
+    assert(KadrisAudio::validVideoCrossDissolve(
+        0, 4000, 0, 2000, 2000, 3000, 1, 2000));
+    assert(!KadrisAudio::validVideoCrossDissolve(
+        0, 4000, 1, 2000, 2000, 3000, 0, 2000));
+    assert(!KadrisAudio::validVideoCrossDissolve(
+        0, 4000, 0, 1500, 2000, 3000, 1, 2000));
+    assert(!KadrisAudio::validVideoCrossDissolve(
+        0, 1000, 0, 500, 2000, 1000, 1, 500));
+
     // Peak hold decays normally, but clipping remains latched until reset.
     float heldPeak = 0.0f;
     bool clipLatched = false;
