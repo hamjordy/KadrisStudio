@@ -25,6 +25,21 @@ inline double equalPowerCrossfadeGain(qint64 positionMs,
     return incoming ? std::sin(angle) : std::cos(angle);
 }
 
+// Linear video fade envelope based on clip-local timeline position.
+inline double videoFadeOpacity(qint64 elapsedMs, qint64 durationMs,
+                               qint64 fadeInMs, qint64 fadeOutMs)
+{
+    if (durationMs <= 0) return 1.0;
+    const qint64 elapsed = qMax<qint64>(0, elapsedMs);
+    double gain = 1.0;
+    if (fadeInMs > 0 && elapsed < fadeInMs)
+        gain = qMin(gain, static_cast<double>(elapsed) / fadeInMs);
+    const qint64 remaining = qMax<qint64>(0, durationMs - elapsed);
+    if (fadeOutMs > 0 && remaining < fadeOutMs)
+        gain = qMin(gain, static_cast<double>(remaining) / fadeOutMs);
+    return qBound(0.0, gain, 1.0);
+}
+
 // Update a track's peak hold and latch clipping at digital full scale.
 // Returns the level to display; a latched clip keeps its peak until reset.
 inline float updatePeakHold(float outputPeak, float &peakHold, bool &clipped)
