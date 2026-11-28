@@ -741,7 +741,8 @@ bool TimelineWidget::applyCrossDissolveToSelectedClips()
     const qint64 overlapMs = overlapEnd - overlapStart;
     if (overlapMs < kMinimumClipDurationMs || overlapMs > 5000) return false;
 
-    incoming->fadeInMs = static_cast<int>(overlapMs);
+    outgoing->videoTransitionOutMs = static_cast<int>(overlapMs);
+    incoming->videoTransitionInMs = static_cast<int>(overlapMs);
     update();
     emit timelineEdited();
     return true;
@@ -1057,6 +1058,10 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
                                       / accumulatedRate));
         clip.fadeOutMs = qMax(0, qRound(item.value("fadeOutMs").toDouble()
                                        / accumulatedRate));
+        clip.videoTransitionInMs = qMax(0, qRound(item.value("videoTransitionInMs").toDouble()
+                                                  / accumulatedRate));
+        clip.videoTransitionOutMs = qMax(0, qRound(item.value("videoTransitionOutMs").toDouble()
+                                                   / accumulatedRate));
         return clip;
     };
 
@@ -1140,6 +1145,8 @@ QVector<TimelineWidget::ClipInfo> TimelineWidget::clipsAtTimeOnTrack(
             item.insert("audioMuted", clip.audioMuted);
             item.insert("fadeInMs", clip.fadeInMs);
             item.insert("fadeOutMs", clip.fadeOutMs);
+            item.insert("videoTransitionInMs", clip.videoTransitionInMs);
+            item.insert("videoTransitionOutMs", clip.videoTransitionOutMs);
             QJsonArray volumeFrames;
             for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
                 QJsonObject frame;
@@ -1732,6 +1739,8 @@ QJsonArray TimelineWidget::toJson() const
         item.insert("audioMuted", clip.audioMuted);
         item.insert("fadeInMs", clip.fadeInMs);
         item.insert("fadeOutMs", clip.fadeOutMs);
+        item.insert("videoTransitionInMs", clip.videoTransitionInMs);
+        item.insert("videoTransitionOutMs", clip.videoTransitionOutMs);
         QJsonArray audioVolumeKeyframes;
         for (const Keyframe &keyframe : clip.audioVolumeKeyframes) {
             QJsonObject frame; frame.insert("timeMs", static_cast<double>(keyframe.timeMs));
@@ -1849,6 +1858,8 @@ void TimelineWidget::fromJson(const QJsonArray &clips)
         clip.audioMuted = item.value("audioMuted").toBool(false);
         clip.fadeInMs = qBound(0, item.value("fadeInMs").toInt(0), 5000);
         clip.fadeOutMs = qBound(0, item.value("fadeOutMs").toInt(0), 5000);
+        clip.videoTransitionInMs = qBound(0, item.value("videoTransitionInMs").toInt(0), 5000);
+        clip.videoTransitionOutMs = qBound(0, item.value("videoTransitionOutMs").toInt(0), 5000);
         const QJsonArray audioVolumeKeyframes = item.value("audioVolumeKeyframes").toArray();
         for (const QJsonValue &frameValue : audioVolumeKeyframes) {
             if (!frameValue.isObject()) continue;
