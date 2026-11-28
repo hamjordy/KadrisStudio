@@ -49,6 +49,44 @@ int main(int argc, char **argv)
     assert(heldPeak == 0.0f && !clipLatched);
     assert(KadrisAudio::updatePeakHold(0.0f, heldPeak, clipLatched) == 0.0f);
 
+    // Cross Dissolve is only applied to two selected, overlapping video clips
+    // on separate layers, and its duration follows the actual overlap.
+    TimelineWidget dissolveTimeline;
+    dissolveTimeline.resize(1600, 300);
+    dissolveTimeline.fromJson(QJsonArray{
+        QJsonObject{{"id", 501}, {"path", "outgoing.mp4"}, {"track", 0},
+            {"timelineStartMs", 0}, {"durationMs", 4000}},
+        QJsonObject{{"id", 502}, {"path", "incoming.mp4"}, {"track", 1},
+            {"timelineStartMs", 2000}, {"durationMs", 3000}}
+    });
+    QMouseEvent selectOutgoing(QEvent::MouseButtonPress, QPointF(230, 55),
+        Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+    QApplication::sendEvent(&dissolveTimeline, &selectOutgoing);
+    QMouseEvent selectIncoming(QEvent::MouseButtonPress, QPointF(390, 96),
+        Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+    QApplication::sendEvent(&dissolveTimeline, &selectIncoming);
+    assert(dissolveTimeline.applyCrossDissolveToSelectedClips());
+    const QJsonArray dissolvedClips = dissolveTimeline.toJson();
+    assert(dissolvedClips.size() == 2);
+    assert(dissolvedClips.at(0).toObject().value("fadeOutMs").toInt() == 0);
+    assert(dissolvedClips.at(1).toObject().value("fadeInMs").toInt() == 2000);
+
+    TimelineWidget nonOverlappingDissolve;
+    nonOverlappingDissolve.resize(1600, 300);
+    nonOverlappingDissolve.fromJson(QJsonArray{
+        QJsonObject{{"id", 511}, {"path", "first.mp4"}, {"track", 0},
+            {"timelineStartMs", 0}, {"durationMs", 1000}},
+        QJsonObject{{"id", 512}, {"path", "second.mp4"}, {"track", 1},
+            {"timelineStartMs", 2000}, {"durationMs", 1000}}
+    });
+    QMouseEvent selectFirstDissolve(QEvent::MouseButtonPress, QPointF(230, 55),
+        Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+    QApplication::sendEvent(&nonOverlappingDissolve, &selectFirstDissolve);
+    QMouseEvent selectSecondDissolve(QEvent::MouseButtonPress, QPointF(310, 96),
+        Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier);
+    QApplication::sendEvent(&nonOverlappingDissolve, &selectSecondDissolve);
+    assert(!nonOverlappingDissolve.applyCrossDissolveToSelectedClips());
+
     TimelineWidget timeline;
 
     timeline.addClip("missing-media.mp4");
