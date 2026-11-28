@@ -28,6 +28,7 @@ public:
     void setTrackTransform(int track, int scale, int positionX, int positionY);
     void setTrackOpacity(int track, int opacity);
     void setTrackBlendMode(int track, int blendMode);
+    void setImageEffects(int blur, int sharpen, int vignette);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -47,5 +48,8 @@ private:
     std::array<ColorGrade, kLayerCount> m_colorGrades;
     struct TrackTransform { int scale = 100; int x = 0; int y = 0; int opacity = 100; int blendMode = 0; };
     std::array<TrackTransform, kLayerCount> m_transforms;
+    int m_blur = 0;
+    int m_sharpen = 0;
+    int m_vignette = 0;
     QString m_caption;
 };
