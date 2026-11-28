@@ -227,12 +227,13 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
     int layer = 0;
     for (const Segment &segment : video) {
         const QString label = QString("v%1").arg(layer);
-        QString videoChain = QString("[%1:v:0]trim=start=%2:duration=%3,setpts=(PTS-STARTPTS)/%4,"
-                           "fps=%5,scale=%6:%7:force_original_aspect_ratio=decrease,"
-                           "pad=%6:%7:(ow-iw)/2:(oh-ih)/2,setsar=1")
+        QString videoChain = QString("[%1:v:0]trim=start=%2:duration=%3,"
+                           "setpts=(PTS-STARTPTS)/%4+%5/TB,"
+                           "fps=%6,scale=%7:%8:force_original_aspect_ratio=decrease,"
+                           "pad=%7:%8:(ow-iw)/2:(oh-ih)/2,setsar=1")
                        .arg(segment.input).arg(number(segment.sourceIn))
                        .arg(number(segment.duration * segment.rate)).arg(number(segment.rate))
-                       .arg(fps).arg(width).arg(height);
+                       .arg(number(segment.start)).arg(fps).arg(width).arg(height);
         if (segment.videoTransitionIn > 0.0) {
             videoChain += QString(",format=rgba,fade=t=in:st=0:d=%1:alpha=1")
                               .arg(number(segment.videoTransitionIn));
@@ -240,10 +241,8 @@ bool FfmpegExport::buildArguments(const QJsonArray &clips, int width, int height
         videoChain += QString("[%1]").arg(label);
         filters << videoChain;
         const QString next = QString("mix%1").arg(layer);
-        filters << QString("[%1][%2]overlay=eof_action=pass:shortest=0:"
-                           "enable='between(t,%3,%4)'[%5]")
-                       .arg(current, label).arg(number(segment.start))
-                       .arg(number(segment.start + segment.duration)).arg(next);
+        filters << QString("[%1][%2]overlay=eof_action=pass:shortest=0[%3]")
+                       .arg(current, label, next);
         current = next;
         ++layer;
     }
