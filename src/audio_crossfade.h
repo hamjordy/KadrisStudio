@@ -40,6 +40,25 @@ inline double videoFadeOpacity(qint64 elapsedMs, qint64 durationMs,
     return qBound(0.0, gain, 1.0);
 }
 
+
+// Linear opacity envelope for a true two-image Cross Dissolve.
+// The outgoing image fades from 100% to 0%; the incoming image
+// fades from 0% to 100% over the same transition interval.
+inline double videoCrossDissolveOpacity(qint64 positionMs,
+                                        qint64 transitionStartMs,
+                                        qint64 transitionEndMs,
+                                        bool incoming)
+{
+    if (transitionEndMs <= transitionStartMs)
+        return incoming ? 1.0 : 0.0;
+
+    const double progress = qBound(0.0,
+        static_cast<double>(positionMs - transitionStartMs)
+            / static_cast<double>(transitionEndMs - transitionStartMs),
+        1.0);
+    return incoming ? progress : 1.0 - progress;
+}
+
 // Update a track's peak hold and latch clipping at digital full scale.
 // Returns the level to display; a latched clip keeps its peak until reset.
 inline float updatePeakHold(float outputPeak, float &peakHold, bool &clipped)
