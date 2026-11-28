@@ -64,6 +64,8 @@ int main()
     assert(dissolveGraph.contains("fade=t=in:st=1.500000:d=0.500000:alpha=1"));
     assert(dissolveGraph.contains("+1.500000/TB"));
     assert(dissolveGraph.contains("overlay=eof_action=pass:shortest=0"));
+    assert(dissolveGraph.contains("enable='gte(t,0.000000)'"));
+    assert(dissolveGraph.contains("enable='gte(t,1.500000)'"));
     assert(dissolveGraph.indexOf("[1:v:0]") < dissolveGraph.indexOf("[0:v:0]"));
 
     assert(FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
