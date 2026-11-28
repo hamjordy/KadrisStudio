@@ -49,6 +49,21 @@ int main()
     assert(args.contains("48000"));
     assert(args.last() == "render.mp4");
 
+    QJsonObject outgoing = video;
+    outgoing.insert("timelineStartMs", 0);
+    outgoing.insert("durationMs", 2000);
+    outgoing.insert("track", 0);
+    QJsonObject incoming = video;
+    incoming.insert("timelineStartMs", 1500);
+    incoming.insert("durationMs", 2000);
+    incoming.insert("track", 1);
+    incoming.insert("videoTransitionInMs", 500);
+    assert(FfmpegExport::buildArguments(QJsonArray{incoming, outgoing}, 1280, 720, 25, 1,
+                                        "cross-dissolve.mp4", &args, &error));
+    const QString dissolveGraph = args.join(" ");
+    assert(dissolveGraph.contains("fade=t=in:st=0:d=0.500000:alpha=1"));
+    assert(dissolveGraph.indexOf("[1:v:0]") < dissolveGraph.indexOf("[0:v:0]"));
+
     assert(FfmpegExport::buildArguments(QJsonArray{video}, 1280, 720, 25, 1,
                                         "render.mp4", &args, &error, 18, "slow"));
     assert(args.contains("18"));
